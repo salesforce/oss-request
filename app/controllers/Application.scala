@@ -17,7 +17,7 @@ import play.twirl.api.Html
 import utils.dev.DevUsers
 import utils.{Metadata, Oauth, UserAction}
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Success, Try}
 import scala.xml.{Comment, Node}
 

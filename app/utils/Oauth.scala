@@ -8,7 +8,6 @@ import javax.inject.{Inject, Singleton}
 
 import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.model.Uri.Query
-import io.netty.handler.codec.http.QueryStringEncoder
 import play.api.http.{HeaderNames, HttpVerbs}
 import play.api.libs.ws.WSClient
 import play.api.mvc.RequestHeader

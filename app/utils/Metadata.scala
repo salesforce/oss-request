@@ -7,13 +7,13 @@ package utils
 import java.io.FileInputStream
 import javax.inject.Inject
 
-import play.api.{Configuration, Environment, Mode}
 import play.api.http.{HeaderNames, Status}
 import play.api.libs.json.{Json, Reads}
 import play.api.libs.ws.WSClient
+import play.api.{Configuration, Environment, Mode}
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 class Metadata @Inject() (configuration: Configuration, environment: Environment, wsClient: WSClient) (implicit ec: ExecutionContext) {
 

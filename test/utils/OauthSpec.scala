@@ -10,8 +10,8 @@ import play.api.Mode
 import play.api.http.{HeaderNames, Status}
 import play.api.libs.ws.WSClient
 import play.api.mvc.AnyContentAsEmpty
-import play.api.test.{FakeHeaders, FakeRequest}
 import play.api.test.Helpers._
+import play.api.test.{FakeHeaders, FakeRequest}
 
 class OauthSpec extends MixedPlaySpec {
 
