@@ -1,0 +1,23 @@
+@*
+ * Copyright (c) Salesforce.com, inc. 2017
+ *@
+
+@this(oauth: utils.Oauth, devUsers: utils.dev.DevUsers)
+
+@(implicit requestHeader: RequestHeader)
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Select A User</title>
+    </head>
+    <body>
+        <h2>DEV MODE</h2>
+        Login as:
+        <ul>
+            @for(user <- devUsers.users) {
+                <li><a href="@oauth.callbackUrl(Some(user.token))">@user.email @if(user.isAdmin) { (admin) }</a></li>
+            }
+        </ul>
+    </body>
+</html>

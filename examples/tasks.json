@@ -1,0 +1,32 @@
+{
+  "start": {
+    "label": "OSS Request Info",
+    "type": "INPUT_NEEDED",
+    "info": "Please fill in all the info for your OSS request.",
+    "form": {
+      "project_name": {
+        "label": "Project Name",
+        "required": true,
+        "type": "text"
+      },
+      "github_org": {
+        "label": "GitHub Org",
+        "required": true,
+        "type": "select",
+        "options": ["Foo", "Bar", "Personal"]
+      }
+    }
+  },
+  "ip_approval": {
+    "label": "IP Approval",
+    "type": "APPROVAL",
+    "completable_by_email": "foo@bar.com",
+    "info": "Schedule a meeting with Foo Bar to start the IP approval process."
+  },
+  "create_github_repo": {
+    "label": "Create GitHub Repo",
+    "type": "ACTION",
+    "completable_by_email": "asdf@test.com",
+    "info": "A GitHub repo needs to be created."
+  }
+}

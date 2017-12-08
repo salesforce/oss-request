@@ -1,0 +1,23 @@
+{
+  "name": "OSS Request",
+  "env": {
+    "APPLICATION_SECRET": {
+      "generator": "secret"
+    }
+  },
+  "addons": [
+    "heroku-postgresql"
+  ],
+  "environments": {
+    "test": {
+      "env": {
+        "APPLICATION_SECRET": {
+          "generator": "secret"
+        }
+      },
+      "addons":[
+        "heroku-postgresql"
+      ]
+    }
+  }
+}
