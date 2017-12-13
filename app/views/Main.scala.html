@@ -2,12 +2,20 @@
  * Copyright (c) Salesforce.com, inc. 2017
  *@
 
+@this(webJarsUtil: org.webjars.play.WebJarsUtil)
+
 @(title: String)(body: Html)
 
 <!DOCTYPE html>
 <html>
     <head>
         <title>@title</title>
+        @Html(webJarsUtil.css("bootstrap", "bootstrap.min.css"))
+        @Html(webJarsUtil.css("alpaca", "bootstrap/alpaca.min.css"))
+        @Html(webJarsUtil.script("jquery", "jquery.min.js"))
+        @Html(webJarsUtil.script("bootstrap", "bootstrap.min.js"))
+        @Html(webJarsUtil.script("handlebars", "handlebars.min.js"))
+        @Html(webJarsUtil.script("alpaca", "bootstrap/alpaca.min.js"))
     </head>
     <body>
         @body

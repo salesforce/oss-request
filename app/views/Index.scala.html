@@ -2,11 +2,11 @@
  * Copyright (c) Salesforce.com, inc. 2017
  *@
 
-@this()
+@this(main: Main)
 
 @(requests: Seq[models.ProjectRequest], userInfo: utils.UserInfo)
 
-@Main("OSS Request") {
+@main("OSS Request") {
     <a href="@routes.Application.newRequest()">New Request</a>
 
     @*

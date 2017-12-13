@@ -4,16 +4,29 @@
     "type": "INPUT_NEEDED",
     "info": "Please fill in all the info for your OSS request.",
     "form": {
-      "project_name": {
-        "label": "Project Name",
-        "required": true,
-        "type": "text"
+      "schema": {
+        "title": "OSS Request Info",
+        "type": "object",
+        "properties": {
+          "project_name": {
+            "title": "Project Name",
+            "type": "string",
+            "required": true
+          },
+          "github_org": {
+            "title": "GitHub Org",
+            "type": "string",
+            "enum": ["Foo", "Bar", "Personal"],
+            "required": true
+          }
+        }
       },
-      "github_org": {
-        "label": "GitHub Org",
-        "required": true,
-        "type": "select",
-        "options": ["Foo", "Bar", "Personal"]
+      "options": {
+        "fields": {
+          "github_org": {
+            "type": "select"
+          }
+        }
       }
     }
   },

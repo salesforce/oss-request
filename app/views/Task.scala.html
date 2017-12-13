@@ -2,11 +2,11 @@
  * Copyright (c) Salesforce.com, inc. 2017
  *@
 
-@this()
+@this(main: Main)
 
 @(maybeProjectRequest: Option[models.ProjectRequest], taskPrototype: models.Task.Prototype)
 
-@Main("Task") {
+@main("Task") {
 
     @maybeProjectRequest.fold {
         New Request
@@ -17,6 +17,11 @@
       Request: @projectRequest.name
     }
 
-    @taskPrototype
+    @for(form <- taskPrototype.form) {
+        <div id="form"></div>
+        <script>
+            $("#form").alpaca(@Html(form.toString()));
+        </script>
+    }
 
 }
