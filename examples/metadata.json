@@ -1,0 +1,85 @@
+{
+  "groups": {
+    "admin": [
+      "foo@bar.com",
+      "zxcv@zxcv.com"
+    ]
+  },
+  "tasks": {
+    "start": {
+      "label": "OSS Request Info",
+      "type": "INPUT_NEEDED",
+      "info": "Please fill in all the info for your OSS request.",
+      "form": {
+        "schema": {
+          "title": "OSS Request Info",
+          "type": "object",
+          "properties": {
+            "project_name": {
+              "title": "Project Description",
+              "type": "string",
+              "required": true
+            },
+            "github_org": {
+              "title": "GitHub Org",
+              "type": "string",
+              "enum": [
+                "Foo",
+                "Bar",
+                "Personal"
+              ],
+              "required": true
+            }
+          }
+        },
+        "options": {
+          "fields": {
+            "github_org": {
+              "type": "select",
+              "noneLabel": "-- Select --",
+              "removeDefaultNone": false
+            }
+          }
+        }
+      },
+      "on_complete": {
+        "create_task": "review_request"
+      }
+    },
+    "review_request": {
+      "label": "Review Request",
+      "type": "ACTION",
+      "completable_by": {
+        "type": "GROUP",
+        "value": "admin"
+      },
+      "info": "Please review the request and assign tasks"
+    },
+    "ip_approval": {
+      "label": "IP Approval",
+      "type": "APPROVAL",
+      "completable_by": {
+        "type": "EMAIL",
+        "value": "foo@bar.com"
+      },
+      "info": "Schedule a meeting with Foo Bar to start the IP approval process."
+    },
+    "vp_approval": {
+      "label": "VP Approval",
+      "type": "APPROVAL",
+      "completable_by": {
+        "type": "EMAIL"
+      },
+      "info": "The requester's VP must approve this."
+    },
+    "create_github_repo": {
+      "label": "Create GitHub Repo",
+      "type": "ACTION",
+      "completable_by": {
+        "type": "GROUP",
+        "value": "admin"
+      },
+      "info": "A GitHub repo needs to be created."
+    }
+  }
+}

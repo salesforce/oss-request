@@ -16,76 +16,48 @@ import play.api.{Configuration, Environment, Mode}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-class Metadata @Inject() (configuration: Configuration, environment: Environment, wsClient: WSClient) (implicit ec: ExecutionContext) {
+case class Metadata(groups: Map[String, Set[String]], tasks: Map[String, Task.Prototype])
 
-  val defaultAdminsFile = "examples/admins.json"
-  val defaultTasksFile = "examples/tasks.json"
+object Metadata {
+  implicit val jsonReads = Json.reads[Metadata]
+}
 
-  val maybeTasksUrl = configuration.getOptional[String]("tasks-url").orElse {
+class MetadataService @Inject() (configuration: Configuration, environment: Environment, wsClient: WSClient) (implicit ec: ExecutionContext) {
+
+  val defaultMetadataFile = "examples/metadata.json"
+
+  val maybeMetadataUrl = configuration.getOptional[String]("metadata-url").orElse {
     if (environment.mode == Mode.Prod)
-      throw new Exception("tasks-url must be set in prod mode")
+      throw new Exception("metadata-url must be set in prod mode")
     else
       None
   }
-  val maybeTasksToken = configuration.getOptional[String]("tasks-token")
+  val maybeMetadataToken = configuration.getOptional[String]("metadata-token")
 
-  val maybeAdminsUrl = configuration.getOptional[String]("admins-url").orElse {
-    if (environment.mode == Mode.Prod)
-      throw new Exception("admins-url must be set in prod mode")
-    else
-      None
-  }
-  val maybeAdminsToken = configuration.getOptional[String]("admins-token")
-
-  def fetchAdmins: Future[Set[String]] = {
-    maybeAdminsUrl.fold {
-      environment.getExistingFile(defaultAdminsFile).fold(Future.failed[Set[String]](new Exception(s"Could not open $defaultAdminsFile"))) { adminsFile =>
-        val adminsTry = Try {
-          val fileInputStream = new FileInputStream(adminsFile)
+  def fetchMetadata: Future[Metadata] = {
+    maybeMetadataUrl.fold {
+      environment.getExistingFile(defaultMetadataFile).fold(Future.failed[Metadata](new Exception(s"Could not open $defaultMetadataFile"))) { metadataFile =>
+        val metadataTry = Try {
+          val fileInputStream = new FileInputStream(metadataFile)
           val json = Json.parse(fileInputStream)
           fileInputStream.close()
-          json.as[Set[String]]
+          json.as[Metadata]
         }
-        Future.fromTry(adminsTry)
+        Future.fromTry(metadataTry)
       }
-    } { adminsUrl =>
-      val wsRequest = wsClient.url(adminsUrl.toString)
-      val requestWithMaybeAuth = maybeAdminsToken.fold(wsRequest) { token =>
+    } { metadataUrl =>
+      val wsRequest = wsClient.url(metadataUrl.toString)
+      val requestWithMaybeAuth = maybeMetadataToken.fold(wsRequest) { token =>
         wsRequest.withHttpHeaders(HeaderNames.AUTHORIZATION -> s"Bearer $token")
       }
 
       requestWithMaybeAuth.get().flatMap { response =>
         response.status match {
-          case Status.OK => Future.fromTry(Try(response.json.as[Set[String]]))
+          case Status.OK => Future.fromTry(Try(response.json.as[Metadata]))
           case _ => Future.failed(new Exception(response.body))
         }
       }
     }
   }
 
-  def fetchTasks: Future[Map[String, Task.Prototype]] = {
-    maybeTasksUrl.fold {
-      environment.getExistingFile(defaultTasksFile).fold(Future.failed[Map[String, Task.Prototype]](new Exception(s"Could not open $defaultTasksFile"))) { tasksFile =>
-        val tasksTry = Try {
-          val fileInputStream = new FileInputStream(tasksFile)
-          val json = Json.parse(fileInputStream)
-          fileInputStream.close()
-          json.as[Map[String, Task.Prototype]]
-        }
-        Future.fromTry(tasksTry)
-      }
-    } { tasksUrl =>
-      val wsRequest = wsClient.url(tasksUrl.toString)
-      val requestWithMaybeAuth = maybeTasksToken.fold(wsRequest) { token =>
-        wsRequest.withHttpHeaders(HeaderNames.AUTHORIZATION -> s"Bearer $token")
-      }
-
-      requestWithMaybeAuth.get().flatMap { response =>
-        response.status match {
-          case Status.OK => Future.fromTry(Try(response.json.as[Map[String, Task.Prototype]]))
-          case _ => Future.failed(new Exception(response.body))
-        }
-      }
-    }
-  }
 }

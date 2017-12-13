@@ -5,7 +5,6 @@
 package models
 
 import io.getquill.MappedEncoding
-import play.api.libs.json.{JsError, JsResult, JsSuccess, Reads}
 
 object State extends Enumeration {
   type State = Value
@@ -17,9 +16,5 @@ object State extends Enumeration {
 
   implicit val encodeState = MappedEncoding[State, String](_.toString)
   implicit val decodeState = MappedEncoding[String, State](State.withName)
-
-  implicit val jsonReads = Reads[State] { jsValue =>
-    values.find(_.toString == jsValue.as[String]).fold[JsResult[State]](JsError("Could not find that state"))(JsSuccess(_))
-  }
 
 }

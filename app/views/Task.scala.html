@@ -4,23 +4,33 @@
 
 @this(main: Main)
 
-@(maybeProjectRequest: Option[models.ProjectRequest], taskPrototype: models.Task.Prototype)
+@(projectName: String, taskPrototype: models.Task.Prototype)
 
 @main("Task") {
 
-    @maybeProjectRequest.fold {
-        New Request
-
-        Request Name: <input name="name" required>
-
-    } { projectRequest =>
-      Request: @projectRequest.name
-    }
+    @projectName
 
     @for(form <- taskPrototype.form) {
         <div id="form"></div>
         <script>
-            $("#form").alpaca(@Html(form.toString()));
+            const form = @Html(form.toString());
+            form.options.form.buttons.submit.click = function() {
+                if (this.isValid(true)) {
+                    const config = {
+                        data: JSON.stringify(this.getValue()),
+                        contentType: "application/json"
+                    };
+                    this.ajaxSubmit(config).done(function(projectRequest) {
+                        // todo: send to project request page
+                        window.location = "/";
+                    });
+                }
+                else {
+                    console.error(this.getValue());
+                }
+            };
+
+            $("#form").alpaca(form);
         </script>
     }
 

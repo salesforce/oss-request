@@ -6,16 +6,18 @@ package controllers
 
 import javax.inject.Inject
 
+import models.State
+import models.Task.CompletableByType
 import modules.DAO
 import org.webjars.WebJarAssetLocator
 import org.webjars.play.WebJarsUtil
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 import play.api.mvc.Results.EmptyContent
 import play.api.mvc._
 import play.api.{Configuration, Environment, Mode}
 import play.twirl.api.Html
 import utils.dev.DevUsers
-import utils.{Metadata, Oauth, UserAction}
+import utils.{MetadataService, Oauth, UserAction}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -23,8 +25,8 @@ import scala.xml.{Comment, Node}
 
 
 class Application @Inject()
-  (env: Environment, dao: DAO, userAction: UserAction, oauth: Oauth, metadata: Metadata, configuration: Configuration, webJarsUtil: WebJarsUtil, devUsers: DevUsers)
-  (indexView: views.html.Index, devSelectUserView: views.html.dev.SelectUser, taskView: views.html.Task)
+  (env: Environment, dao: DAO, userAction: UserAction, oauth: Oauth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, devUsers: DevUsers)
+  (indexView: views.html.Index, devSelectUserView: views.html.dev.SelectUser, newRequestView: views.html.NewRequest, taskView: views.html.Task)
   (implicit ec: ExecutionContext)
   extends InjectedController {
 
@@ -43,10 +45,44 @@ class Application @Inject()
     }
   }
 
-  def newRequest = userAction.async { implicit userRequest =>
-    metadata.fetchTasks.map { tasks =>
-      tasks.get("start").fold(InternalServerError("Could not find task named 'start'")) { metaTask =>
-        Ok(taskView(None, metaTask))
+  def newRequest(maybeName: Option[String]) = userAction.async { implicit userRequest =>
+    maybeName.fold {
+      Future.successful(Ok(newRequestView()))
+    } { name =>
+      metadataService.fetchMetadata.map { metadata =>
+        metadata.tasks.get("start").fold(InternalServerError("Could not find task named 'start'")) { metaTask =>
+          val submitJson = Json.obj(
+            "options" -> Json.obj(
+              "form" -> Json.obj(
+                "attributes" -> Json.obj(
+                  "action" -> routes.Application.newRequest(Some(name)).url,
+                  "method" -> "post"
+                ),
+                "buttons" -> Json.obj(
+                  "submit" -> Json.obj()
+                )
+              )
+            )
+          )
+          val formWithSubmit = metaTask.form.map(_ deepMerge submitJson)
+          val metaTaskWithSubmit = metaTask.copy(form = formWithSubmit)
+          Ok(taskView(name, metaTaskWithSubmit))
+        }
+      }
+    }
+  }
+
+  def createRequest(name: String) = userAction.async(parse.json) { implicit userRequest =>
+    userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
+      metadataService.fetchMetadata.flatMap { metadata =>
+        metadata.tasks.get("start").fold(Future.successful(InternalServerError("Could not find task named 'start'"))) { metaTask =>
+          dao.createRequest(name, userInfo.email).flatMap { projectRequest =>
+            dao.createTask(projectRequest.id, metaTask, CompletableByType.Email, userInfo.email, Json.toJson(userRequest.body).asOpt[JsObject], State.Completed).map { task =>
+              // todo: send redirect?
+              Ok(Json.toJson(projectRequest))
+            }
+          }
+        }
       }
     }
   }
@@ -83,8 +119,8 @@ class Application @Inject()
   def oauthCallback(code: String, state: Option[String]) = Action.async { implicit request =>
     oauth.accessToken(oauth.tokenUrl(code)).flatMap { accessToken =>
       oauth.email(oauth.userinfoUrl(), accessToken).flatMap { email =>
-        metadata.fetchAdmins.map { adminsResponse =>
-          val isAdmin = adminsResponse.contains(email)
+        metadataService.fetchMetadata.map { metadata =>
+          val isAdmin = metadata.groups("admin").contains(email)
           val url = state.getOrElse(controllers.routes.Application.index().url)
 
           // todo: putting this info in the session means we can't easily invalidate it later

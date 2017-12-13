@@ -13,6 +13,7 @@ import com.github.mauricio.async.db.postgresql.pool.PostgreSQLConnectionFactory
 import com.github.mauricio.async.db.postgresql.util.URLParser
 import io.getquill.{PostgresAsyncContext, SnakeCase}
 import models.State.State
+import models.Task.CompletableByType.CompletableByType
 import models.{Comment, ProjectRequest, State, Task}
 import org.slf4j.LoggerFactory
 import play.api.inject.{ApplicationLifecycle, Binding, Module}
@@ -33,7 +34,7 @@ trait DAO {
   def createRequest(name: String, creatorEmail: String): Future[ProjectRequest]
   def allRequests(): Future[Seq[ProjectRequest]]
   def requestsForUser(email: String): Future[Seq[ProjectRequest]]
-  def createTask(projectRequestId: Int, prototype: Task.Prototype, completableByEmail: String): Future[Task]
+  def createTask(projectRequestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task]
   def updateTaskState(taskId: Int, state: State): Future[Long]
   def requestTasks(projectRequestId: Int, maybeState: Option[State] = None): Future[Seq[Task]]
   def commentOnTask(taskId: Int, email: String, contents: String): Future[Comment]
@@ -92,20 +93,20 @@ class DAOImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext
     }
   }
 
-  override def createTask(projectRequestId: Int, prototype: Task.Prototype, completableByEmail: String): Future[Task] = {
-    val state = State.InProgress
-
+  override def createTask(projectRequestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task] = {
     run {
       quote {
         query[Task].insert(
-          _.completableByEmail -> lift(completableByEmail),
+          _.completableByType -> lift(completableByType),
+          _.completableByValue -> lift(completableByValue),
           _.projectRequestId -> lift(projectRequestId),
           _.state -> lift(state),
-          _.prototype -> lift(prototype)
+          _.prototype -> lift(prototype),
+          _.data -> lift(maybeData)
         ).returning(_.id)
       }
     } map { id =>
-      Task(id, completableByEmail, state, prototype, None, projectRequestId)
+      Task(id, completableByType, completableByValue, state, prototype, maybeData, projectRequestId)
     }
   }
 

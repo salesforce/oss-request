@@ -6,7 +6,7 @@ package modules
 
 import java.time.ZonedDateTime
 
-import models.Task.Type
+import models.Task.{CompletableByType, TaskType}
 import models.{State, Task}
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
@@ -95,9 +95,9 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
     "work" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest("foo", "foo@bar.com"))
 
-      val prototype = Task.Prototype("asdf", Type.Approval, "asdf", None, None)
+      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
 
-      val task = await(dao.createTask(request.id, prototype, "foo@foo.com"))
+      val task = await(dao.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
       task.state must equal (State.InProgress)
     }
   }
@@ -105,8 +105,8 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
   "updateTaskState" must {
     "work" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest("foo", "foo@bar.com"))
-      val prototype = Task.Prototype("asdf", Type.Approval, "asdf", None, None)
-      val task = await(dao.createTask(request.id, prototype, "foo@foo.com"))
+      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf", None, None)
+      val task = await(dao.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
       task.state must equal (State.InProgress)
       val numUpdates = await(dao.updateTaskState(task.id, State.Completed))
       numUpdates must equal (1)
@@ -116,9 +116,9 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
   "requestTasks" must {
     "work when a task state is specified" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest("foo", "foo@bar.com"))
-      val prototype = Task.Prototype("asdf", Type.Approval, "asdf", None, None)
-      val task1 = await(dao.createTask(request.id, prototype, "foo@foo.com"))
-      val task2 = await(dao.createTask(request.id, prototype, "foo@foo.com"))
+      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf", None, None)
+      val task1 = await(dao.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
+      val task2 = await(dao.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
       await(dao.updateTaskState(task1.id, State.Completed))
       val inProgressTasks = await(dao.requestTasks(request.id, Some(State.InProgress)))
       inProgressTasks must have size 1
@@ -130,8 +130,8 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
   "commentOnTask" must {
     "work" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest("foo", "foo@bar.com"))
-      val prototype = Task.Prototype("asdf", Type.Approval, "asdf", None, None)
-      val task = await(dao.createTask(request.id, prototype, "foo@foo.com"))
+      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf", None, None)
+      val task = await(dao.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
       val comment = await(dao.commentOnTask(task.id, "foo@bar.com", "test"))
       comment.id must be >= 0
       comment.contents must equal ("test")
