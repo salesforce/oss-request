@@ -1,0 +1,22 @@
+@*
+ * Copyright (c) Salesforce.com, inc. 2017
+ *@
+
+@this()
+
+@(maybeProjectRequest: Option[models.ProjectRequest], taskPrototype: models.Task.Prototype)
+
+@Main("Task") {
+
+    @maybeProjectRequest.fold {
+        New Request
+
+        Request Name: <input name="name" required>
+
+    } { projectRequest =>
+      Request: @projectRequest.name
+    }
+
+    @taskPrototype
+
+}

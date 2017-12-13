@@ -17,22 +17,37 @@ import play.twirl.api.Html
 import utils.dev.DevUsers
 import utils.{Metadata, Oauth, UserAction}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import scala.xml.{Comment, Node}
 
 
 class Application @Inject()
   (env: Environment, dao: DAO, userAction: UserAction, oauth: Oauth, metadata: Metadata, configuration: Configuration, webJarsUtil: WebJarsUtil, devUsers: DevUsers)
-  (indexView: views.html.Index, devSelectUserView: views.html.dev.SelectUser)
+  (indexView: views.html.Index, devSelectUserView: views.html.dev.SelectUser, taskView: views.html.Task)
   (implicit ec: ExecutionContext)
   extends InjectedController {
 
-  def index = userAction { implicit userRequest =>
-    userRequest.maybeUserInfo.fold(Redirect(oauth.authUrl)) { userInfo =>
-      // if not an admin, then show user requests and button to create a new one
-      // if admin, show the dashboard
-      Ok(indexView())
+  def index = userAction.async { implicit userRequest =>
+    userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
+      val requestsFuture = if (userInfo.isAdmin) {
+        dao.allRequests()
+      }
+      else {
+        dao.requestsForUser(userInfo.email)
+      }
+
+      requestsFuture.map { requests =>
+        Ok(indexView(requests, userInfo))
+      }
+    }
+  }
+
+  def newRequest = userAction.async { implicit userRequest =>
+    metadata.fetchTasks.map { tasks =>
+      tasks.get("start").fold(InternalServerError("Could not find task named 'start'")) { metaTask =>
+        Ok(taskView(None, metaTask))
+      }
     }
   }
 

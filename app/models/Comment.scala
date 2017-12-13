@@ -4,4 +4,6 @@
 
 package models
 
-case class Comment(id: Int)
+import java.time.ZonedDateTime
+
+case class Comment(id: Int, creatorEmail: String, createDate: ZonedDateTime, contents: String, taskId: Int)

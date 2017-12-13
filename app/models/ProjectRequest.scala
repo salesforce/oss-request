@@ -4,5 +4,6 @@
 
 package models
 
-case class ProjectRequest(id: Int)
+import java.time.ZonedDateTime
 
+case class ProjectRequest(id: Int, name: String, slug: String, createDate: ZonedDateTime, creatorEmail: String, state: State.State)

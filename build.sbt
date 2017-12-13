@@ -34,6 +34,7 @@ headerMappings += FileType("html") -> HeaderCommentStyle.twirlStyleBlockComment
 
 unmanagedSources.in(Compile, headerCreate) ++= sources.in(Compile, TwirlKeys.compileTemplates).value
 
+javaOptions in Test := Seq("-Dlogger.resource=logback-test.xml")
 
 // license report stuff
 

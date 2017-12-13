@@ -15,7 +15,7 @@ CREATE TABLE task (
   id SERIAL PRIMARY KEY,
   completable_by_email TEXT NOT NULL,
   state state NOT NULL,
-  prototype TEXT NOT NULL,
+  prototype jsonb,
   data jsonb,
   project_request_id INTEGER REFERENCES project_request(id)
 );
@@ -35,7 +35,5 @@ DROP TABLE comment;
 DROP TABLE task;
 
 DROP TABLE project_request;
-
-DROP TYPE task_type;
 
 DROP TYPE state;

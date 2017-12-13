@@ -3,6 +3,8 @@
 # ~~~~
 
 GET         /                                controllers.Application.index
+GET         /new-request                     controllers.Application.newRequest
+
 
 GET         /.well-known/acme-challenge/:key controllers.Application.wellKnown(key)
 

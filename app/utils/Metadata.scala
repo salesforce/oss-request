@@ -7,8 +7,9 @@ package utils
 import java.io.FileInputStream
 import javax.inject.Inject
 
+import models.Task
 import play.api.http.{HeaderNames, Status}
-import play.api.libs.json.{Json, Reads}
+import play.api.libs.json.Json
 import play.api.libs.ws.WSClient
 import play.api.{Configuration, Environment, Mode}
 
@@ -62,14 +63,14 @@ class Metadata @Inject() (configuration: Configuration, environment: Environment
     }
   }
 
-  def fetchTasks: Future[Map[String, MetaTask]] = {
+  def fetchTasks: Future[Map[String, Task.Prototype]] = {
     maybeTasksUrl.fold {
-      environment.getExistingFile(defaultTasksFile).fold(Future.failed[Map[String, MetaTask]](new Exception(s"Could not open $defaultTasksFile"))) { tasksFile =>
+      environment.getExistingFile(defaultTasksFile).fold(Future.failed[Map[String, Task.Prototype]](new Exception(s"Could not open $defaultTasksFile"))) { tasksFile =>
         val tasksTry = Try {
           val fileInputStream = new FileInputStream(tasksFile)
           val json = Json.parse(fileInputStream)
           fileInputStream.close()
-          json.as[Map[String, MetaTask]]
+          json.as[Map[String, Task.Prototype]]
         }
         Future.fromTry(tasksTry)
       }
@@ -81,18 +82,10 @@ class Metadata @Inject() (configuration: Configuration, environment: Environment
 
       requestWithMaybeAuth.get().flatMap { response =>
         response.status match {
-          case Status.OK => Future.fromTry(Try(response.json.as[Map[String, MetaTask]]))
+          case Status.OK => Future.fromTry(Try(response.json.as[Map[String, Task.Prototype]]))
           case _ => Future.failed(new Exception(response.body))
         }
       }
     }
-
   }
-
-  case class MetaTask(label: String)
-
-  object MetaTask {
-    implicit val jsonReads: Reads[MetaTask] = Json.reads[MetaTask]
-  }
-
 }
