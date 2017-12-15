@@ -22,25 +22,25 @@ import play.api.{Configuration, Environment}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class DAOModule extends Module {
+class DBModule extends Module {
   def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = {
     Seq(
-      bind[DAO].to[DAOImpl]
+      bind[DB].to[DBImpl]
     )
   }
 }
 
-trait DAO {
+trait DB {
   def createRequest(name: String, creatorEmail: String): Future[ProjectRequest]
   def allRequests(): Future[Seq[ProjectRequest]]
   def requestsForUser(email: String): Future[Seq[ProjectRequest]]
   def createTask(projectRequestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task]
-  def updateTaskState(taskId: Int, state: State): Future[Long]
+  def updateTaskState(taskId: Int, state: State): Future[Task]
   def requestTasks(projectRequestId: Int, maybeState: Option[State] = None): Future[Seq[Task]]
   def commentOnTask(taskId: Int, email: String, contents: String): Future[Comment]
 }
 
-class DAOImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext) extends DAO {
+class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext) extends DB {
   import database.ctx._
 
   implicit val jsObjectDecoder = MappedEncoding[String, JsObject](Json.parse(_).as[JsObject])
@@ -50,14 +50,14 @@ class DAOImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext
     // todo: slug choice in transaction with create
 
     // figure out slug
-    val defaultSlug = DAO.slug(name)
+    val defaultSlug = DB.slug(name)
     val takenSlugsFuture = run {
       quote {
         query[ProjectRequest].map(_.slug).filter(_.startsWith(lift(defaultSlug)))
       }
     }
 
-    takenSlugsFuture.map(DAO.nextSlug(defaultSlug)).flatMap { slug =>
+    takenSlugsFuture.map(DB.nextSlug(defaultSlug)).flatMap { slug =>
       val state = State.InProgress
       val createDate = ZonedDateTime.now()
 
@@ -110,12 +110,23 @@ class DAOImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext
     }
   }
 
-  override def updateTaskState(taskId: Int, state: State): Future[Long] = {
+  def taskById(taskId: Int): Future[Task] = {
     run {
+      quote {
+        query[Task].filter(_.id == lift(taskId))
+      }
+    } flatMap { result =>
+      result.headOption.fold(Future.failed[Task](new Exception("Task not found")))(Future.successful)
+    }
+  }
+
+  override def updateTaskState(taskId: Int, state: State): Future[Task] = {
+    val updateFuture = run {
       quote {
         query[Task].filter(_.id == lift(taskId)).update(_.state -> lift(state))
       }
     }
+    updateFuture.flatMap(_ => taskById(taskId))
   }
 
   override def requestTasks(projectRequestId: Int, maybeState: Option[State] = None): Future[Seq[Task]] = {
@@ -153,7 +164,7 @@ class DAOImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext
   }
 }
 
-object DAO {
+object DB {
   def slug(s: String): String = {
     s.toLowerCase.replaceAllLiterally("  ", " ").replaceAllLiterally(" ", "-").replaceAll("[^a-z0-9-]", "")
   }

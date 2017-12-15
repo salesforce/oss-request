@@ -4,7 +4,7 @@
 
 package controllers
 
-import modules.DAOMock
+import modules.DBMock
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.Mode
@@ -13,7 +13,7 @@ import scala.xml.Comment
 
 class ApplicationSpec extends PlaySpec with GuiceOneAppPerTest {
 
-  override implicit def fakeApplication() = DAOMock.fakeApplicationBuilder(Mode.Test).build()
+  override implicit def fakeApplication() = DBMock.fakeApplicationBuilder(Mode.Test).build()
 
   lazy val applicationController = app.injector.instanceOf[Application]
 

@@ -4,7 +4,7 @@
 
 package utils
 
-import modules.DAOMock
+import modules.DBMock
 import org.scalatestplus.play._
 import play.api.Mode
 import play.api.http.{HeaderNames, Status}
@@ -24,16 +24,16 @@ class OauthSpec extends MixedPlaySpec {
   val maybeTestPassword = sys.env.get("TEST_OAUTH_PASSWORD")
 
   "getOrThrow" must {
-    "produce a default value for clientId in dev mode" in new App(DAOMock.fakeApplicationBuilder(Mode.Dev).build()) {
+    "produce a default value for clientId in dev mode" in new App(DBMock.fakeApplicationBuilder(Mode.Dev).build()) {
       val oauth = app.injector.instanceOf[Oauth]
 
       oauth.clientId must not be null
     }
     "throw an exception in prod mode when the config is missing" in { () =>
-      an[Exception] should be thrownBy DAOMock.fakeApplicationBuilder(Mode.Prod, MetadataSpec.defaultConfig).build()
+      an[Exception] should be thrownBy DBMock.fakeApplicationBuilder(Mode.Prod, MetadataSpec.defaultConfig).build()
     }
     "work in prod mode with the required config" in { () =>
-      val app = DAOMock.fakeApplicationBuilder(Mode.Prod, OauthSpec.defaultConfig ++ MetadataSpec.defaultConfig).build()
+      val app = DBMock.fakeApplicationBuilder(Mode.Prod, OauthSpec.defaultConfig ++ MetadataSpec.defaultConfig).build()
 
       val oauth = app.injector.instanceOf[Oauth]
 
@@ -42,14 +42,14 @@ class OauthSpec extends MixedPlaySpec {
   }
 
   "callbackUrl" must {
-    "not have query params when no code is passed" in new App(DAOMock.fakeApplicationBuilder(Mode.Dev).build()) {
+    "not have query params when no code is passed" in new App(DBMock.fakeApplicationBuilder(Mode.Dev).build()) {
       implicit val request = FakeRequest("GET", "/")
 
       val oauth = app.injector.instanceOf[Oauth]
 
       oauth.callbackUrl(None) must equal ("http://localhost/oauth2/callback")
     }
-    "have a query param when code is passed" in new App(DAOMock.fakeApplicationBuilder(Mode.Dev).build()) {
+    "have a query param when code is passed" in new App(DBMock.fakeApplicationBuilder(Mode.Dev).build()) {
       implicit val request = FakeRequest("GET", "/")
 
       val oauth = app.injector.instanceOf[Oauth]
@@ -69,7 +69,7 @@ class OauthSpec extends MixedPlaySpec {
           "oauth.client-secret" -> testClientSecret
         )
 
-        "work for the auth url" in new App(DAOMock.fakeApplicationBuilder(Mode.Dev, config).build()) {
+        "work for the auth url" in new App(DBMock.fakeApplicationBuilder(Mode.Dev, config).build()) {
           implicit val request = FakeRequest("GET", "/", FakeHeaders(Seq(HeaderNames.HOST -> "localhost:9000")), AnyContentAsEmpty)
 
           val oauth = app.injector.instanceOf[Oauth]
@@ -85,7 +85,7 @@ class OauthSpec extends MixedPlaySpec {
           await(wsClient.url(url).get()).status must equal (Status.OK)
         }
 
-        "create the right url to get a token with a code" in new App(DAOMock.fakeApplicationBuilder(Mode.Dev, config).build()) {
+        "create the right url to get a token with a code" in new App(DBMock.fakeApplicationBuilder(Mode.Dev, config).build()) {
           implicit val request = FakeRequest("GET", "/", FakeHeaders(Seq(HeaderNames.HOST -> "localhost:9000")), AnyContentAsEmpty)
 
           val oauth = app.injector.instanceOf[Oauth]
@@ -97,7 +97,7 @@ class OauthSpec extends MixedPlaySpec {
           tokenUrl must equal (s"$testTokenUrl?grant_type=authorization_code&code=foo&client_id=$testClientId&client_secret=$testClientSecret&redirect_uri=$callbackUrl")
         }
 
-        "work to get a token via username and password" in new App(DAOMock.fakeApplicationBuilder(Mode.Dev, config).build()) {
+        "work to get a token via username and password" in new App(DBMock.fakeApplicationBuilder(Mode.Dev, config).build()) {
           implicit val request = FakeRequest("GET", "/", FakeHeaders(Seq(HeaderNames.HOST -> "localhost:9000")), AnyContentAsEmpty)
 
           val oauth = app.injector.instanceOf[Oauth]
@@ -109,7 +109,7 @@ class OauthSpec extends MixedPlaySpec {
           accessToken must not be null
         }
 
-        "work to get an email" in new App(DAOMock.fakeApplicationBuilder(Mode.Dev, config).build()) {
+        "work to get an email" in new App(DBMock.fakeApplicationBuilder(Mode.Dev, config).build()) {
           implicit val request = FakeRequest("GET", "/", FakeHeaders(Seq(HeaderNames.HOST -> "localhost:9000")), AnyContentAsEmpty)
 
           val oauth = app.injector.instanceOf[Oauth]

@@ -4,17 +4,15 @@
 
 package utils
 
-import modules.DAOMock
+import modules.DBMock
 import org.scalatestplus.play._
 import play.api.Mode
 import play.api.test.Helpers._
 
 class MetadataSpec extends MixedPlaySpec {
 
-  val testMetadataUrl = "https://gist.githubusercontent.com/jamesward/22a915c683ee9f2731283b660341582e/raw/50abf67539dd70ba0505ccd0dfa79ea6736637c0/metadata.json"
-
   "fetchMetadata" must {
-    "work with the default value in dev mode" in new App(DAOMock.fakeApplicationBuilder(Mode.Dev).build()) {
+    "work with the default value in dev mode" in new App(DBMock.fakeApplicationBuilder(Mode.Dev).build()) {
       val metadataService = app.injector.instanceOf[MetadataService]
 
       val metadata = await(metadataService.fetchMetadata)
@@ -22,11 +20,11 @@ class MetadataSpec extends MixedPlaySpec {
       metadata.tasks.get("start") must be (defined)
     }
     "fail in prod mode without a value" in { () =>
-      an[Exception] should be thrownBy DAOMock.fakeApplicationBuilder(Mode.Prod, OauthSpec.defaultConfig).build()
+      an[Exception] should be thrownBy DBMock.fakeApplicationBuilder(Mode.Prod, OauthSpec.defaultConfig).build()
     }
-    "work with an http value" in new App(DAOMock.fakeApplicationBuilder(Mode.Dev, Map("metadata-url" -> testMetadataUrl)).build()) {
+    "work with an http value" in new Server(DBMock.fakeApplicationBuilder(Mode.Dev, Map("metadata-url" -> "http://localhost:9999/.dev/metadata.json")).build(), 9999) {
       val metadataService = app.injector.instanceOf[MetadataService]
-      await(metadataService.fetchMetadata).groups("admin") must contain ("hello@world.com")
+      await(metadataService.fetchMetadata).groups("admin") must contain ("zxcv@zxcv.com")
     }
   }
 

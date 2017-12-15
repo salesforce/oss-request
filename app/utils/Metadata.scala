@@ -34,18 +34,20 @@ class MetadataService @Inject() (configuration: Configuration, environment: Envi
   }
   val maybeMetadataToken = configuration.getOptional[String]("metadata-token")
 
-  def fetchMetadata: Future[Metadata] = {
-    maybeMetadataUrl.fold {
-      environment.getExistingFile(defaultMetadataFile).fold(Future.failed[Metadata](new Exception(s"Could not open $defaultMetadataFile"))) { metadataFile =>
-        val metadataTry = Try {
-          val fileInputStream = new FileInputStream(metadataFile)
-          val json = Json.parse(fileInputStream)
-          fileInputStream.close()
-          json.as[Metadata]
-        }
-        Future.fromTry(metadataTry)
+  def localMetadata: Future[Metadata] = {
+    environment.getExistingFile(defaultMetadataFile).fold(Future.failed[Metadata](new Exception(s"Could not open $defaultMetadataFile"))) { metadataFile =>
+      val metadataTry = Try {
+        val fileInputStream = new FileInputStream(metadataFile)
+        val json = Json.parse(fileInputStream)
+        fileInputStream.close()
+        json.as[Metadata]
       }
-    } { metadataUrl =>
+      Future.fromTry(metadataTry)
+    }
+  }
+
+  def fetchMetadata: Future[Metadata] = {
+    maybeMetadataUrl.fold(localMetadata) { metadataUrl =>
       val wsRequest = wsClient.url(metadataUrl.toString)
       val requestWithMaybeAuth = maybeMetadataToken.fold(wsRequest) { token =>
         wsRequest.withHttpHeaders(HeaderNames.AUTHORIZATION -> s"Bearer $token")

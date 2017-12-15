@@ -42,9 +42,16 @@
           }
         }
       },
-      "on_complete": {
-        "create_task": "review_request"
-      }
+      "task_events": [
+        {
+          "type": "STATE_CHANGE",
+          "value": "COMPLETED",
+          "action": {
+            "type": "CREATE_TASK",
+            "value": "review_request"
+          }
+        }
+      ]
     },
     "review_request": {
       "label": "Review Request",

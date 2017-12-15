@@ -6,13 +6,14 @@ package models
 
 import io.getquill.MappedEncoding
 import models.Task.CompletableByType.CompletableByType
-import play.api.libs.json.{JsError, JsObject, JsResult, JsSuccess, Json, Reads}
+import play.api.libs.json._
+import play.api.libs.functional.syntax._
 
 case class Task(id: Int, completableByType: CompletableByType, completableByValue: String, state: State.State, prototype: Task.Prototype, data: Option[JsObject], projectRequestId: Int)
 
 object Task {
 
-  case class Prototype(label: String, `type`: TaskType.TaskType, info: String, completableBy: Option[CompletableBy] = None, form: Option[JsObject] = None, onComplete: Option[JsObject] = None)
+  case class Prototype(label: String, `type`: TaskType.TaskType, info: String, completableBy: Option[CompletableBy] = None, form: Option[JsObject] = None, taskEvents: Seq[TaskEvent] = Seq.empty[TaskEvent])
 
   object TaskType extends Enumeration {
     type TaskType = Value
@@ -51,10 +52,20 @@ object Task {
   }
 
   object Prototype {
-    implicit val jsonReads = Json.reads[Prototype]
+    implicit val jsonReads = (
+      (__ \ "label").read[String] ~
+      (__ \ "type").read[TaskType.TaskType] ~
+      (__ \ "info").read[String] ~
+      (__ \ "completable_by").readNullable[CompletableBy] ~
+      (__ \ "form").readNullable[JsObject] ~
+      (__ \ "task_events").readNullable[Seq[TaskEvent]].map(_.getOrElse(Seq.empty[TaskEvent]))
+    )(Prototype.apply _)
     implicit val jsonWrites = Json.writes[Prototype]
     implicit val prototypeEncoder = MappedEncoding[Task.Prototype, String](prototype => Json.toJson(prototype).toString())
     implicit val prototypeDecoder = MappedEncoding[String, Task.Prototype](Json.parse(_).as[Task.Prototype])
   }
+
+  implicit val jsonReads = Json.reads[Task]
+  implicit val jsonWrites = Json.writes[Task]
 
 }
