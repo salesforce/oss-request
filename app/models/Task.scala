@@ -4,12 +4,14 @@
 
 package models
 
+import java.time.ZonedDateTime
+
 import io.getquill.MappedEncoding
 import models.Task.CompletableByType.CompletableByType
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 
-case class Task(id: Int, completableByType: CompletableByType, completableByValue: String, state: State.State, prototype: Task.Prototype, data: Option[JsObject], projectRequestId: Int)
+case class Task(id: Int, completableByType: CompletableByType, completableByValue: String, completedDate: Option[ZonedDateTime], state: State.State, prototype: Task.Prototype, data: Option[JsObject], projectRequestId: Int)
 
 object Task {
 

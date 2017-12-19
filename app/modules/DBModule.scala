@@ -34,6 +34,7 @@ trait DB {
   def createRequest(name: String, creatorEmail: String): Future[ProjectRequest]
   def allRequests(): Future[Seq[ProjectRequest]]
   def requestsForUser(email: String): Future[Seq[ProjectRequest]]
+  def requestById(id: Int): Future[ProjectRequest]
   def createTask(projectRequestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task]
   def updateTaskState(taskId: Int, state: State): Future[Task]
   def requestTasks(projectRequestId: Int, maybeState: Option[State] = None): Future[Seq[Task]]
@@ -93,6 +94,16 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
     }
   }
 
+  override def requestById(id: Int): Future[ProjectRequest] = {
+    run {
+      quote {
+        query[ProjectRequest].filter(_.id == lift(id))
+      }
+    } flatMap { result =>
+      result.headOption.fold(Future.failed[ProjectRequest](new Exception("ProjectRequest not found")))(Future.successful)
+    }
+  }
+
   override def createTask(projectRequestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task] = {
     run {
       quote {
@@ -106,7 +117,7 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
         ).returning(_.id)
       }
     } map { id =>
-      Task(id, completableByType, completableByValue, state, prototype, maybeData, projectRequestId)
+      Task(id, completableByType, completableByValue, None, state, prototype, maybeData, projectRequestId)
     }
   }
 
@@ -121,9 +132,10 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
   }
 
   override def updateTaskState(taskId: Int, state: State): Future[Task] = {
+    val maybeCompletedData = if (state == State.Completed) Some(ZonedDateTime.now()) else None
     val updateFuture = run {
       quote {
-        query[Task].filter(_.id == lift(taskId)).update(_.state -> lift(state))
+        query[Task].filter(_.id == lift(taskId)).update(_.state -> lift(state), _.completedDate -> lift(maybeCompletedData))
       }
     }
     updateFuture.flatMap(_ => taskById(taskId))

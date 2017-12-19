@@ -2,36 +2,32 @@
  * Copyright (c) Salesforce.com, inc. 2017
  *@
 
-@this(main: Main)
+@this()
 
-@(projectName: String, taskPrototype: models.Task.Prototype)
+@(task: models.Task)
 
-@main("Task") {
+@import play.api.libs.json._
 
-    @projectName
+@task.state
 
-    @for(form <- taskPrototype.form) {
-        <div id="form"></div>
-        <script>
-            const form = @Html(form.toString());
-            form.options.form.buttons.submit.click = function() {
-                if (this.isValid(true)) {
-                    const config = {
-                        data: JSON.stringify(this.getValue()),
-                        contentType: "application/json"
-                    };
-                    this.ajaxSubmit(config).done(function(projectRequest) {
-                        // todo: send to project request page
-                        window.location = "/";
-                    });
-                }
-                else {
-                    console.error(this.getValue());
-                }
-            };
+@task.completableByType
 
-            $("#form").alpaca(form);
-        </script>
-    }
+@task.completableByValue
 
+@formWithData(form: JsObject) = @{
+    val dataBody = task.data.getOrElse(Json.obj())
+    val data = Json.obj("data" -> dataBody)
+    val view = Json.obj("view" -> "bootstrap-display")
+    form ++ data ++ view
 }
+
+@for(form <- task.prototype.form) {
+    <div id="form-@task.id"></div>
+    <script>
+        (function() {
+            const form = @Html(formWithData(form).toString);
+            $("#form-@task.id").alpaca(form);
+        })();
+    </script>
+}
+

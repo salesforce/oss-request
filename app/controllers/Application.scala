@@ -6,8 +6,8 @@ package controllers
 
 import javax.inject.Inject
 
-import models.State
-import models.Task.CompletableByType
+import models.{State, Task}
+import models.Task.{CompletableByType, TaskType}
 import modules.DAO
 import org.webjars.WebJarAssetLocator
 import org.webjars.play.WebJarsUtil
@@ -17,7 +17,7 @@ import play.api.mvc._
 import play.api.{Configuration, Environment, Mode}
 import play.twirl.api.Html
 import utils.dev.DevUsers
-import utils.{MetadataService, Oauth, UserAction}
+import utils.{MetadataService, Oauth, UserAction, UserInfo}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -26,9 +26,19 @@ import scala.xml.{Comment, Node}
 
 class Application @Inject()
   (env: Environment, dao: DAO, userAction: UserAction, oauth: Oauth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, devUsers: DevUsers)
-  (indexView: views.html.Index, devSelectUserView: views.html.dev.SelectUser, newRequestView: views.html.NewRequest, taskView: views.html.Task)
+  (indexView: views.html.Index, devSelectUserView: views.html.dev.SelectUser, newRequestView: views.html.NewRequest, projectRequestView: views.html.ProjectRequest, taskPrototypeView: views.html.TaskPrototype)
   (implicit ec: ExecutionContext)
   extends InjectedController {
+
+  // if no completable info was specified set it to the current user
+  // otherwise use the provided default
+  private def completableByWithDefaults(maybeCompletableBy: Option[Task.CompletableBy], userInfo: UserInfo, maybeDefaultValue: Option[String]): Option[(CompletableByType.CompletableByType, String)] = {
+    maybeCompletableBy.fold[Option[(CompletableByType.CompletableByType, String)]](Some(CompletableByType.Email -> userInfo.email)) { completableBy =>
+      completableBy.value.orElse(maybeDefaultValue).map { value =>
+        completableBy.`type` -> value
+      }
+    }
+  }
 
   def index = userAction.async { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
@@ -66,7 +76,7 @@ class Application @Inject()
           )
           val formWithSubmit = metaTask.form.map(_ deepMerge submitJson)
           val metaTaskWithSubmit = metaTask.copy(form = formWithSubmit)
-          Ok(taskView(name, metaTaskWithSubmit))
+          Ok(taskPrototypeView(name, metaTaskWithSubmit))
         }
       }
     }
@@ -77,9 +87,13 @@ class Application @Inject()
       metadataService.fetchMetadata.flatMap { metadata =>
         metadata.tasks.get("start").fold(Future.successful(InternalServerError("Could not find task named 'start'"))) { metaTask =>
           dao.createRequest(name, userInfo.email).flatMap { projectRequest =>
-            dao.createTask(projectRequest.id, metaTask, CompletableByType.Email, userInfo.email, Json.toJson(userRequest.body).asOpt[JsObject], State.Completed).map { task =>
-              // todo: send redirect?
-              Ok(Json.toJson(projectRequest))
+            completableByWithDefaults(metaTask.completableBy, userInfo, None).fold {
+              Future.successful(BadRequest("Could not determine who can complete the task"))
+            } { case (completableByType, completableByValue) =>
+              dao.createTask(projectRequest.id, metaTask, completableByType, completableByValue, Json.toJson(userRequest.body).asOpt[JsObject], State.Completed).map { task =>
+                // todo: send redirect?
+                Ok(Json.toJson(projectRequest))
+              }
             }
           }
         }
@@ -87,11 +101,35 @@ class Application @Inject()
     }
   }
 
-  def addTaskToRequest = Action {
-    // must be admin
-    // email completable_by_email and request owner
+  def request(id: Int) = Action.async { implicit request =>
+    dao.requestById(id).flatMap { projectRequest =>
+      dao.requestTasks(id).flatMap { tasks =>
+        metadataService.fetchMetadata.map { metadata =>
+          Ok(projectRequestView(metadata, projectRequest, tasks))
+        }
+      }
+    }
+  }
 
-    NotImplemented
+  def addTask(requestId: Int) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
+    userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
+      val maybeTaskPrototypeKey = userRequest.body.get("taskPrototypeKey").flatMap(_.headOption)
+      val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption)
+
+      maybeTaskPrototypeKey.fold(Future.successful(BadRequest("No taskPrototypeKey specified"))) { taskPrototypeKey =>
+        metadataService.fetchMetadata.flatMap { metadata =>
+          metadata.tasks.get(taskPrototypeKey).fold(Future.successful(InternalServerError(s"Could not find task prototype $taskPrototypeKey"))) { taskPrototype =>
+            completableByWithDefaults(taskPrototype.completableBy, userInfo, maybeCompletableBy).fold {
+              Future.successful(BadRequest("Could not determine who can complete the task"))
+            } { case (completableByType, completableByValue) =>
+              dao.createTask(requestId, taskPrototype, completableByType, completableByValue).map { _ =>
+                Redirect(routes.Application.request(requestId))
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   def updateRequest = Action {

@@ -1,0 +1,100 @@
+@*
+ * Copyright (c) Salesforce.com, inc. 2017
+ *@
+
+@this(main: Main, taskView: views.html.Task)
+
+@(metadata: _root_.utils.Metadata, projectRequest: models.ProjectRequest, tasks: Seq[models.Task])
+
+@import java.time.format.DateTimeFormatter
+@import java.time.{Instant, ZoneOffset, ZonedDateTime}
+
+@datetime(zonedDateTime: ZonedDateTime) = @{
+    zonedDateTime.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
+}
+
+@tasksWithState(state: State.State) = @{
+    tasks.filter(_.state == state)
+}
+
+@state() = @{
+    projectRequest.state match {
+        case State.InProgress =>
+            val completedTasks = tasksWithState(State.Completed)
+            s"In Progress - ${completedTasks.size} of ${tasks.size} tasks completed"
+
+        case State.Completed =>
+            val latestCompletedTask = tasks.maxBy(_.completedDate.getOrElse(Instant.MIN.atZone(ZoneOffset.UTC)).toInstant)
+            latestCompletedTask.completedDate.fold("Completed") { completedDate =>
+                s"Completed on ${datetime(completedDate)}"
+            }
+
+        case _ =>
+            "???"
+    }
+}
+
+@main("Task") {
+
+    @projectRequest.name
+
+    State: @state()
+
+    Created by: @projectRequest.creatorEmail
+
+    Created on: @datetime(projectRequest.createDate)
+
+    <form action="@routes.Application.addTask(projectRequest.id)" method="post">
+        Add a Task:
+        <select id="taskPrototypeKeySelect" name="taskPrototypeKey">
+            <option disabled selected value> -- task type -- </option>
+            @for((key, taskPrototype) <- metadata.tasks) {
+                <option value="@key">@taskPrototype.label</option>
+            }
+        </select>
+        <input id="completableByEmail" type="email">
+        <select id="completableByGroup">
+        @for(group <- metadata.groups.keys) {
+            <option>@group</option>
+        }
+        </select>
+        <button type="submit">Go</button>
+    </form>
+
+    <script>
+        // Only send a completableBy form value if it was needed by the prototype
+        const taskPrototypes = @Html(play.api.libs.json.Json.toJson(metadata.tasks).toString);
+
+        const completableByEmail = document.getElementById("completableByEmail");
+        const completableByGroup = document.getElementById("completableByGroup");
+        const taskPrototypeKeySelect = document.getElementById("taskPrototypeKeySelect");
+
+        completableByEmail.style.display = "none";
+        completableByGroup.style.display = "none";
+
+        taskPrototypeKeySelect.onchange = function(event) {
+            const taskPrototype = taskPrototypes[this.value];
+
+            completableByEmail.style.display = "none";
+            completableByGroup.style.display = "none";
+            completableByEmail.name = null;
+            completableByGroup.name = null;
+
+            if ((taskPrototype.completableBy !== undefined) && (taskPrototype.completableBy.value === undefined)) {
+              if (taskPrototype.completableBy.type === "GROUP") {
+                  completableByGroup.style.display = "block";
+                  completableByGroup.name = "completableBy";
+              }
+              else if (taskPrototype.completableBy.type === "EMAIL") {
+                  completableByEmail.style.display = "block";
+                  completableByEmail.name = "completableBy";
+              }
+            }
+        };
+    </script>
+
+    @for(task <- tasks) {
+        @taskView(task)
+    }
+
+}

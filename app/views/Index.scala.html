@@ -9,7 +9,17 @@
 @main("OSS Request") {
     <a href="@routes.Application.newRequest(None)">New Request</a>
 
-    @*
-    - Your Requests or All Requests
-    *@
+    <br/>
+
+    @if(userInfo.isAdmin) {
+        Your Requests:
+    } else {
+        All Requests:
+    }
+
+    <ul>
+    @for(request <- requests) {
+        <li><a href="@routes.Application.request(request.id)">@request.name</a></li>
+    }
+    </ul>
 }

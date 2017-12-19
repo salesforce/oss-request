@@ -38,6 +38,12 @@ class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler)(implicit ec: Exe
     } yield requests
   }
 
+  def requestById(id: Int): Future[ProjectRequest] = {
+    for {
+      projectRequest <- db.requestById(id)
+    } yield projectRequest
+  }
+
   def updateTaskState(taskId: Int, state: State.State): Future[Task] = {
     for {
       task <- db.updateTaskState(taskId, state)

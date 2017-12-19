@@ -111,6 +111,9 @@ class DBModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       val updatedTask = await(db.updateTaskState(task.id, State.Completed))
       updatedTask.state must equal (State.Completed)
     }
+    "add a completedDate when closing a task" in Evolutions.withEvolutions(database) {
+      fail()
+    }
   }
 
   "requestTasks" must {

@@ -16,6 +16,7 @@ CREATE TABLE task (
   id SERIAL PRIMARY KEY,
   completable_by_type completable_by_type NOT NULL,
   completable_by_value TEXT NOT NULL,
+  completed_date TIMESTAMP WITH TIME ZONE,
   state state NOT NULL,
   prototype jsonb,
   data jsonb,
