@@ -7,6 +7,7 @@ GET         /new-request                     controllers.Application.newRequest(
 POST        /new-request                     controllers.Application.createRequest(name: String)
 GET         /request                         controllers.Application.request(id: Int)
 POST        /add-task                        controllers.Application.addTask(requestId: Int)
+POST        /update-task                     controllers.Application.updateTask(taskId: Int)
 
 GET         /.well-known/acme-challenge/:key controllers.Application.wellKnown(key)
 

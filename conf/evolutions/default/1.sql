@@ -3,7 +3,7 @@
 CREATE TYPE state AS ENUM ('IN_PROGRESS', 'ON_HOLD', 'CANCELLED', 'COMPLETED');
 CREATE TYPE completable_by_type AS ENUM ('EMAIL', 'GROUP');
 
-CREATE TABLE project_request (
+CREATE TABLE request (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
@@ -20,7 +20,7 @@ CREATE TABLE task (
   state state NOT NULL,
   prototype jsonb,
   data jsonb,
-  project_request_id INTEGER REFERENCES project_request(id)
+  request_id INTEGER REFERENCES request(id)
 );
 
 CREATE TABLE comment (
@@ -37,7 +37,7 @@ DROP TABLE comment;
 
 DROP TABLE task;
 
-DROP TABLE project_request;
+DROP TABLE request;
 
 DROP TYPE completable_by_type;
 

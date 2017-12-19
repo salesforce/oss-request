@@ -16,9 +16,9 @@ import play.api.libs.json.JsObject
 import scala.concurrent.Future
 
 class DBMock extends DB {
-  override def createRequest(name: String, creatorEmail: String): Future[ProjectRequest] = Future.failed(new NotImplementedError())
+  override def createRequest(name: String, creatorEmail: String): Future[Request] = Future.failed(new NotImplementedError())
   override def allRequests(): Future[Seq[ProjectRequest]] = Future.failed(new NotImplementedError())
-  override def requestsForUser(email: String): Future[Seq[ProjectRequest]] = Future.failed(new NotImplementedError())
+  override def requestsForUser(email: String): Future[Seq[Request]] = Future.failed(new NotImplementedError())
   override def createTask(projectRequestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeData: Option[JsObject], state: State): Future[Task] = Future.failed(new NotImplementedError())
   override def requestTasks(projectRequestId: Int, maybeState: Option[State]): Future[Seq[Task]] = Future.failed(new NotImplementedError())
   override def updateTaskState(taskId: Int, state: State): Future[Task] = Future.failed(new NotImplementedError())

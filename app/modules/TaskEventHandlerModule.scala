@@ -25,13 +25,13 @@ class TaskEventHandlerModule extends Module {
 }
 
 trait TaskEventHandler {
-  def process(projectRequestId: Int, eventType: TaskEvent.EventType.EventType, task: Task): Future[Seq[_]]
+  def process(requestId: Int, eventType: TaskEvent.EventType.EventType, task: Task): Future[Seq[_]]
 }
 
 class TaskEventHandlerImpl @Inject()(db: DB, metadataService: MetadataService)(implicit ec: ExecutionContext) extends TaskEventHandler {
   lazy val taskPrototypesFuture = metadataService.fetchMetadata.map(_.tasks)
 
-  def process(projectRequestId: Int, eventType: TaskEvent.EventType.EventType, task: Task): Future[Seq[_]] = {
+  def process(requestId: Int, eventType: TaskEvent.EventType.EventType, task: Task): Future[Seq[_]] = {
     Future.sequence {
       task.prototype.taskEvents.filter { taskEvent =>
         taskEvent.`type` == eventType && taskEvent.value == task.state.toString
@@ -42,7 +42,7 @@ class TaskEventHandlerImpl @Inject()(db: DB, metadataService: MetadataService)(i
               taskPrototypes.get(taskEvent.action.value).fold(Future.failed[Task](new Exception(s"Could not find task named '${taskEvent.action.value}'"))) { taskPrototype =>
                 taskPrototype.completableBy.fold(Future.failed[Task](new Exception("Could not create task because it does not have completable_by info"))) { completableBy =>
                   completableBy.value.fold(Future.failed[Task](new Exception("Could not create task because it does not have a completable_by value"))) { completableByValue =>
-                    db.createTask(projectRequestId, taskPrototype, completableBy.`type`, completableByValue)
+                    db.createTask(requestId, taskPrototype, completableBy.`type`, completableByValue)
                   }
                 }
               }
@@ -54,19 +54,4 @@ class TaskEventHandlerImpl @Inject()(db: DB, metadataService: MetadataService)(i
     }
   }
 
-  /*
-  override def createRequest(name: String, creatorEmail: String): Future[ProjectRequest] = Future.failed()
-
-  override def allRequests(): Future[Seq[ProjectRequest]] = ???
-
-  override def requestsForUser(email: String): Future[Seq[ProjectRequest]] = ???
-
-  override def createTask(projectRequestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeData: Option[JsObject], state: State): Future[Task] = ???
-
-  override def updateTaskState(taskId: Int, state: State): Future[Long] = ???
-
-  override def requestTasks(projectRequestId: Int, maybeState: Option[State]): Future[Seq[Task]] = ???
-
-  override def commentOnTask(taskId: Int, email: String, contents: String): Future[Comment] = ???
-  */
 }

@@ -2,11 +2,9 @@
  * Copyright (c) Salesforce.com, inc. 2017
  *@
 
-@this()
+@this(taskEditView: TaskEdit, taskShowView: TaskShow)
 
 @(task: models.Task)
-
-@import play.api.libs.json._
 
 @task.state
 
@@ -14,20 +12,11 @@
 
 @task.completableByValue
 
-@formWithData(form: JsObject) = @{
-    val dataBody = task.data.getOrElse(Json.obj())
-    val data = Json.obj("data" -> dataBody)
-    val view = Json.obj("view" -> "bootstrap-display")
-    form ++ data ++ view
+@task.state match {
+    case models.State.InProgress => {
+        @taskEditView(task.prototype, Right(task.id))
+    }
+    case _ => {
+        @taskShowView(task)
+    }
 }
-
-@for(form <- task.prototype.form) {
-    <div id="form-@task.id"></div>
-    <script>
-        (function() {
-            const form = @Html(formWithData(form).toString);
-            $("#form-@task.id").alpaca(form);
-        })();
-    </script>
-}
-

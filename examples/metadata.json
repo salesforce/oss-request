@@ -8,7 +8,7 @@
   "tasks": {
     "start": {
       "label": "OSS Request Info",
-      "type": "INPUT_NEEDED",
+      "type": "INPUT",
       "info": "Please fill in all the info for your OSS request.",
       "form": {
         "schema": {

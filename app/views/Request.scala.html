@@ -4,7 +4,7 @@
 
 @this(main: Main, taskView: views.html.Task)
 
-@(metadata: _root_.utils.Metadata, projectRequest: models.ProjectRequest, tasks: Seq[models.Task])
+@(metadata: _root_.utils.Metadata, request: models.Request, tasks: Seq[models.Task])
 
 @import java.time.format.DateTimeFormatter
 @import java.time.{Instant, ZoneOffset, ZonedDateTime}
@@ -18,7 +18,7 @@
 }
 
 @state() = @{
-    projectRequest.state match {
+    request.state match {
         case State.InProgress =>
             val completedTasks = tasksWithState(State.Completed)
             s"In Progress - ${completedTasks.size} of ${tasks.size} tasks completed"
@@ -36,15 +36,15 @@
 
 @main("Task") {
 
-    @projectRequest.name
+    @request.name
 
     State: @state()
 
-    Created by: @projectRequest.creatorEmail
+    Created by: @request.creatorEmail
 
-    Created on: @datetime(projectRequest.createDate)
+    Created on: @datetime(request.createDate)
 
-    <form action="@routes.Application.addTask(projectRequest.id)" method="post">
+    <form action="@routes.Application.addTask(request.id)" method="post">
         Add a Task:
         <select id="taskPrototypeKeySelect" name="taskPrototypeKey">
             <option disabled selected value> -- task type -- </option>

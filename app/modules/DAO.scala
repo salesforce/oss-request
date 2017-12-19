@@ -6,54 +6,54 @@ package modules
 
 import javax.inject.Inject
 
-import models.{Comment, ProjectRequest, State, Task, TaskEvent}
+import models.{Comment, Request, State, Task, TaskEvent}
 import models.Task.CompletableByType.CompletableByType
 import play.api.libs.json.JsObject
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler)(implicit ec: ExecutionContext) {
-  def createRequest(name: String, creatorEmail: String): Future[ProjectRequest] = {
+  def createRequest(name: String, creatorEmail: String): Future[Request] = {
     for {
-      projectRequest <- db.createRequest(name, creatorEmail)
-    } yield projectRequest
+      request <- db.createRequest(name, creatorEmail)
+    } yield request
   }
 
-  def createTask(projectRequestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeData: Option[JsObject] = None, state: State.State = State.InProgress): Future[Task] = {
+  def createTask(requestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeData: Option[JsObject] = None, state: State.State = State.InProgress): Future[Task] = {
     for {
-      task <- db.createTask(projectRequestId, prototype, completableByType, completableByValue, maybeData, state)
-      _ <- taskEventHandler.process(projectRequestId, TaskEvent.EventType.StateChange, task)
+      task <- db.createTask(requestId, prototype, completableByType, completableByValue, maybeData, state)
+      _ <- taskEventHandler.process(requestId, TaskEvent.EventType.StateChange, task)
     } yield task
   }
 
-  def allRequests(): Future[Seq[ProjectRequest]] = {
+  def allRequests(): Future[Seq[Request]] = {
     for {
       allRequests <- db.allRequests()
     } yield allRequests
   }
 
-  def requestsForUser(email: String): Future[Seq[ProjectRequest]] = {
+  def requestsForUser(email: String): Future[Seq[Request]] = {
     for {
       requests <- db.requestsForUser(email)
     } yield requests
   }
 
-  def requestById(id: Int): Future[ProjectRequest] = {
+  def requestById(id: Int): Future[Request] = {
     for {
-      projectRequest <- db.requestById(id)
-    } yield projectRequest
+      request <- db.requestById(id)
+    } yield request
   }
 
-  def updateTaskState(taskId: Int, state: State.State): Future[Task] = {
+  def updateTask(taskId: Int, state: State.State, maybeData: Option[JsObject]): Future[Task] = {
     for {
-      task <- db.updateTaskState(taskId, state)
-      _ <- taskEventHandler.process(task.projectRequestId, TaskEvent.EventType.StateChange, task)
+      task <- db.updateTask(taskId, state, maybeData)
+      _ <- taskEventHandler.process(task.requestId, TaskEvent.EventType.StateChange, task)
     } yield task
   }
 
-  def requestTasks(projectRequestId: Int, maybeState: Option[State.State] = None): Future[Seq[Task]] = {
+  def requestTasks(requestId: Int, maybeState: Option[State.State] = None): Future[Seq[Task]] = {
     for {
-      tasks <- db.requestTasks(projectRequestId, maybeState)
+      tasks <- db.requestTasks(requestId, maybeState)
     } yield tasks
   }
 

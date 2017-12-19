@@ -1,0 +1,37 @@
+@*
+ * Copyright (c) Salesforce.com, inc. 2017
+ *@
+
+@this()
+
+@(task: models.Task)
+
+@formWithData(form: play.api.libs.json.JsObject) = @{
+    val dataBody = task.data.getOrElse(play.api.libs.json.Json.obj())
+    val data = play.api.libs.json.Json.obj("data" -> dataBody)
+    val view = play.api.libs.json.Json.obj("view" -> "bootstrap-display")
+    form ++ data ++ view
+}
+
+@(task.prototype.`type`) match {
+    case models.Task.TaskType.Input => {
+        @defining(scala.util.Random.alphanumeric.take(8).mkString) { formid =>
+            @for(form <- task.prototype.form) {
+                <div id="@formid"></div>
+                <script>
+                    (function() {
+                        const form = @Html(formWithData(form).toString);
+                        $("#@formid").alpaca(form);
+                    })();
+                </script>
+            }
+        }
+    }
+    case models.Task.TaskType.Action => {
+        Action Needed
+    }
+    case models.Task.TaskType.Approval => {
+        Approval Needed
+    }
+}
+

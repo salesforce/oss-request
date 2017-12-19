@@ -11,7 +11,7 @@ import models.Task.CompletableByType.CompletableByType
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 
-case class Task(id: Int, completableByType: CompletableByType, completableByValue: String, completedDate: Option[ZonedDateTime], state: State.State, prototype: Task.Prototype, data: Option[JsObject], projectRequestId: Int)
+case class Task(id: Int, completableByType: CompletableByType, completableByValue: String, completedDate: Option[ZonedDateTime], state: State.State, prototype: Task.Prototype, data: Option[JsObject], requestId: Int)
 
 object Task {
 
@@ -22,7 +22,7 @@ object Task {
 
     val Approval = Value("APPROVAL")
     val Action = Value("ACTION")
-    val InputNeeded = Value("INPUT_NEEDED")
+    val Input = Value("INPUT")
 
     implicit val jsonReads = Reads[TaskType] { jsValue =>
       values.find(_.toString == jsValue.as[String]).fold[JsResult[TaskType]](JsError("Could not find that type"))(JsSuccess(_))
@@ -62,7 +62,14 @@ object Task {
       (__ \ "form").readNullable[JsObject] ~
       (__ \ "task_events").readNullable[Seq[TaskEvent]].map(_.getOrElse(Seq.empty[TaskEvent]))
     )(Prototype.apply _)
-    implicit val jsonWrites = Json.writes[Prototype]
+    implicit val jsonWrites = (
+      (__ \ "label").write[String] ~
+      (__ \ "type").write[TaskType.TaskType] ~
+      (__ \ "info").write[String] ~
+      (__ \ "completable_by").writeNullable[CompletableBy] ~
+      (__ \ "form").writeNullable[JsObject] ~
+      (__ \ "task_events").write[Seq[TaskEvent]]
+    )(unlift(Prototype.unapply))
     implicit val prototypeEncoder = MappedEncoding[Task.Prototype, String](prototype => Json.toJson(prototype).toString())
     implicit val prototypeDecoder = MappedEncoding[String, Task.Prototype](Json.parse(_).as[Task.Prototype])
   }

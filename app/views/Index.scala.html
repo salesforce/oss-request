@@ -4,7 +4,7 @@
 
 @this(main: Main)
 
-@(requests: Seq[models.ProjectRequest], userInfo: utils.UserInfo)
+@(requests: Seq[models.Request], userInfo: utils.UserInfo)
 
 @main("OSS Request") {
     <a href="@routes.Application.newRequest(None)">New Request</a>

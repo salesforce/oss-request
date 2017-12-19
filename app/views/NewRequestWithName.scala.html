@@ -1,0 +1,15 @@
+@*
+ * Copyright (c) Salesforce.com, inc. 2017
+ *@
+
+@this(mainView: Main, taskEditView: TaskEdit)
+
+@(projectName: String, taskPrototype: models.Task.Prototype)
+
+@mainView("Task") {
+
+    @projectName
+
+    @taskEditView(taskPrototype, Left(projectName))
+
+}
