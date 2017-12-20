@@ -1,0 +1,36 @@
+@*
+ * Copyright (c) Salesforce.com, inc. 2017
+ *@
+
+@this(taskEditView: TaskEdit, taskShowView: TaskShow)
+
+@(task: models.Task, groups: Map[String, Set[String]])
+
+@panelType = {
+    @task.state match {
+        case models.State.InProgress => {
+            panel-default
+        }
+        case models.State.Completed => {
+            panel-success
+        }
+        case _ => {
+            panel-warning
+        }
+    }
+}
+
+<div class="panel @panelType">
+    <div class="panel-heading">
+        <h3 class="panel-title">@task.prototype.label</h3>
+    </div>
+
+    @task.state match {
+        case models.State.InProgress => {
+            @taskEditView(Right(task), groups)
+        }
+        case _ => {
+            @taskShowView(task)
+        }
+    }
+</div>

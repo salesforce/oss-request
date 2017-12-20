@@ -74,7 +74,7 @@ class Application @Inject()
             completableByWithDefaults(metaTask.completableBy, Some(userInfo.email), None).fold {
               Future.successful(BadRequest("Could not determine who can complete the task"))
             } { case (completableByType, completableByValue) =>
-              dao.createTask(request.id, metaTask, completableByType, completableByValue, Json.toJson(userRequest.body).asOpt[JsObject], State.Completed).map { task =>
+              dao.createTask(request.id, metaTask, completableByType, completableByValue, Some(userInfo.email), Json.toJson(userRequest.body).asOpt[JsObject], State.Completed).map { task =>
                 Ok(Json.toJson(request))
               }
             }
@@ -133,7 +133,7 @@ class Application @Inject()
 
   def updateTask(taskId: Int, state: State.State) = userAction.async(maybeJsObject) { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
-      dao.updateTask(taskId, State.Completed, userRequest.body).map { task =>
+      dao.updateTask(taskId, state, Some(userInfo.email), userRequest.body).map { task =>
         render {
           case Accepts.Html() => Redirect(routes.Application.request(task.requestId))
           case Accepts.Json() => Ok(Json.toJson(task))

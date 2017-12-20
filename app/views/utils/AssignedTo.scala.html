@@ -1,0 +1,17 @@
+@*
+ * Copyright (c) Salesforce.com, inc. 2017
+ *@
+
+@(groups: Map[String, Set[String]], maybeCompletableBy: Option[(models.Task.CompletableByType.CompletableByType, String)])
+
+@for((completableByType, completableByValue) <- maybeCompletableBy) {
+    @completableByType match {
+        case models.Task.CompletableByType.Group => {
+            Assigned to any of: @groups(completableByValue).mkString(", ")
+        }
+        case models.Task.CompletableByType.Email => {
+            Assigned to: @completableByValue
+        }
+    }
+
+}

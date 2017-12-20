@@ -11,7 +11,7 @@ import models.Task.CompletableByType.CompletableByType
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 
-case class Task(id: Int, completableByType: CompletableByType, completableByValue: String, completedDate: Option[ZonedDateTime], state: State.State, prototype: Task.Prototype, data: Option[JsObject], requestId: Int)
+case class Task(id: Int, completableByType: CompletableByType, completableByValue: String, completedBy: Option[String], completedDate: Option[ZonedDateTime], state: State.State, prototype: Task.Prototype, data: Option[JsObject], requestId: Int)
 
 object Task {
 

@@ -1,0 +1,80 @@
+@*
+ * Copyright (c) Salesforce.com, inc. 2017
+ *@
+
+@this()
+
+@(task: models.Task)
+
+@formWithData(form: play.api.libs.json.JsObject) = @{
+    val dataBody = task.data.getOrElse(play.api.libs.json.Json.obj())
+    val data = play.api.libs.json.Json.obj("data" -> dataBody)
+    val view = play.api.libs.json.Json.obj("view" -> "bootstrap-display")
+    form ++ data ++ view
+}
+
+@(task.prototype.`type`) match {
+    case models.Task.TaskType.Input => {
+        <div class="panel-body">
+            @defining(scala.util.Random.alphanumeric.take(8).mkString) { formid =>
+                @for(form <- task.prototype.form) {
+                    <div id="@formid"></div>
+                    <script>
+                        (function() {
+                            const form = @Html(formWithData(form).toString);
+                            $("#@formid").alpaca(form);
+                        })();
+                    </script>
+                }
+            }
+        </div>
+        @task.state match {
+            case models.State.Completed => {
+                @for(completedDate <- task.completedDate) {
+                    @for(completedBy <-  task.completedBy) {
+                        <div class="panel-footer">Completed on @views.utils.DateTime.date(completedDate) by @completedBy</div>
+                    }
+                }
+            }
+            case models.State.Cancelled => {
+                <div class="panel-footer">Task Cancelled</div>
+            }
+        }
+
+    }
+    case models.Task.TaskType.Action => {
+        <div class="panel-body">
+            <p>@task.prototype.info</p>
+        </div>
+        @task.state match {
+            case models.State.Completed => {
+                @for(completedDate <- task.completedDate) {
+                    @for(completedBy <-  task.completedBy) {
+                        <div class="panel-footer">Completed on @views.utils.DateTime.date(completedDate) by @completedBy</div>
+                    }
+                }
+            }
+            case models.State.Cancelled => {
+                <div class="panel-footer">Task Cancelled</div>
+            }
+        }
+    }
+    case models.Task.TaskType.Approval => {
+        <div class="panel-body">
+            <p>@task.prototype.info</p>
+        </div>
+        @task.state match {
+            case models.State.Completed => {
+                @for(completedDate <- task.completedDate) {
+                    @for(completedBy <-  task.completedBy) {
+                        <div class="panel-footer">Approved on @views.utils.DateTime.date(completedDate) by @completedBy</div>
+                    }
+                }
+            }
+            case models.State.Cancelled => {
+                <div class="panel-footer">Denied</div>
+            }
+        }
+    }
+}
+

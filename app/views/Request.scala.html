@@ -5,13 +5,9 @@
 @import java.time.format.DateTimeFormatter
 @import java.time.{Instant, ZoneOffset, ZonedDateTime}
 
-@this(mainView: Main, taskView: views.html.Task)
+@this(mainView: Main, taskView: utils.Task)
 
 @(metadata: _root_.utils.Metadata, request: models.Request, tasks: Seq[models.Task])
-
-@datetime(zonedDateTime: ZonedDateTime) = @{
-    zonedDateTime.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
-}
 
 @tasksWithState(state: State.State) = @{
     tasks.filter(_.state == state)
@@ -97,7 +93,7 @@
         case models.State.Completed => {
             @request.completedDate match {
                 case Some(completedDate) => {
-                    Completed on @datetime(completedDate)
+                    Completed on @views.utils.DateTime.date(completedDate)
                 }
                 case None => {
                     Completed
@@ -111,11 +107,11 @@
     }
 }
 
-@mainView("Task") {
+@mainView("Request") {
 
     <div class="jumbotron">
         <h1>@request.name</h1>
-        <p>Created by @request.creatorEmail on @datetime(request.createDate)</p>
+        <p>Created by @request.creatorEmail on @views.utils.DateTime.date(request.createDate)</p>
 
         <div>@state</div>
     </div>

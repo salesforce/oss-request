@@ -2,14 +2,18 @@
  * Copyright (c) Salesforce.com, inc. 2017
  *@
 
-@this(mainView: Main, taskEditView: TaskEdit)
+@this(mainView: Main, taskEditView: utils.TaskEdit)
 
 @(projectName: String, taskPrototype: models.Task.Prototype, groups: Map[String, Set[String]])
 
-@mainView("Task") {
+@mainView("New Request") {
 
-    @projectName
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3 class="panel-title">New Request - @projectName</h3>
+        </div>
 
-    @taskEditView(Left(projectName -> taskPrototype), groups)
+        @taskEditView(Left(projectName -> taskPrototype), groups)
+    </div>
 
 }

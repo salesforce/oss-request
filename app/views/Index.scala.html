@@ -4,22 +4,22 @@
 
 @this(main: Main)
 
-@(requests: Seq[models.Request], userInfo: utils.UserInfo)
+@(requests: Seq[models.Request], userInfo: _root_.utils.UserInfo)
 
-@main("OSS Request") {
-    <a href="@routes.Application.newRequest(None)">New Request</a>
+@main("OSS Requests") {
+    @if(requests.nonEmpty) {
+        @if(userInfo.isAdmin) {
+            Your Requests:
+        } else {
+            All Requests:
+        }
 
-    <br/>
-
-    @if(userInfo.isAdmin) {
-        Your Requests:
+        <ul>
+            @for(request <- requests) {
+                <li><a href="@routes.Application.request(request.id)">@request.name</a></li>
+            }
+        </ul>
     } else {
-        All Requests:
+        You have no requests!
     }
-
-    <ul>
-    @for(request <- requests) {
-        <li><a href="@routes.Application.request(request.id)">@request.name</a></li>
-    }
-    </ul>
 }

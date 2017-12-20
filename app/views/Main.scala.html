@@ -25,7 +25,11 @@
         <nav class="navbar navbar-inverse navbar-fixed-top">
             <div class="container">
                 <div class="navbar-header">
-                    <a class="navbar-brand" href="#">OSS Request</a>
+                    <a class="navbar-brand" href="/">OSS Request</a>
+                    <ul class="nav navbar-nav">
+                        <li @if(title == "OSS Requests") { class="active" }><a href="/">Requests</a></li>
+                        <li @if(title == "New Request") { class="active" }><a href="@routes.Application.newRequest(None)">New Request</a></li>
+                    </ul>
                 </div>
             </div>
         </nav>
