@@ -8,10 +8,13 @@
 
 @mainView("New Request") {
 
-    <form action="@routes.Application.newRequest(None)" method="get">
-        Request Name: <input name="name" required>
+    <form action="@routes.Application.newRequest(None)" method="get" class="form-inline">
+        <div class="form-group">
+            <label for="name">Request Name</label>
+            <input name="name" required class="form-control">
+        </div>
 
-        <button type="submit">Next</button>
+        <button type="submit" class="btn btn-default">Next</button>
     </form>
 
 }
