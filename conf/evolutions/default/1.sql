@@ -9,7 +9,8 @@ CREATE TABLE request (
   slug TEXT NOT NULL UNIQUE,
   create_date TIMESTAMP WITH TIME ZONE NOT NULL,
   creator_email TEXT NOT NULL,
-  state state NOT NULL
+  state state NOT NULL,
+  completed_date TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE task (

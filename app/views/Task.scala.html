@@ -4,7 +4,7 @@
 
 @this(taskEditView: TaskEdit, taskShowView: TaskShow)
 
-@(task: models.Task)
+@(task: models.Task, groups: Map[String, Set[String]])
 
 @task.state
 
@@ -14,7 +14,7 @@
 
 @task.state match {
     case models.State.InProgress => {
-        @taskEditView(task.prototype, Right(task.id))
+        @taskEditView(Right(task), groups)
     }
     case _ => {
         @taskShowView(task)

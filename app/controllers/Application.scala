@@ -30,7 +30,8 @@ class Application @Inject()
   (implicit ec: ExecutionContext)
   extends InjectedController {
 
-  private def completableByWithDefaults(maybeCompletableBy: Option[Task.CompletableBy], defaultWhenNoCompletableBy: Option[String], defaultWhenNoCompletableByValue: Option[String]): Option[(CompletableByType.CompletableByType, String)] = {
+  // todo: test cause it doesn't seem to be working correctly
+  private[controllers] def completableByWithDefaults(maybeCompletableBy: Option[Task.CompletableBy], defaultWhenNoCompletableBy: Option[String], defaultWhenNoCompletableByValue: Option[String]): Option[(CompletableByType.CompletableByType, String)] = {
     maybeCompletableBy.flatMap { completableBy =>
       completableBy.value.orElse(defaultWhenNoCompletableByValue).map { value =>
         completableBy.`type` -> value
@@ -59,7 +60,7 @@ class Application @Inject()
     } { name =>
       metadataService.fetchMetadata.map { metadata =>
         metadata.tasks.get("start").fold(InternalServerError("Could not find task named 'start'")) { metaTask =>
-          Ok(newRequestWithNameView(name, metaTask))
+          Ok(newRequestWithNameView(name, metaTask, metadata.groups))
         }
       }
     }
@@ -93,10 +94,18 @@ class Application @Inject()
     }
   }
 
+  def updateRequest(id: Int, state: State.State) = userAction.async { implicit userRequest =>
+    userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
+      dao.updateRequest(id, state).map { _ =>
+        Redirect(routes.Application.request(id))
+      }
+    }
+  }
+
   def addTask(requestId: Int) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
       val maybeTaskPrototypeKey = userRequest.body.get("taskPrototypeKey").flatMap(_.headOption)
-      val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption)
+      val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption).filterNot(_.isEmpty)
 
       dao.requestById(requestId).flatMap { request =>
         maybeTaskPrototypeKey.fold(Future.successful(BadRequest("No taskPrototypeKey specified"))) { taskPrototypeKey =>
@@ -116,34 +125,21 @@ class Application @Inject()
     }
   }
 
-  def updateTask(taskId: Int) = userAction.async(parse.json) { implicit userRequest =>
-    userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
-      dao.updateTask(taskId, State.Completed, userRequest.body.asOpt[JsObject]).map { task =>
-        Ok(Json.toJson(task))
-      }
+  private lazy val maybeJsObject: BodyParser[Option[JsObject]] = {
+    parse.tolerantText.map { s =>
+      Try(Json.parse(s).as[JsObject]).toOption
     }
   }
 
-  def updateRequest = Action {
-    // must be admin
-    // notify request owner
-
-    NotImplemented
-  }
-
-  def updateTask = Action {
-    // admins and completable_by_email user are allowed
-    // email request owner (if that isn't who is logged in)
-
-    NotImplemented
-  }
-
-  def addCommentToTask = Action {
-    // protected by oauth
-    // must be admin, request owner, or completable_by_email user
-    // email task completable_by_email or request owner (depending on who is commenting)
-
-    NotImplemented
+  def updateTask(taskId: Int, state: State.State) = userAction.async(maybeJsObject) { implicit userRequest =>
+    userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
+      dao.updateTask(taskId, State.Completed, userRequest.body).map { task =>
+        render {
+          case Accepts.Html() => Redirect(routes.Application.request(task.requestId))
+          case Accepts.Json() => Ok(Json.toJson(task))
+        }
+      }
+    }
   }
 
   def oauthCallback(code: String, state: Option[String]) = Action.async { implicit request =>

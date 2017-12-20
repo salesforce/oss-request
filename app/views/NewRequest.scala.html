@@ -2,11 +2,11 @@
  * Copyright (c) Salesforce.com, inc. 2017
  *@
 
-@this(main: Main)
+@this(mainView: Main)
 
 @()
 
-@main("Task") {
+@mainView("Task") {
 
     <form action="@routes.Application.newRequest(None)" method="get">
         Request Name: <input name="name" required>

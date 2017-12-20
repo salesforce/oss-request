@@ -4,14 +4,50 @@
 
 @this()
 
-@(taskPrototype: models.Task.Prototype, nameOrTaskId: Either[String, Int])
+@(newOrExistingTask: Either[(String, models.Task.Prototype), models.Task], groups: Map[String, Set[String]])
 
-@formUrl = @{
-    nameOrTaskId match {
-        case Left(name) => routes.Application.newRequest(Some(name)).url
-        case Right(taskId) => routes.Application.updateTask(taskId).url
+@taskPrototype = @{
+    newOrExistingTask match {
+        case Left((_, taskPrototype)) => taskPrototype
+        case Right(task) => task.prototype
     }
 }
+
+@maybeCompletableBy = @{
+    newOrExistingTask match {
+        case Left((_, taskPrototype)) =>
+            taskPrototype.completableBy.flatMap { completableBy =>
+                completableBy.value.map { completableByValue =>
+                    completableBy.`type` -> completableByValue
+                }
+            }
+        case Right(task) =>
+            Some(task.completableByType -> task.completableByValue)
+    }
+}
+
+@assignedTo = {
+    @for((completableByType, completableByValue) <- maybeCompletableBy) {
+        @completableByType match {
+            case models.Task.CompletableByType.Group => {
+                Assigned to any of: @groups(completableByValue).mkString(", ")
+            }
+            case models.Task.CompletableByType.Email => {
+                Assigned to: @completableByValue
+            }
+        }
+
+    }
+}
+
+@formUrl(state: models.State.State = State.Completed) = @{
+    newOrExistingTask match {
+        case Left((name, _)) => routes.Application.newRequest(Some(name)).url
+        case Right(task) => routes.Application.updateTask(task.id, state).url
+    }
+}
+
+@taskPrototype.info
 
 @(taskPrototype.`type`) match {
     case models.Task.TaskType.Input => {
@@ -24,7 +60,7 @@
 
                         form.options.form = {
                             attributes: {
-                                action: "@formUrl",
+                                action: "@Html(formUrl())",
                                 method: "post"
                             },
                             buttons: {
@@ -59,40 +95,32 @@
         }
     }
     case models.Task.TaskType.Action => {
-        Action Needed
+        Action Required:
+
+        @taskPrototype.label
+
+        @taskPrototype.info
+
+        @assignedTo
+
+        <form action="@formUrl()" method="post">
+            <button>Mark as Completed</button>
+        </form>
     }
     case models.Task.TaskType.Approval => {
-        Approval Needed
+        Approval Required:
+
+        @taskPrototype.label
+
+        @taskPrototype.info
+
+        @assignedTo
+
+        <form action="@formUrl()" method="post">
+            <button>Approve</button>
+        </form>
+        <form action="@formUrl(models.State.Cancelled)" method="post">
+            <button>Deny</button>
+        </form>
     }
 }
-
-@*
-        case Some(State.Completed) => {
-            @taskPrototype.`type` match {
-                case Task.TaskType.Action => {
-
-                }
-                case Task.TaskType.Approval => {
-
-                }
-                case Task.TaskType.InputNeeded => {
-                    @for(form <- taskPrototype.form) {
-                        <div id="@formid"></div>
-                        <script>
-                            (function() {
-                                const form = @Html(formWithData(form).toString);
-                                $("#@formid").alpaca(form);
-                            })();
-                        </script>
-                    }
-                }
-            }
-        }
-
-        case _ => {
-            Render ???
-        }
-    }
-
-}
-*@

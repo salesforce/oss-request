@@ -2,12 +2,12 @@
  * Copyright (c) Salesforce.com, inc. 2017
  *@
 
-@this(main: Main, taskView: views.html.Task)
-
-@(metadata: _root_.utils.Metadata, request: models.Request, tasks: Seq[models.Task])
-
 @import java.time.format.DateTimeFormatter
 @import java.time.{Instant, ZoneOffset, ZonedDateTime}
+
+@this(mainView: Main, taskView: views.html.Task)
+
+@(metadata: _root_.utils.Metadata, request: models.Request, tasks: Seq[models.Task])
 
 @datetime(zonedDateTime: ZonedDateTime) = @{
     zonedDateTime.format(DateTimeFormatter.ofPattern("MMM dd, yyyy"))
@@ -17,84 +17,111 @@
     tasks.filter(_.state == state)
 }
 
-@state() = @{
-    request.state match {
-        case State.InProgress =>
-            val completedTasks = tasksWithState(State.Completed)
-            s"In Progress - ${completedTasks.size} of ${tasks.size} tasks completed"
+@state = {
+    @request.state match {
+        case models.State.InProgress => {
+            @defining(tasksWithState(State.Completed)) { completedTasks =>
+                <div class="progress">
+                    <div class="progress-bar" role="progressbar" aria-valuenow="@completedTasks.size" aria-valuemin="0" aria-valuemax="@tasks.size" style="width: @(completedTasks.size * 100 / tasks.size)%;">
+                        @completedTasks.size of @tasks.size tasks completed
+                    </div>
+                </div>
 
-        case State.Completed =>
-            val latestCompletedTask = tasks.maxBy(_.completedDate.getOrElse(Instant.MIN.atZone(ZoneOffset.UTC)).toInstant)
-            latestCompletedTask.completedDate.fold("Completed") { completedDate =>
-                s"Completed on ${datetime(completedDate)}"
+                @if(completedTasks.size == tasks.size) {
+                    <form action="@routes.Application.updateRequest(request.id, models.State.Completed)" method="post">
+                        <button type="submit" class="btn btn-success">Mark as Completed</button>
+                    </form>
+                }
             }
 
-        case _ =>
-            "???"
+            <form action="@routes.Application.addTask(request.id)" method="post" class="form-inline">
+                <div class="form-group">
+                    <label for="taskPrototypeKey">Add a Task</label>
+                    <select id="taskPrototypeKeySelect" name="taskPrototypeKey" class="form-control">
+                        <option disabled selected value> -- task type -- </option>
+                        @for((key, taskPrototype) <- metadata.tasks) {
+                            <option value="@key">@taskPrototype.label</option>
+                        }
+                    </select>
+                </div>
+                <div id="completableByEmailDiv" class="form-group">
+                    <label for="completableByEmail">Completable By (Email)</label>
+                    <input id="completableByEmail" type="email" class="form-control">
+                </div>
+                <div id="completableByGroupDiv" class="form-group">
+                    <label for="completableByGroup">Completable By</label>
+                    <select id="completableByGroup" class="form-control">
+                    @for(group <- metadata.groups.keys) {
+                        <option>@group</option>
+                    }
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Add It</button>
+            </form>
+
+            <script>
+                // Only send a completableBy form value if it was needed by the prototype
+                const taskPrototypes = @Html(play.api.libs.json.Json.toJson(metadata.tasks).toString);
+
+                const completableByEmailDiv = document.getElementById("completableByEmailDiv");
+                const completableByGroupDiv = document.getElementById("completableByGroupDiv");
+                const completableByEmail = document.getElementById("completableByEmail");
+                const completableByGroup = document.getElementById("completableByGroup");
+                const taskPrototypeKeySelect = document.getElementById("taskPrototypeKeySelect");
+
+                completableByEmailDiv.style.display = "none";
+                completableByGroupDiv.style.display = "none";
+
+                taskPrototypeKeySelect.onchange = function(event) {
+                    const taskPrototype = taskPrototypes[this.value];
+
+                    completableByEmailDiv.style.display = "none";
+                    completableByGroupDiv.style.display = "none";
+                    completableByEmail.name = "";
+                    completableByGroup.name = "";
+
+                    if ((taskPrototype.completable_by !== undefined) && (taskPrototype.completable_by.value === undefined)) {
+                        if (taskPrototype.completable_by.type === "GROUP") {
+                            completableByGroupDiv.style.display = "inline-block";
+                            completableByGroup.name = "completableBy";
+                        }
+                        else if (taskPrototype.completable_by.type === "EMAIL") {
+                            completableByEmailDiv.style.display = "inline-block";
+                            completableByEmail.name = "completableBy";
+                        }
+                    }
+                };
+            </script>
+        }
+
+        case models.State.Completed => {
+            @request.completedDate match {
+                case Some(completedDate) => {
+                    Completed on @datetime(completedDate)
+                }
+                case None => {
+                    Completed
+                }
+            }
+        }
+
+        case _ => {
+            ???
+        }
     }
 }
 
-@main("Task") {
+@mainView("Task") {
 
-    @request.name
+    <div class="jumbotron">
+        <h1>@request.name</h1>
+        <p>Created by @request.creatorEmail on @datetime(request.createDate)</p>
 
-    State: @state()
-
-    Created by: @request.creatorEmail
-
-    Created on: @datetime(request.createDate)
-
-    <form action="@routes.Application.addTask(request.id)" method="post">
-        Add a Task:
-        <select id="taskPrototypeKeySelect" name="taskPrototypeKey">
-            <option disabled selected value> -- task type -- </option>
-            @for((key, taskPrototype) <- metadata.tasks) {
-                <option value="@key">@taskPrototype.label</option>
-            }
-        </select>
-        <input id="completableByEmail" type="email">
-        <select id="completableByGroup">
-        @for(group <- metadata.groups.keys) {
-            <option>@group</option>
-        }
-        </select>
-        <button type="submit">Go</button>
-    </form>
-
-    <script>
-        // Only send a completableBy form value if it was needed by the prototype
-        const taskPrototypes = @Html(play.api.libs.json.Json.toJson(metadata.tasks).toString);
-
-        const completableByEmail = document.getElementById("completableByEmail");
-        const completableByGroup = document.getElementById("completableByGroup");
-        const taskPrototypeKeySelect = document.getElementById("taskPrototypeKeySelect");
-
-        completableByEmail.style.display = "none";
-        completableByGroup.style.display = "none";
-
-        taskPrototypeKeySelect.onchange = function(event) {
-            const taskPrototype = taskPrototypes[this.value];
-
-            completableByEmail.style.display = "none";
-            completableByGroup.style.display = "none";
-            completableByEmail.name = null;
-            completableByGroup.name = null;
-
-            if ((taskPrototype.completableBy !== undefined) && (taskPrototype.completableBy.value === undefined)) {
-              if (taskPrototype.completableBy.type === "GROUP") {
-                  completableByGroup.style.display = "block";
-                  completableByGroup.name = "completableBy";
-              }
-              else if (taskPrototype.completableBy.type === "EMAIL") {
-                  completableByEmail.style.display = "block";
-                  completableByEmail.name = "completableBy";
-              }
-            }
-        };
-    </script>
+        <div>@state</div>
+    </div>
 
     @for(task <- tasks) {
-        @taskView(task)
+        @taskView(task, metadata.groups)
     }
 
 }

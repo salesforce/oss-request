@@ -4,12 +4,12 @@
 
 @this(mainView: Main, taskEditView: TaskEdit)
 
-@(projectName: String, taskPrototype: models.Task.Prototype)
+@(projectName: String, taskPrototype: models.Task.Prototype, groups: Map[String, Set[String]])
 
 @mainView("Task") {
 
     @projectName
 
-    @taskEditView(taskPrototype, Left(projectName))
+    @taskEditView(Left(projectName -> taskPrototype), groups)
 
 }

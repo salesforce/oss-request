@@ -35,6 +35,7 @@ trait DB {
   def allRequests(): Future[Seq[Request]]
   def requestsForUser(email: String): Future[Seq[Request]]
   def requestById(id: Int): Future[Request]
+  def updateRequest(id: Int, state: State.State): Future[Request]
   def createTask(requestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task]
   def updateTask(taskId: Int, state: State, maybeData: Option[JsObject]): Future[Task]
   def requestTasks(requestId: Int, maybeState: Option[State] = None): Future[Seq[Task]]
@@ -73,7 +74,7 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
           ).returning(_.id)
         }
       } map { id =>
-        Request(id, name, slug, createDate, creatorEmail, state)
+        Request(id, name, slug, createDate, creatorEmail, state, None)
       }
     }
   }
@@ -84,6 +85,20 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
         query[Request]
       }
     }
+  }
+
+  override def updateRequest(id: Index, state: State): Future[Request] = {
+    val maybeCompletedDate = if (state == State.Completed) Some(ZonedDateTime.now()) else None
+
+    val updateFuture = run {
+      quote {
+        query[Request].filter(_.id == lift(id)).update(
+          _.state -> lift(state),
+          _.completedDate -> lift(maybeCompletedDate)
+        )
+      }
+    }
+    updateFuture.flatMap(_ => requestById(id))
   }
 
   override def requestsForUser(email: String): Future[Seq[Request]] = {
@@ -105,6 +120,8 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
   }
 
   override def createTask(requestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task] = {
+    val maybeCompletedDate = if (state == State.Completed) Some(ZonedDateTime.now()) else None
+
     run {
       quote {
         query[Task].insert(
@@ -113,11 +130,12 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
           _.requestId -> lift(requestId),
           _.state -> lift(state),
           _.prototype -> lift(prototype),
-          _.data -> lift(maybeData)
+          _.data -> lift(maybeData),
+          _.completedDate -> lift(maybeCompletedDate)
         ).returning(_.id)
       }
     } map { id =>
-      Task(id, completableByType, completableByValue, None, state, prototype, maybeData, requestId)
+      Task(id, completableByType, completableByValue, maybeCompletedDate, state, prototype, maybeData, requestId)
     }
   }
 
@@ -132,12 +150,12 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
   }
 
   override def updateTask(taskId: Int, state: State, maybeData: Option[JsObject]): Future[Task] = {
-    val maybeCompletedData = if (state == State.Completed) Some(ZonedDateTime.now()) else None
+    val maybeCompletedDate = if (state == State.Completed) Some(ZonedDateTime.now()) else None
     val updateFuture = run {
       quote {
         query[Task].filter(_.id == lift(taskId)).update(
           _.state -> lift(state),
-          _.completedDate -> lift(maybeCompletedData),
+          _.completedDate -> lift(maybeCompletedDate),
           _.data -> lift(maybeData)
         )
       }
