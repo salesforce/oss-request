@@ -102,17 +102,27 @@ class DBModuleSpec extends PlaySpec with GuiceOneAppPerTest {
     }
   }
 
-  "updateTaskState" must {
+  "updateTask" must {
     "work" in Evolutions.withEvolutions(database) {
       val request = await(db.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
       val task = await(db.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
       task.state must equal (State.InProgress)
-      val updatedTask = await(db.updateTaskState(task.id, State.Completed))
+      val updatedTask = await(db.updateTask(task.id, State.Completed, Some("foo@foo.com"), None))
       updatedTask.state must equal (State.Completed)
     }
     "add a completedDate when closing a task" in Evolutions.withEvolutions(database) {
-      fail()
+      val request = await(db.createRequest("foo", "foo@bar.com"))
+      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
+      val task = await(db.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
+      val updatedTask = await(db.updateTask(task.id, State.Completed, Some("foo@foo.com"), None))
+      updatedTask.completedDate must be (defined)
+    }
+    "fail to complete without a completedByEmail" in Evolutions.withEvolutions(database) {
+      val request = await(db.createRequest("foo", "foo@bar.com"))
+      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
+      val task = await(db.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
+      an [Exception] must be thrownBy await(db.updateTask(task.id, State.Completed, None, None))
     }
   }
 
@@ -122,7 +132,7 @@ class DBModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
       val task1 = await(db.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
       val task2 = await(db.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
-      await(db.updateTaskState(task1.id, State.Completed))
+      await(db.updateTask(task1.id, State.Completed, Some("foo@foo.com"), None))
       val inProgressTasks = await(db.requestTasks(request.id, Some(State.InProgress)))
       inProgressTasks must have size 1
       val allTasks = await(db.requestTasks(request.id))
