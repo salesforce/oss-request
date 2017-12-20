@@ -140,9 +140,10 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
     }
   }
 
-  override def createTask(requestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedBy: Option[String], maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task] = {
-    if (state == State.Completed && maybeCompletedBy.isEmpty) {
-      Future.failed(new Exception("maybeCompletedBy was not specified"))
+  override def createTask(requestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedByEmail: Option[String], maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task] = {
+    // todo: move this to a validation module via the DAO
+    if (state == State.Completed && maybeCompletedByEmail.isEmpty) {
+      Future.failed(new Exception("maybeCompletedByEmail was not specified"))
     }
     else {
       val maybeCompletedDate = if (state == State.Completed) Some(ZonedDateTime.now()) else None
@@ -152,7 +153,7 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
           query[Task].insert(
             _.completableByType -> lift(completableByType),
             _.completableByValue -> lift(completableByValue),
-            _.completedBy -> lift(maybeCompletedBy),
+            _.completedByEmail -> lift(maybeCompletedByEmail),
             _.requestId -> lift(requestId),
             _.state -> lift(state),
             _.prototype -> lift(prototype),
@@ -161,7 +162,7 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
           ).returning(_.id)
         }
       } map { id =>
-        Task(id, completableByType, completableByValue, maybeCompletedBy, maybeCompletedDate, state, prototype, maybeData, requestId)
+        Task(id, completableByType, completableByValue, maybeCompletedByEmail, maybeCompletedDate, state, prototype, maybeData, requestId)
       }
     }
   }
@@ -176,16 +177,17 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
     }
   }
 
-  override def updateTask(taskId: Int, state: State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task] = {
-    if (state == State.Completed && maybeCompletedBy.isEmpty) {
-      Future.failed(new Exception("maybeCompletedBy was not specified"))
+  override def updateTask(taskId: Int, state: State, maybeCompletedByEmail: Option[String], maybeData: Option[JsObject]): Future[Task] = {
+    // todo: move this to a validation module via the DAO
+    if (state == State.Completed && maybeCompletedByEmail.isEmpty) {
+      Future.failed(new Exception("maybeCompletedByEmail was not specified"))
     }
     else {
       val maybeCompletedDate = if (state == State.Completed) Some(ZonedDateTime.now()) else None
       val updateFuture = run {
         quote {
           query[Task].filter(_.id == lift(taskId)).update(
-            _.completedBy -> lift(maybeCompletedBy),
+            _.completedByEmail -> lift(maybeCompletedByEmail),
             _.state -> lift(state),
             _.completedDate -> lift(maybeCompletedDate),
             _.data -> lift(maybeData)

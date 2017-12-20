@@ -31,8 +31,8 @@
         @task.state match {
             case models.State.Completed => {
                 @for(completedDate <- task.completedDate) {
-                    @for(completedBy <-  task.completedBy) {
-                        <div class="panel-footer">Completed on @views.utils.DateTime.date(completedDate) by @completedBy</div>
+                    @for(completedByEmail <-  task.completedByEmail) {
+                        <div class="panel-footer">Completed on @views.utils.DateTime.date(completedDate) by @completedByEmail</div>
                     }
                 }
             }
@@ -49,8 +49,8 @@
         @task.state match {
             case models.State.Completed => {
                 @for(completedDate <- task.completedDate) {
-                    @for(completedBy <-  task.completedBy) {
-                        <div class="panel-footer">Completed on @views.utils.DateTime.date(completedDate) by @completedBy</div>
+                    @for(completedByEmail <- task.completedByEmail) {
+                        <div class="panel-footer">Completed on @views.utils.DateTime.date(completedDate) by @completedByEmail</div>
                     }
                 }
             }
@@ -66,8 +66,8 @@
         @task.state match {
             case models.State.Completed => {
                 @for(completedDate <- task.completedDate) {
-                    @for(completedBy <-  task.completedBy) {
-                        <div class="panel-footer">Approved on @views.utils.DateTime.date(completedDate) by @completedBy</div>
+                    @for(completedByEmail <- task.completedByEmail) {
+                        <div class="panel-footer">Approved on @views.utils.DateTime.date(completedDate) by @completedByEmail</div>
                     }
                 }
             }
