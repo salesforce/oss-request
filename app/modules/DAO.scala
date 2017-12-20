@@ -26,7 +26,7 @@ class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler)(implicit ec: Exe
     } yield task
   }
 
-  def allRequests(): Future[Seq[Request]] = {
+  def allRequests(): Future[Seq[(Request, Long, Long)]] = {
     for {
       allRequests <- db.allRequests()
     } yield allRequests
@@ -38,7 +38,7 @@ class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler)(implicit ec: Exe
     } yield request
   }
 
-  def requestsForUser(email: String): Future[Seq[Request]] = {
+  def requestsForUser(email: String): Future[Seq[(Request, Long, Long)]] = {
     for {
       requests <- db.requestsForUser(email)
     } yield requests
@@ -47,6 +47,12 @@ class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler)(implicit ec: Exe
   def requestById(id: Int): Future[Request] = {
     for {
       request <- db.requestById(id)
+    } yield request
+  }
+
+  def requestBySlug(slug: String): Future[Request] = {
+    for {
+      request <- db.requestBySlug(slug)
     } yield request
   }
 

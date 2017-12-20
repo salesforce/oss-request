@@ -84,9 +84,15 @@ class Application @Inject()
     }
   }
 
-  def request(id: Int) = Action.async { implicit request =>
-    dao.requestById(id).flatMap { request =>
-      dao.requestTasks(id).flatMap { tasks =>
+  def requestById(id: Int) = Action.async { implicit request =>
+    dao.requestById(id).map { request =>
+      Redirect(routes.Application.requestBySlug(request.slug))
+    }
+  }
+
+  def requestBySlug(slug: String) = Action.async { implicit request =>
+    dao.requestBySlug(slug).flatMap { request =>
+      dao.requestTasks(request.id).flatMap { tasks =>
         metadataService.fetchMetadata.map { metadata =>
           Ok(requestView(metadata, request, tasks))
         }
@@ -96,8 +102,8 @@ class Application @Inject()
 
   def updateRequest(id: Int, state: State.State) = userAction.async { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
-      dao.updateRequest(id, state).map { _ =>
-        Redirect(routes.Application.request(id))
+      dao.updateRequest(id, state).map { request =>
+        Redirect(routes.Application.requestBySlug(request.slug))
       }
     }
   }
@@ -115,7 +121,7 @@ class Application @Inject()
                 Future.successful(BadRequest("Could not determine who can complete the task"))
               } { case (completableByType, completableByValue) =>
                 dao.createTask(requestId, taskPrototype, completableByType, completableByValue).map { _ =>
-                  Redirect(routes.Application.request(requestId))
+                  Redirect(routes.Application.requestBySlug(request.slug))
                 }
               }
             }
@@ -133,10 +139,12 @@ class Application @Inject()
 
   def updateTask(taskId: Int, state: State.State) = userAction.async(maybeJsObject) { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
-      dao.updateTask(taskId, state, Some(userInfo.email), userRequest.body).map { task =>
-        render {
-          case Accepts.Html() => Redirect(routes.Application.request(task.requestId))
-          case Accepts.Json() => Ok(Json.toJson(task))
+      dao.updateTask(taskId, state, Some(userInfo.email), userRequest.body).flatMap { task =>
+        dao.requestById(task.requestId).map { request =>
+          render {
+            case Accepts.Html() => Redirect(routes.Application.requestBySlug(request.slug))
+            case Accepts.Json() => Ok(Json.toJson(task))
+          }
         }
       }
     }

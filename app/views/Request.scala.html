@@ -13,13 +13,27 @@
     tasks.filter(_.state == state)
 }
 
+@progressWidth(completedTasks: Seq[Task]) = @{
+    if (tasks.size == 0) {
+        0
+    }
+    else {
+        completedTasks.size * 100 / tasks.size
+    }
+}
+
 @state = {
     @request.state match {
         case models.State.InProgress => {
             @defining(tasksWithState(State.Completed)) { completedTasks =>
                 <div class="progress">
-                    <div class="progress-bar" role="progressbar" aria-valuenow="@completedTasks.size" aria-valuemin="0" aria-valuemax="@tasks.size" style="width: @(completedTasks.size * 100 / tasks.size)%;">
-                        @completedTasks.size of @tasks.size tasks completed
+                    @if(completedTasks.isEmpty) {
+                        <span>@completedTasks.size of @tasks.size tasks completed</span>
+                    }
+                    <div class="progress-bar" role="progressbar" aria-valuenow="@completedTasks.size" aria-valuemin="0" aria-valuemax="@tasks.size" style="width: @progressWidth(completedTasks)%;">
+                        @if(completedTasks.nonEmpty) {
+                            @completedTasks.size of @tasks.size tasks completed
+                        }
                     </div>
                 </div>
 

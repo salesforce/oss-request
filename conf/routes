@@ -5,7 +5,8 @@
 GET         /                                controllers.Application.index
 GET         /new-request                     controllers.Application.newRequest(name: Option[String])
 POST        /new-request                     controllers.Application.createRequest(name: String)
-GET         /request                         controllers.Application.request(id: Int)
+GET         /request/:slug                   controllers.Application.requestBySlug(slug: String)
+GET         /request                         controllers.Application.requestById(id: Int)
 POST        /request                         controllers.Application.updateRequest(id: Int, state: models.State.State)
 POST        /add-task                        controllers.Application.addTask(requestId: Int)
 POST        /update-task                     controllers.Application.updateTask(taskId: Int, state: models.State.State)

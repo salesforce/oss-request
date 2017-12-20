@@ -32,9 +32,10 @@ class DBModule extends Module {
 
 trait DB {
   def createRequest(name: String, creatorEmail: String): Future[Request]
-  def allRequests(): Future[Seq[Request]]
-  def requestsForUser(email: String): Future[Seq[Request]]
+  def allRequests(): Future[Seq[(Request, Long, Long)]]
+  def requestsForUser(email: String): Future[Seq[(Request, Long, Long)]]
   def requestById(id: Int): Future[Request]
+  def requestBySlug(slug: String): Future[Request]
   def updateRequest(id: Int, state: State.State): Future[Request]
   def createTask(requestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task]
   def updateTask(taskId: Int, state: State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task]
@@ -79,10 +80,15 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
     }
   }
 
-  override def allRequests(): Future[Seq[Request]] = {
+  override def allRequests(): Future[Seq[(Request, Long, Long)]] = {
     run {
       quote {
-        query[Request]
+        for {
+          request <- query[Request]
+          tasks = query[Task].filter(_.requestId == request.id)
+          totalTasks = tasks.size
+          completedTasks = tasks.filter(_.state == lift(State.Completed)).size
+        } yield (request, totalTasks, completedTasks)
       }
     }
   }
@@ -101,10 +107,15 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
     updateFuture.flatMap(_ => requestById(id))
   }
 
-  override def requestsForUser(email: String): Future[Seq[Request]] = {
+  override def requestsForUser(email: String): Future[Seq[(Request, Long, Long)]] = {
     run {
       quote {
-        query[Request].filter(_.creatorEmail == lift(email))
+        for {
+          request <- query[Request].filter(_.creatorEmail == lift(email))
+          tasks = query[Task].filter(_.requestId == request.id)
+          totalTasks = tasks.size
+          completedTasks = tasks.filter(_.state == lift(State.Completed)).size
+        } yield (request, totalTasks, completedTasks)
       }
     }
   }
@@ -113,6 +124,16 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
     run {
       quote {
         query[Request].filter(_.id == lift(id))
+      }
+    } flatMap { result =>
+      result.headOption.fold(Future.failed[Request](new Exception("Request not found")))(Future.successful)
+    }
+  }
+
+  override def requestBySlug(slug: String): Future[Request] = {
+    run {
+      quote {
+        query[Request].filter(_.slug == lift(slug))
       }
     } flatMap { result =>
       result.headOption.fold(Future.failed[Request](new Exception("Request not found")))(Future.successful)

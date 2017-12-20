@@ -4,7 +4,21 @@
 
 @this(main: Main)
 
-@(requests: Seq[models.Request], userInfo: _root_.utils.UserInfo)
+@(requests: Seq[(models.Request, Long, Long)], userInfo: _root_.utils.UserInfo)
+
+@stateClass(state: models.State.State) = {
+    @state match {
+        case models.State.InProgress => {
+            list-group-item-info
+        }
+        case models.State.Cancelled => {
+            list-group-item-warning
+        }
+        case models.State.Completed => {
+            list-group-item-success
+        }
+    }
+}
 
 @main("OSS Requests") {
     @if(requests.nonEmpty) {
@@ -14,11 +28,15 @@
             All Requests:
         }
 
-        <ul>
-            @for(request <- requests) {
-                <li><a href="@routes.Application.request(request.id)">@request.name</a></li>
+        <div class="list-group">
+            @for((request, totalTasks, completedTasks) <- requests) {
+                <a href="@routes.Application.requestBySlug(request.slug)" class="list-group-item @stateClass(request.state)">
+                    <span class="badge" style="margin-top: 25px;">@completedTasks of @totalTasks tasks completed</span>
+                    <h4>@request.name</h4>
+                    <p>Created @views.utils.DateTime.date(request.createDate) </p>
+                </a>
             }
-        </ul>
+        </div>
     } else {
         You have no requests!
     }
