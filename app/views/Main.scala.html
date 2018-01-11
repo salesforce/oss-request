@@ -13,12 +13,12 @@
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>@title</title>
-        @Html(webJarsUtil.css("bootstrap", "bootstrap.min.css"))
-        @Html(webJarsUtil.css("alpaca", "bootstrap/alpaca.min.css"))
-        @Html(webJarsUtil.script("jquery", "jquery.min.js"))
-        @Html(webJarsUtil.script("bootstrap", "bootstrap.min.js"))
-        @Html(webJarsUtil.script("handlebars", "handlebars.min.js"))
-        @Html(webJarsUtil.script("alpaca", "bootstrap/alpaca.min.js"))
+        @webJarsUtil.locate("bootstrap", "bootstrap.min.css").css()
+        @webJarsUtil.locate("alpaca", "bootstrap/alpaca.min.css").css()
+        @webJarsUtil.locate("jquery", "jquery.min.js").script()
+        @webJarsUtil.locate("bootstrap", "bootstrap.min.js").script()
+        @webJarsUtil.locate("handlebars", "handlebars.min.js").script()
+        @webJarsUtil.locate("alpaca", "bootstrap/alpaca.min.js").script()
         <link rel="stylesheet" type="text/css" href="@routes.Assets.versioned("main.css")"/>
     </head>
     <body>
