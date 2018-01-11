@@ -1,3 +1,12 @@
 body {
     margin-top: 60px;
 }
+
+.panel-heading .glyphicon {
+    vertical-align: middle;
+    font-size: 16px;
+}
+
+.panel-title.pull-left {
+    padding-top: 7px;
+}

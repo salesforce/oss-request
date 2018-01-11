@@ -19,10 +19,10 @@ class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler)(implicit ec: Exe
     } yield request
   }
 
-  def createTask(requestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress): Future[Task] = {
+  def createTask(requestSlug: String, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress): Future[Task] = {
     for {
-      task <- db.createTask(requestId, prototype, completableByType, completableByValue, maybeCompletedBy, maybeData, state)
-      _ <- taskEventHandler.process(requestId, TaskEvent.EventType.StateChange, task)
+      task <- db.createTask(requestSlug, prototype, completableByType, completableByValue, maybeCompletedBy, maybeData, state)
+      _ <- taskEventHandler.process(requestSlug, TaskEvent.EventType.StateChange, task)
     } yield task
   }
 
@@ -32,9 +32,9 @@ class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler)(implicit ec: Exe
     } yield allRequests
   }
 
-  def updateRequest(id: Int, state: State.State): Future[Request] = {
+  def updateRequest(requestSlug: String, state: State.State): Future[Request] = {
     for {
-      request <- db.updateRequest(id, state)
+      request <- db.updateRequest(requestSlug, state)
     } yield request
   }
 
@@ -44,28 +44,28 @@ class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler)(implicit ec: Exe
     } yield requests
   }
 
-  def requestById(id: Int): Future[Request] = {
+  def request(id: String): Future[Request] = {
     for {
-      request <- db.requestById(id)
-    } yield request
-  }
-
-  def requestBySlug(slug: String): Future[Request] = {
-    for {
-      request <- db.requestBySlug(slug)
+      request <- db.request(id)
     } yield request
   }
 
   def updateTask(taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task] = {
     for {
       task <- db.updateTask(taskId, state, maybeCompletedBy, maybeData)
-      _ <- taskEventHandler.process(task.requestId, TaskEvent.EventType.StateChange, task)
+      _ <- taskEventHandler.process(task.requestSlug, TaskEvent.EventType.StateChange, task)
     } yield task
   }
 
-  def requestTasks(requestId: Int, maybeState: Option[State.State] = None): Future[Seq[Task]] = {
+  def taskById(taskId: Int): Future[Task] = {
     for {
-      tasks <- db.requestTasks(requestId, maybeState)
+      task <- db.taskById(taskId)
+    } yield task
+  }
+
+  def requestTasks(requestSlug: String, maybeState: Option[State.State] = None): Future[Seq[(Task, Long)]] = {
+    for {
+      tasks <- db.requestTasks(requestSlug, maybeState)
     } yield tasks
   }
 
@@ -73,6 +73,12 @@ class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler)(implicit ec: Exe
     for {
       comment <- db.commentOnTask(taskId, email, contents)
     } yield comment
+  }
+
+  def commentsOnTask(taskId: Int): Future[Seq[Comment]] = {
+    for {
+      comments <- db.commentsOnTask(taskId)
+    } yield comments
   }
 
 }

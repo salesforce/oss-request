@@ -25,13 +25,13 @@ class TaskEventHandlerModule extends Module {
 }
 
 trait TaskEventHandler {
-  def process(requestId: Int, eventType: TaskEvent.EventType.EventType, task: Task): Future[Seq[_]]
+  def process(requestSlug: String, eventType: TaskEvent.EventType.EventType, task: Task): Future[Seq[_]]
 }
 
 class TaskEventHandlerImpl @Inject()(db: DB, metadataService: MetadataService)(implicit ec: ExecutionContext) extends TaskEventHandler {
   lazy val taskPrototypesFuture = metadataService.fetchMetadata.map(_.tasks)
 
-  def process(requestId: Int, eventType: TaskEvent.EventType.EventType, task: Task): Future[Seq[_]] = {
+  def process(requestSlug: String, eventType: TaskEvent.EventType.EventType, task: Task): Future[Seq[_]] = {
     Future.sequence {
       task.prototype.taskEvents.filter { taskEvent =>
         taskEvent.`type` == eventType && taskEvent.value == task.state.toString
@@ -42,7 +42,7 @@ class TaskEventHandlerImpl @Inject()(db: DB, metadataService: MetadataService)(i
               taskPrototypes.get(taskEvent.action.value).fold(Future.failed[Task](new Exception(s"Could not find task named '${taskEvent.action.value}'"))) { taskPrototype =>
                 taskPrototype.completableBy.fold(Future.failed[Task](new Exception("Could not create task because it does not have completable_by info"))) { completableBy =>
                   completableBy.value.fold(Future.failed[Task](new Exception("Could not create task because it does not have a completable_by value"))) { completableByValue =>
-                    db.createTask(requestId, taskPrototype, completableBy.`type`, completableByValue)
+                    db.createTask(requestSlug, taskPrototype, completableBy.`type`, completableByValue)
                   }
                 }
               }

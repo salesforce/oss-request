@@ -4,7 +4,7 @@
 
 @this(taskEditView: TaskEdit, taskShowView: TaskShow)
 
-@(task: models.Task, groups: Map[String, Set[String]])
+@(task: models.Task, commentCount: Long, groups: Map[String, Set[String]])
 
 @panelType = {
     @task.state match {
@@ -21,8 +21,12 @@
 }
 
 <div class="panel @panelType">
-    <div class="panel-heading">
-        <h3 class="panel-title">@task.prototype.label</h3>
+    <div class="panel-heading clearfix">
+        <h3 class="panel-title pull-left">@task.prototype.label</h3>
+        <button type="button" class="btn btn-default btn-sm pull-right" data-toggle="modal" data-target="#myModal" data-requestslug="@task.requestSlug" data-taskid="@task.id">
+            <span class="glyphicon glyphicon-comment"></span>
+            @commentCount Comments
+        </button>
     </div>
 
     @task.state match {

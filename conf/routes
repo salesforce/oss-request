@@ -2,30 +2,35 @@
 # This file defines all application routes (Higher priority routes first)
 # ~~~~
 
-GET         /                                controllers.Application.index
-GET         /new-request                     controllers.Application.newRequest(name: Option[String])
-POST        /new-request                     controllers.Application.createRequest(name: String)
-GET         /request/:slug                   controllers.Application.requestBySlug(slug: String)
-GET         /request                         controllers.Application.requestById(id: Int)
-POST        /request                         controllers.Application.updateRequest(id: Int, state: models.State.State)
-POST        /add-task                        controllers.Application.addTask(requestId: Int)
-POST        /update-task                     controllers.Application.updateTask(taskId: Int, state: models.State.State)
+# User Visible URLs
+GET         /                                                  controllers.Application.index
+GET         /request                                           controllers.Application.newRequest(name: Option[String])
+GET         /request/:requestSlug                              controllers.Application.request(requestSlug: String)
 
-GET         /.well-known/acme-challenge/:key controllers.Application.wellKnown(key)
+# API and Form Post URLs
+POST        /request                                           controllers.Application.createRequest(name: String)
+POST        /request/:requestSlug                              controllers.Application.updateRequest(requestSlug: String, state: models.State.State)
+POST        /request/:requestSlug/task                         controllers.Application.addTask(requestSlug: String)
+POST        /request/:requestSlug/task/:taskId                 controllers.Application.updateTask(requestSlug: String, taskId: Int, state: models.State.State)
+GET         /request/:requestSlug/task/:taskId/comments        controllers.Application.commentsOnTask(requestSlug: String, taskId: Int)
+POST        /request/:requestSlug/task/:taskId/comments        controllers.Application.commentOnTask(requestSlug: String, taskId: Int)
 
-GET         /oauth2/callback                 controllers.Application.oauthCallback(code: String, state: Option[String])
 
-GET         /logout                          controllers.Application.logout()
+GET         /.well-known/acme-challenge/:key                   controllers.Application.wellKnown(key)
 
-GET         /.dev/oauth2/authorize           controllers.Application.devOauthAuthorize(response_type: String, client_id: String, redirect_uri: String)
-POST        /.dev/oauth2/token               controllers.Application.devOauthToken(grant_type: String, code: String, redirect_uri: String, client_id: String, client_secret: String)
-GET         /.dev/oauth2/userinfo            controllers.Application.devOauthUserinfo
-GET         /.dev/metadata.json              controllers.Application.devMetadata
+GET         /oauth2/callback                                   controllers.Application.oauthCallback(code: String, state: Option[String])
+
+GET         /logout                                            controllers.Application.logout()
+
+GET         /.dev/oauth2/authorize                             controllers.Application.devOauthAuthorize(response_type: String, client_id: String, redirect_uri: String)
+POST        /.dev/oauth2/token                                 controllers.Application.devOauthToken(grant_type: String, code: String, redirect_uri: String, client_id: String, client_secret: String)
+GET         /.dev/oauth2/userinfo                              controllers.Application.devOauthUserinfo
+GET         /.dev/metadata.json                                controllers.Application.devMetadata
 
 
 # Map static resources from the /public folder to the /assets URL path
-GET        /assets/*file                     controllers.Assets.versioned(path="/public", file: Asset)
-GET        /favicon.ico                      controllers.Assets.at(path="/public/images", file="favicon.ico")
+GET         /assets/*file                                      controllers.Assets.versioned(path="/public", file: Asset)
+GET         /favicon.ico                                       controllers.Assets.at(path="/public/images", file="favicon.ico")
 
 # WebJars
-->         /webjars                          webjars.Routes
+->          /webjars                                           webjars.Routes

@@ -1,0 +1,21 @@
+@*
+ * Copyright (c) Salesforce.com, inc. 2017
+ *@
+
+@this()
+
+@(comments: Seq[Comment])
+
+@if(comments.isEmpty) {
+    No comments yet
+}
+
+@for(comment <- comments) {
+
+  @comment.creatorEmail
+
+  @comment.createDate
+
+  @comment.contents
+
+}

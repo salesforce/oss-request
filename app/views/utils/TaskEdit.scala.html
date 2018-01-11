@@ -28,8 +28,8 @@
 
 @formUrl(state: models.State.State = State.Completed) = @{
     newOrExistingTask match {
-        case Left((name, _)) => routes.Application.newRequest(Some(name)).url
-        case Right(task) => routes.Application.updateTask(task.id, state).url
+        case Left((name, _)) => routes.Application.createRequest(name).url
+        case Right(task) => routes.Application.updateTask(task.requestSlug, task.id, state).url
     }
 }
 
@@ -59,11 +59,13 @@
                                                     contentType: "application/json"
                                                 };
                                                 this.ajaxSubmit(config).done(function(data) {
-                                                    if (data.requestId !== undefined) {
-                                                        window.location = "/request?id=" + data.requestId;
+                                                    if (data.requestSlug !== undefined) {
+                                                        // the updateTask call returns a task json
+                                                        window.location = "/request/" + data.requestSlug;
                                                     }
                                                     else {
-                                                        window.location = "/request?id=" + data.id;
+                                                        // the createRequest call returns a request json
+                                                        window.location = "/request/" + data.slug;
                                                     }
                                                 });
                                             }

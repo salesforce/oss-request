@@ -29,8 +29,8 @@ class DAOSpec extends PlaySpec with GuiceOneAppPerTest {
       val event = TaskEvent(TaskEvent.EventType.StateChange, State.InProgress.toString, TaskEvent.EventAction(TaskEvent.EventActionType.CreateTask, "review_request"))
       val request = await(dao.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", Task.TaskType.Approval, "asdf", None, None, Seq(event))
-      val task = await(dao.createTask(request.id, prototype, Task.CompletableByType.Email, "foo@foo.com"))
-      val allTasks = await(dao.requestTasks(request.id))
+      val task = await(dao.createTask(request.slug, prototype, Task.CompletableByType.Email, "foo@foo.com"))
+      val allTasks = await(dao.requestTasks(request.slug))
       allTasks must have size 2
     }
     // todo: fail on unmet conditions for the EventAction's task

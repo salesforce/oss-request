@@ -57,7 +57,7 @@ class DBModuleSpec extends PlaySpec with GuiceOneAppPerTest {
   "createRequest" must {
     "work" in Evolutions.withEvolutions(database) {
       val projectRequest = await(db.createRequest("foo", "foo@bar.com"))
-      projectRequest.id must be >= 0
+      projectRequest.slug must be >= 0
       projectRequest.name must equal ("foo")
       projectRequest.createDate.isBefore(ZonedDateTime.now()) must be (true)
       projectRequest.creatorEmail must equal ("foo@bar.com")
@@ -97,7 +97,7 @@ class DBModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
 
-      val task = await(db.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
+      val task = await(db.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
       task.state must equal (State.InProgress)
     }
   }
@@ -106,7 +106,7 @@ class DBModuleSpec extends PlaySpec with GuiceOneAppPerTest {
     "work" in Evolutions.withEvolutions(database) {
       val request = await(db.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task = await(db.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
+      val task = await(db.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
       task.state must equal (State.InProgress)
       val updatedTask = await(db.updateTask(task.id, State.Completed, Some("foo@foo.com"), None))
       updatedTask.state must equal (State.Completed)
@@ -114,14 +114,14 @@ class DBModuleSpec extends PlaySpec with GuiceOneAppPerTest {
     "add a completedDate when closing a task" in Evolutions.withEvolutions(database) {
       val request = await(db.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task = await(db.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
+      val task = await(db.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
       val updatedTask = await(db.updateTask(task.id, State.Completed, Some("foo@foo.com"), None))
       updatedTask.completedDate must be (defined)
     }
     "fail to complete without a completedByEmail" in Evolutions.withEvolutions(database) {
       val request = await(db.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task = await(db.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
+      val task = await(db.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
       an [Exception] must be thrownBy await(db.updateTask(task.id, State.Completed, None, None))
     }
   }
@@ -130,12 +130,12 @@ class DBModuleSpec extends PlaySpec with GuiceOneAppPerTest {
     "work when a task state is specified" in Evolutions.withEvolutions(database) {
       val request = await(db.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task1 = await(db.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
-      val task2 = await(db.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
+      val task1 = await(db.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
+      val task2 = await(db.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
       await(db.updateTask(task1.id, State.Completed, Some("foo@foo.com"), None))
-      val inProgressTasks = await(db.requestTasks(request.id, Some(State.InProgress)))
+      val inProgressTasks = await(db.requestTasks(request.slug, Some(State.InProgress)))
       inProgressTasks must have size 1
-      val allTasks = await(db.requestTasks(request.id))
+      val allTasks = await(db.requestTasks(request.slug))
       allTasks must have size 2
     }
   }
@@ -144,7 +144,7 @@ class DBModuleSpec extends PlaySpec with GuiceOneAppPerTest {
     "work" in Evolutions.withEvolutions(database) {
       val request = await(db.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task = await(db.createTask(request.id, prototype, CompletableByType.Email, "foo@foo.com"))
+      val task = await(db.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
       val comment = await(db.commentOnTask(task.id, "foo@bar.com", "test"))
       comment.id must be >= 0
       comment.contents must equal ("test")

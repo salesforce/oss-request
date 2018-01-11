@@ -34,13 +34,14 @@ trait DB {
   def createRequest(name: String, creatorEmail: String): Future[Request]
   def allRequests(): Future[Seq[(Request, Long, Long)]]
   def requestsForUser(email: String): Future[Seq[(Request, Long, Long)]]
-  def requestById(id: Int): Future[Request]
-  def requestBySlug(slug: String): Future[Request]
-  def updateRequest(id: Int, state: State.State): Future[Request]
-  def createTask(requestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task]
+  def request(requestSlug: String): Future[Request]
+  def updateRequest(requestSlug: String, state: State.State): Future[Request]
+  def createTask(requestSlug: String, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task]
   def updateTask(taskId: Int, state: State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task]
-  def requestTasks(requestId: Int, maybeState: Option[State] = None): Future[Seq[Task]]
+  def taskById(taskId: Int): Future[Task]
+  def requestTasks(requestSlug: String, maybeState: Option[State] = None): Future[Seq[(Task, Long)]]
   def commentOnTask(taskId: Int, email: String, contents: String): Future[Comment]
+  def commentsOnTask(taskId: Int): Future[Seq[Comment]]
 }
 
 class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext) extends DB {
@@ -64,18 +65,16 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
       val state = State.InProgress
       val createDate = ZonedDateTime.now()
 
+      val request = Request(slug, name, createDate, creatorEmail, state, None)
+
       run {
         quote {
-          query[Request].insert(
-            _.name -> lift(name),
-            _.slug -> lift(slug),
-            _.state -> lift(state),
-            _.creatorEmail -> lift(creatorEmail),
-            _.createDate -> lift(createDate)
-          ).returning(_.id)
+          query[Request].insert {
+            lift(request)
+          }
         }
-      } map { id =>
-        Request(id, name, slug, createDate, creatorEmail, state, None)
+      } map { _ =>
+        request
       }
     }
   }
@@ -85,7 +84,7 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
       quote {
         for {
           request <- query[Request]
-          tasks = query[Task].filter(_.requestId == request.id)
+          tasks = query[Task].filter(_.requestSlug == request.slug)
           totalTasks = tasks.size
           completedTasks = tasks.filter(_.state == lift(State.Completed)).size
         } yield (request, totalTasks, completedTasks)
@@ -93,18 +92,18 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
     }
   }
 
-  override def updateRequest(id: Index, state: State): Future[Request] = {
+  override def updateRequest(requestSlug: String, state: State): Future[Request] = {
     val maybeCompletedDate = if (state == State.Completed) Some(ZonedDateTime.now()) else None
 
     val updateFuture = run {
       quote {
-        query[Request].filter(_.id == lift(id)).update(
+        query[Request].filter(_.slug == lift(requestSlug)).update(
           _.state -> lift(state),
           _.completedDate -> lift(maybeCompletedDate)
         )
       }
     }
-    updateFuture.flatMap(_ => requestById(id))
+    updateFuture.flatMap(_ => request(requestSlug))
   }
 
   override def requestsForUser(email: String): Future[Seq[(Request, Long, Long)]] = {
@@ -112,7 +111,7 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
       quote {
         for {
           request <- query[Request].filter(_.creatorEmail == lift(email))
-          tasks = query[Task].filter(_.requestId == request.id)
+          tasks = query[Task].filter(_.requestSlug == request.slug)
           totalTasks = tasks.size
           completedTasks = tasks.filter(_.state == lift(State.Completed)).size
         } yield (request, totalTasks, completedTasks)
@@ -120,17 +119,7 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
     }
   }
 
-  override def requestById(id: Int): Future[Request] = {
-    run {
-      quote {
-        query[Request].filter(_.id == lift(id))
-      }
-    } flatMap { result =>
-      result.headOption.fold(Future.failed[Request](new Exception("Request not found")))(Future.successful)
-    }
-  }
-
-  override def requestBySlug(slug: String): Future[Request] = {
+  override def request(slug: String): Future[Request] = {
     run {
       quote {
         query[Request].filter(_.slug == lift(slug))
@@ -140,7 +129,7 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
     }
   }
 
-  override def createTask(requestId: Int, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedByEmail: Option[String], maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task] = {
+  override def createTask(requestSlug: String, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedByEmail: Option[String], maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task] = {
     // todo: move this to a validation module via the DAO
     if (state == State.Completed && maybeCompletedByEmail.isEmpty) {
       Future.failed(new Exception("maybeCompletedByEmail was not specified"))
@@ -154,7 +143,7 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
             _.completableByType -> lift(completableByType),
             _.completableByValue -> lift(completableByValue),
             _.completedByEmail -> lift(maybeCompletedByEmail),
-            _.requestId -> lift(requestId),
+            _.requestSlug -> lift(requestSlug),
             _.state -> lift(state),
             _.prototype -> lift(prototype),
             _.data -> lift(maybeData),
@@ -162,7 +151,7 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
           ).returning(_.id)
         }
       } map { id =>
-        Task(id, completableByType, completableByValue, maybeCompletedByEmail, maybeCompletedDate, state, prototype, maybeData, requestId)
+        Task(id, completableByType, completableByValue, maybeCompletedByEmail, maybeCompletedDate, state, prototype, maybeData, requestSlug)
       }
     }
   }
@@ -198,19 +187,25 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
     }
   }
 
-  override def requestTasks(requestId: Int, maybeState: Option[State] = None): Future[Seq[Task]] = {
+  override def requestTasks(requestSlug: String, maybeState: Option[State] = None): Future[Seq[(Task, Long)]] = {
     maybeState.fold {
       run {
         quote {
-          query[Task].filter(_.requestId == lift(requestId))
+          for {
+            task <- query[Task].filter(_.requestSlug == lift(requestSlug))
+            numComments = query[Comment].filter(_.taskId == task.id).size
+          } yield task -> numComments
         }
       }
     } { state =>
       run {
         quote {
-          query[Task].filter { task =>
-            task.requestId == lift(requestId) && task.state == lift(state)
-          }
+          for {
+            task <- query[Task].filter { task =>
+              task.requestSlug == lift(requestSlug) && task.state == lift(state)
+            }
+            numComments = query[Comment].filter(_.taskId == task.id).size
+          } yield task -> numComments
         }
       }
     }
@@ -229,6 +224,14 @@ class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext)
       }
     } map { id =>
       Comment(id, email, createDate, contents, taskId)
+    }
+  }
+
+  override def commentsOnTask(taskId: Index): Future[Seq[Comment]] = {
+    run {
+      quote {
+        query[Comment].filter(_.taskId == lift(taskId))
+      }
     }
   }
 }

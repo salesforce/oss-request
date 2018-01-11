@@ -4,9 +4,8 @@ CREATE TYPE state AS ENUM ('IN_PROGRESS', 'ON_HOLD', 'CANCELLED', 'COMPLETED');
 CREATE TYPE completable_by_type AS ENUM ('EMAIL', 'GROUP');
 
 CREATE TABLE request (
-  id SERIAL PRIMARY KEY,
+  slug TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  slug TEXT NOT NULL UNIQUE,
   create_date TIMESTAMP WITH TIME ZONE NOT NULL,
   creator_email TEXT NOT NULL,
   state state NOT NULL,
@@ -22,7 +21,7 @@ CREATE TABLE task (
   state state NOT NULL,
   prototype jsonb,
   data jsonb,
-  request_id INTEGER REFERENCES request(id)
+  request_slug TEXT REFERENCES request(slug)
 );
 
 CREATE TABLE comment (

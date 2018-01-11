@@ -26,7 +26,7 @@ import scala.xml.{Comment, Node}
 
 class Application @Inject()
   (env: Environment, dao: DAO, userAction: UserAction, oauth: Oauth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, devUsers: DevUsers)
-  (indexView: views.html.Index, devSelectUserView: views.html.dev.SelectUser, newRequestView: views.html.NewRequest, newRequestWithNameView: views.html.NewRequestWithName, requestView: views.html.Request)
+  (indexView: views.html.Index, devSelectUserView: views.html.dev.SelectUser, newRequestView: views.html.NewRequest, newRequestWithNameView: views.html.NewRequestWithName, requestView: views.html.Request, commentsView: views.html.partials.Comments)
   (implicit ec: ExecutionContext)
   extends InjectedController {
 
@@ -76,7 +76,7 @@ class Application @Inject()
             completableByWithDefaults(metaTask.completableBy, Some(userInfo.email), None).fold {
               Future.successful(BadRequest("Could not determine who can complete the task"))
             } { case (completableByType, completableByValue) =>
-              dao.createTask(request.id, metaTask, completableByType, completableByValue, Some(userInfo.email), Json.toJson(userRequest.body).asOpt[JsObject], State.Completed).map { task =>
+              dao.createTask(request.slug, metaTask, completableByType, completableByValue, Some(userInfo.email), Json.toJson(userRequest.body).asOpt[JsObject], State.Completed).map { task =>
                 Ok(Json.toJson(request))
               }
             }
@@ -86,18 +86,10 @@ class Application @Inject()
     }
   }
 
-  def requestById(id: Int) = userAction.async(parse.json) { implicit userRequest =>
+  def request(requestSlug: String) = userAction.async { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
-      dao.requestById(id).map { request =>
-        Redirect(routes.Application.requestBySlug(request.slug))
-      }
-    }
-  }
-
-  def requestBySlug(slug: String) = userAction.async(parse.json) { implicit userRequest =>
-    userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
-      dao.requestBySlug(slug).flatMap { request =>
-        dao.requestTasks(request.id).flatMap { tasks =>
+      dao.request(requestSlug).flatMap { request =>
+        dao.requestTasks(request.slug).flatMap { tasks =>
           metadataService.fetchMetadata.map { metadata =>
             Ok(requestView(metadata, request, tasks, userInfo))
           }
@@ -106,28 +98,28 @@ class Application @Inject()
     }
   }
 
-  def updateRequest(id: Int, state: State.State) = userAction.async { implicit userRequest =>
+  def updateRequest(requestSlug: String, state: State.State) = userAction.async { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
-      dao.updateRequest(id, state).map { request =>
-        Redirect(routes.Application.requestBySlug(request.slug))
+      dao.updateRequest(requestSlug, state).map { request =>
+        Redirect(routes.Application.request(request.slug))
       }
     }
   }
 
-  def addTask(requestId: Int) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
+  def addTask(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
       val maybeTaskPrototypeKey = userRequest.body.get("taskPrototypeKey").flatMap(_.headOption)
       val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption).filterNot(_.isEmpty)
 
-      dao.requestById(requestId).flatMap { request =>
+      dao.request(requestSlug).flatMap { request =>
         maybeTaskPrototypeKey.fold(Future.successful(BadRequest("No taskPrototypeKey specified"))) { taskPrototypeKey =>
           metadataService.fetchMetadata.flatMap { metadata =>
             metadata.tasks.get(taskPrototypeKey).fold(Future.successful(InternalServerError(s"Could not find task prototype $taskPrototypeKey"))) { taskPrototype =>
               completableByWithDefaults(taskPrototype.completableBy, Some(request.creatorEmail), maybeCompletableBy).fold {
                 Future.successful(BadRequest("Could not determine who can complete the task"))
               } { case (completableByType, completableByValue) =>
-                dao.createTask(requestId, taskPrototype, completableByType, completableByValue).map { _ =>
-                  Redirect(routes.Application.requestBySlug(request.slug))
+                dao.createTask(requestSlug, taskPrototype, completableByType, completableByValue).map { _ =>
+                  Redirect(routes.Application.request(request.slug))
                 }
               }
             }
@@ -143,15 +135,33 @@ class Application @Inject()
     }
   }
 
-  def updateTask(taskId: Int, state: State.State) = userAction.async(maybeJsObject) { implicit userRequest =>
+  def updateTask(requestSlug: String, taskId: Int, state: State.State) = userAction.async(maybeJsObject) { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
-      dao.updateTask(taskId, state, Some(userInfo.email), userRequest.body).flatMap { task =>
-        dao.requestById(task.requestId).map { request =>
-          render {
-            case Accepts.Html() => Redirect(routes.Application.requestBySlug(request.slug))
-            case Accepts.Json() => Ok(Json.toJson(task))
-          }
+      dao.updateTask(taskId, state, Some(userInfo.email), userRequest.body).map { task =>
+        render {
+          case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
+          case Accepts.Json() => Ok(Json.toJson(task))
         }
+      }
+    }
+  }
+
+  def commentOnTask(requestSlug: String, taskId: Int) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
+    userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
+      val maybeContents = userRequest.body.get("contents").flatMap(_.headOption).filterNot(_.isEmpty)
+
+      maybeContents.fold(Future.successful(BadRequest("The contents were empty"))) { contents =>
+        dao.commentOnTask(taskId, userInfo.email, contents).map { comment =>
+          Redirect(routes.Application.request(requestSlug))
+        }
+      }
+    }
+  }
+
+  def commentsOnTask(requestSlug: String, taskId: Int) = userAction.async(maybeJsObject) { implicit userRequest =>
+    userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
+      dao.commentsOnTask(taskId).map { comments =>
+        Ok(commentsView(comments))
       }
     }
   }

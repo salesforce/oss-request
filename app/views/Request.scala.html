@@ -7,14 +7,14 @@
 
 @this(mainView: Main, taskView: utils.Task)
 
-@(metadata: _root_.utils.Metadata, request: models.Request, tasks: Seq[models.Task], userInfo: _root_.utils.UserInfo)
+@(metadata: _root_.utils.Metadata, request: models.Request, tasks: Seq[(models.Task, Long)], userInfo: _root_.utils.UserInfo)
 
 @tasksWithState(state: State.State) = @{
-    tasks.filter(_.state == state)
+    tasks.filter(_._1.state == state)
 }
 
-@progressWidth(completedTasks: Seq[Task]) = @{
-    if (tasks.size == 0) {
+@progressWidth(completedTasks: Seq[_]) = @{
+    if (tasks.isEmpty) {
         0
     }
     else {
@@ -38,13 +38,13 @@
                 </div>
 
                 @if(completedTasks.size == tasks.size) {
-                    <form action="@routes.Application.updateRequest(request.id, models.State.Completed)" method="post">
+                    <form action="@routes.Application.updateRequest(request.slug, models.State.Completed)" method="post">
                         <button type="submit" class="btn btn-success">Mark as Completed</button>
                     </form>
                 }
             }
 
-            <form action="@routes.Application.addTask(request.id)" method="post" class="form-inline">
+            <form action="@routes.Application.addTask(request.slug)" method="post" class="form-inline">
                 <div class="form-group">
                     <label for="taskPrototypeKey">Add a Task</label>
                     <select id="taskPrototypeKeySelect" name="taskPrototypeKey" class="form-control">
@@ -131,7 +131,7 @@
     </div>
 
     @for(task <- tasks) {
-        @taskView(task, metadata.groups)
+        @taskView(task._1, task._2, metadata.groups)
     }
 
 }
