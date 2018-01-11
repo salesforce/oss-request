@@ -4,9 +4,9 @@
 
 @this(mainView: Main, taskEditView: utils.TaskEdit)
 
-@(projectName: String, taskPrototype: models.Task.Prototype, groups: Map[String, Set[String]])
+@(projectName: String, taskPrototype: models.Task.Prototype, groups: Map[String, Set[String]], userInfo: _root_.utils.UserInfo)
 
-@mainView("New Request") {
+@mainView(Some(userInfo))("New Request") {
 
     <div class="panel panel-default">
         <div class="panel-heading">

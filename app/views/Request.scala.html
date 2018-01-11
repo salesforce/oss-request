@@ -7,7 +7,7 @@
 
 @this(mainView: Main, taskView: utils.Task)
 
-@(metadata: _root_.utils.Metadata, request: models.Request, tasks: Seq[models.Task])
+@(metadata: _root_.utils.Metadata, request: models.Request, tasks: Seq[models.Task], userInfo: _root_.utils.UserInfo)
 
 @tasksWithState(state: State.State) = @{
     tasks.filter(_.state == state)
@@ -121,7 +121,7 @@
     }
 }
 
-@mainView("Request") {
+@mainView(Some(userInfo))("Request") {
 
     <div class="jumbotron">
         <h1>@request.name</h1>

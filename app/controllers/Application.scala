@@ -55,12 +55,14 @@ class Application @Inject()
   }
 
   def newRequest(maybeName: Option[String]) = userAction.async { implicit userRequest =>
-    maybeName.fold {
-      Future.successful(Ok(newRequestView()))
-    } { name =>
-      metadataService.fetchMetadata.map { metadata =>
-        metadata.tasks.get("start").fold(InternalServerError("Could not find task named 'start'")) { metaTask =>
-          Ok(newRequestWithNameView(name, metaTask, metadata.groups))
+    userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
+      maybeName.fold {
+        Future.successful(Ok(newRequestView(userInfo)))
+      } { name =>
+        metadataService.fetchMetadata.map { metadata =>
+          metadata.tasks.get("start").fold(InternalServerError("Could not find task named 'start'")) { metaTask =>
+            Ok(newRequestWithNameView(name, metaTask, metadata.groups, userInfo))
+          }
         }
       }
     }
@@ -84,17 +86,21 @@ class Application @Inject()
     }
   }
 
-  def requestById(id: Int) = Action.async { implicit request =>
-    dao.requestById(id).map { request =>
-      Redirect(routes.Application.requestBySlug(request.slug))
+  def requestById(id: Int) = userAction.async(parse.json) { implicit userRequest =>
+    userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
+      dao.requestById(id).map { request =>
+        Redirect(routes.Application.requestBySlug(request.slug))
+      }
     }
   }
 
-  def requestBySlug(slug: String) = Action.async { implicit request =>
-    dao.requestBySlug(slug).flatMap { request =>
-      dao.requestTasks(request.id).flatMap { tasks =>
-        metadataService.fetchMetadata.map { metadata =>
-          Ok(requestView(metadata, request, tasks))
+  def requestBySlug(slug: String) = userAction.async(parse.json) { implicit userRequest =>
+    userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
+      dao.requestBySlug(slug).flatMap { request =>
+        dao.requestTasks(request.id).flatMap { tasks =>
+          metadataService.fetchMetadata.map { metadata =>
+            Ok(requestView(metadata, request, tasks, userInfo))
+          }
         }
       }
     }
@@ -162,6 +168,10 @@ class Application @Inject()
         }
       }
     }
+  }
+
+  def logout() = Action {
+    Redirect(routes.Application.index()).withNewSession
   }
 
 

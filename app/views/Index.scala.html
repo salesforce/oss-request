@@ -20,7 +20,7 @@
     }
 }
 
-@main("OSS Requests") {
+@main(Some(userInfo))("OSS Requests") {
     @if(requests.nonEmpty) {
         @if(userInfo.isAdmin) {
             Your Requests:

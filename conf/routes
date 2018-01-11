@@ -15,6 +15,8 @@ GET         /.well-known/acme-challenge/:key controllers.Application.wellKnown(k
 
 GET         /oauth2/callback                 controllers.Application.oauthCallback(code: String, state: Option[String])
 
+GET         /logout                          controllers.Application.logout()
+
 GET         /.dev/oauth2/authorize           controllers.Application.devOauthAuthorize(response_type: String, client_id: String, redirect_uri: String)
 POST        /.dev/oauth2/token               controllers.Application.devOauthToken(grant_type: String, code: String, redirect_uri: String, client_id: String, client_secret: String)
 GET         /.dev/oauth2/userinfo            controllers.Application.devOauthUserinfo

@@ -4,9 +4,9 @@
 
 @this(mainView: Main)
 
-@()
+@(userInfo: _root_.utils.UserInfo)
 
-@mainView("New Request") {
+@mainView(Some(userInfo))("New Request") {
 
     <form action="@routes.Application.newRequest(None)" method="get" class="form-inline">
         <div class="form-group">

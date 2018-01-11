@@ -4,7 +4,7 @@
 
 @this(webJarsUtil: org.webjars.play.WebJarsUtil)
 
-@(title: String)(body: Html)
+@(maybeUserInfo: Option[_root_.utils.UserInfo])(title: String)(body: Html)
 
 <!DOCTYPE html>
 <html>
@@ -26,12 +26,27 @@
             <div class="container">
                 <div class="navbar-header">
                     <a class="navbar-brand" href="/">OSS Request</a>
-                    <ul class="nav navbar-nav">
-                        <li @if(title == "OSS Requests") { class="active" }><a href="/">Requests</a></li>
-                        <li @if(title == "New Request") { class="active" }><a href="@routes.Application.newRequest(None)">New Request</a></li>
-                    </ul>
                 </div>
+
+                @maybeUserInfo match {
+                    case Some(userInfo) => {
+                        <ul class="nav navbar-nav">
+                            <li @if(title == "OSS Requests") { class="active" }><a href="/">Requests</a></li>
+                            <li @if(title == "New Request") { class="active" }><a href="@routes.Application.newRequest(None)">New Request</a></li>
+                        </ul>
+
+                        <div class="navbar-header navbar-right">
+                            <p class="navbar-text">@userInfo.email</p>
+                            <a href="@routes.Application.logout()" class="btn btn-default navbar-btn">Logout</a>
+                        </div>
+                    }
+                    case None => {
+                        ???
+                    }
+                }
             </div>
+
+
         </nav>
 
         <div class="container">
