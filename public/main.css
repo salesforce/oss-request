@@ -10,3 +10,11 @@ body {
 .panel-title.pull-left {
     padding-top: 7px;
 }
+
+.modal-body .list-group-item {
+    background: white;
+}
+
+.modal-body .list-group-item:nth-child(odd) {
+    background: ghostwhite;
+}
