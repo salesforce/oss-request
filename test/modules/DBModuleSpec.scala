@@ -57,11 +57,10 @@ class DBModuleSpec extends PlaySpec with GuiceOneAppPerTest {
   "createRequest" must {
     "work" in Evolutions.withEvolutions(database) {
       val projectRequest = await(db.createRequest("foo", "foo@bar.com"))
-      projectRequest.slug must be >= 0
+      projectRequest.slug must equal ("foo")
       projectRequest.name must equal ("foo")
       projectRequest.createDate.isBefore(ZonedDateTime.now()) must be (true)
       projectRequest.creatorEmail must equal ("foo@bar.com")
-      projectRequest.slug must equal ("foo")
       projectRequest.state must equal (State.InProgress)
     }
     "increment the slug" in Evolutions.withEvolutions(database) {
