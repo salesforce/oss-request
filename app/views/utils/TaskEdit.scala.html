@@ -84,14 +84,16 @@
             }
         </div>
 
-        <div class="panel-footer">@utils.AssignedTo(groups, maybeCompletableBy)</div>
+        <div class="panel-footer">
+            @utils.AssignedTo(groups, maybeCompletableBy)
+        </div>
     }
     case models.Task.TaskType.Action => {
         <div class="panel-body">
             <p>@taskPrototype.info</p>
         </div>
         <div class="panel-footer clearfix">
-
+            <span>@utils.AssignedTo(groups, maybeCompletableBy)</span>
 
             <form action="@formUrl()" method="post" class="pull-right">
                 <button type="submit" class="btn btn-success">Mark as Completed</button>
