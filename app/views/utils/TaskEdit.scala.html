@@ -83,15 +83,17 @@
                 }
             }
         </div>
+
+        <div class="panel-footer">@utils.AssignedTo(groups, maybeCompletableBy)</div>
     }
     case models.Task.TaskType.Action => {
         <div class="panel-body">
             <p>@taskPrototype.info</p>
-
-            <p>@utils.AssignedTo(groups, maybeCompletableBy)</p>
         </div>
-        <div class="panel-footer">
-            <form action="@formUrl()" method="post">
+        <div class="panel-footer clearfix">
+
+
+            <form action="@formUrl()" method="post" class="pull-right">
                 <button type="submit" class="btn btn-success">Mark as Completed</button>
             </form>
         </div>
@@ -99,21 +101,23 @@
     case models.Task.TaskType.Approval => {
         <div class="panel-body">
             <p>@taskPrototype.info</p>
-
-            <p>@utils.AssignedTo(groups, maybeCompletableBy)</p>
         </div>
 
-        <div class="panel-footer">
-            <div class="row">
-                <div class="col-md-1">
-                    <form action="@formUrl()" method="post">
-                        <button type="submit" class="btn btn-success">Approve</button>
-                    </form>
-                </div>
-                <div class="col-md-1">
-                    <form action="@formUrl(models.State.Cancelled)" method="post">
-                        <button type="submit" class="btn btn-danger">Deny</button>
-                    </form>
+        <div class="panel-footer clearfix">
+            <span>@utils.AssignedTo(groups, maybeCompletableBy)</span>
+
+            <div class="pull-right">
+                <div class="row">
+                    <div class="col-md-6">
+                        <form action="@formUrl()" method="post">
+                            <button type="submit" class="btn btn-success">Approve</button>
+                        </form>
+                    </div>
+                    <div class="col-md-6">
+                        <form action="@formUrl(models.State.Cancelled)" method="post">
+                            <button type="submit" class="btn btn-danger">Deny</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>

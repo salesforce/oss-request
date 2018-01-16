@@ -11,6 +11,10 @@ body {
     padding-top: 7px;
 }
 
+.panel-footer span {
+    line-height: 32px;
+}
+
 .modal-body .list-group-item {
     background: white;
 }
