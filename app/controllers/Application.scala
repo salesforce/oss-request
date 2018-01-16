@@ -30,13 +30,13 @@ class Application @Inject()
   (implicit ec: ExecutionContext)
   extends InjectedController {
 
-  // todo: test cause it doesn't seem to be working correctly
-  private[controllers] def completableByWithDefaults(maybeCompletableBy: Option[Task.CompletableBy], defaultWhenNoCompletableBy: Option[String], defaultWhenNoCompletableByValue: Option[String]): Option[(CompletableByType.CompletableByType, String)] = {
-    maybeCompletableBy.flatMap { completableBy =>
-      completableBy.value.orElse(defaultWhenNoCompletableByValue).map { value =>
-        completableBy.`type` -> value
-      }
-    } orElse defaultWhenNoCompletableBy.map(CompletableByType.Email -> _)
+  private[controllers] def completableByWithDefaults(maybeCompletableBy: Option[Task.CompletableBy], maybeRequestOwner: Option[String], maybeProvidedValue: Option[String]): Option[(CompletableByType.CompletableByType, String)] = {
+    (maybeCompletableBy, maybeRequestOwner, maybeProvidedValue) match {
+      case (Some(Task.CompletableBy(completableByType, Some(completableByValue))), _, _) => Some(completableByType -> completableByValue)
+      case (Some(Task.CompletableBy(completableByType, None)), _, Some(providedValue)) => Some(completableByType -> providedValue)
+      case (None, Some(requestOwner), _) => Some(CompletableByType.Email -> requestOwner)
+      case _ => None
+    }
   }
 
   def index = userAction.async { implicit userRequest =>
