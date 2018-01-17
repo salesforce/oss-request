@@ -9,20 +9,22 @@ import javax.inject.Inject
 import models.{Comment, Request, State, Task, TaskEvent}
 import models.Task.CompletableByType.CompletableByType
 import play.api.libs.json.JsObject
+import play.api.mvc.RequestHeader
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler)(implicit ec: ExecutionContext) {
+class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler, notify: Notify)(implicit ec: ExecutionContext) {
   def createRequest(name: String, creatorEmail: String): Future[Request] = {
     for {
       request <- db.createRequest(name, creatorEmail)
     } yield request
   }
 
-  def createTask(requestSlug: String, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress): Future[Task] = {
+  def createTask(requestSlug: String, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress)(implicit requestHeader: RequestHeader): Future[Task] = {
     for {
       task <- db.createTask(requestSlug, prototype, completableByType, completableByValue, maybeCompletedBy, maybeData, state)
       _ <- taskEventHandler.process(requestSlug, TaskEvent.EventType.StateChange, task)
+      _ <- if (state == State.InProgress) notify.taskAssigned(task) else Future.unit
     } yield task
   }
 
@@ -32,9 +34,10 @@ class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler)(implicit ec: Exe
     } yield allRequests
   }
 
-  def updateRequest(requestSlug: String, state: State.State): Future[Request] = {
+  def updateRequest(requestSlug: String, state: State.State)(implicit requestHeader: RequestHeader): Future[Request] = {
     for {
       request <- db.updateRequest(requestSlug, state)
+      _ <- notify.requestStatusChange(request)
     } yield request
   }
 
@@ -69,9 +72,10 @@ class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler)(implicit ec: Exe
     } yield tasks
   }
 
-  def commentOnTask(taskId: Int, email: String, contents: String): Future[Comment] = {
+  def commentOnTask(requestSlug: String, taskId: Int, email: String, contents: String)(implicit requestHeader: RequestHeader): Future[Comment] = {
     for {
       comment <- db.commentOnTask(taskId, email, contents)
+      _ <- notify.taskComment(requestSlug, comment)
     } yield comment
   }
 

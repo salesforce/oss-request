@@ -151,7 +151,7 @@ class Application @Inject()
       val maybeContents = userRequest.body.get("contents").flatMap(_.headOption).filterNot(_.isEmpty)
 
       maybeContents.fold(Future.successful(BadRequest("The contents were empty"))) { contents =>
-        dao.commentOnTask(taskId, userInfo.email, contents).map { comment =>
+        dao.commentOnTask(requestSlug, taskId, userInfo.email, contents).map { comment =>
           Redirect(routes.Application.request(requestSlug))
         }
       }
