@@ -18,6 +18,7 @@
 
     <logger name="play" level="INFO" />
     <logger name="application" level="DEBUG" />
+    <logger name="com.github.mauricio.async.db.postgresql.codec" level="ERROR" />
 
     <root>
         <appender-ref ref="ASYNCSTDOUT" />
