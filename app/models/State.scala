@@ -37,4 +37,12 @@ object State extends Enumeration {
     }
   }
 
+  implicit class RichState(state: State) {
+    def toHuman: String = state match {
+      case State.OnHold => "put on hold"
+      case State.Cancelled => "cancelled"
+      case State.Completed => "completed"
+    }
+  }
+
 }

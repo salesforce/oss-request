@@ -23,21 +23,51 @@ class NotifySparkPost @Inject()(notifyBase: NotifyBase, configuration: Configura
 
   lazy val client = new Client(apiKey)
 
-  override def taskAssigned(task: Task)(implicit requestHeader: RequestHeader): Future[Unit] = {
-    notifyBase.taskAssigned(task) { email =>
+  // todo: move content to templates
 
+  override def taskAssigned(task: Task)(implicit requestHeader: RequestHeader): Future[Unit] = {
+    val url = controllers.routes.Application.request(task.requestSlug).absoluteURL()
+
+    notifyBase.taskAssigned(task) { email =>
+      val subject = s"OSS Request - Task Assigned - ${task.prototype.label}"
+      val message =
+        s"""
+          |You have been assigned an OSS Request task '${task.prototype.label}'
+          |To complete or followup on this task, see: $url
+        """.stripMargin
+
+      client.sendMessage(from, email, subject, message, message)
     }
   }
 
   override def taskComment(requestSlug: String, comment: Comment)(implicit requestHeader: RequestHeader): Future[Unit] = {
-    notifyBase.taskComment(requestSlug, comment) { case (request, task) => email =>
+    val url = controllers.routes.Application.request(requestSlug).absoluteURL()
 
+    notifyBase.taskComment(requestSlug, comment) { case (request, task) => email =>
+      val subject = s"Comment on OSS Request Task - ${request.name} - ${task.prototype.label}"
+      val message =
+        s"""
+           |${comment.creatorEmail} said:
+           |${comment.contents}
+           |
+           |Respond: $url
+        """.stripMargin
+
+      client.sendMessage(from, email, subject, message, message)
     }
   }
 
   override def requestStatusChange(request: Request)(implicit requestHeader: RequestHeader): Future[Unit] = {
-    notifyBase.requestStatusChange(request) { email =>
+    val url = controllers.routes.Application.request(request.slug).absoluteURL()
 
+    notifyBase.requestStatusChange(request) { email =>
+      val subject = s"OSS Request ${request.name} was ${request.state.toHuman}"
+      val message =
+        s"""
+           |Details: $url
+        """.stripMargin
+
+      client.sendMessage(from, email, subject, message, message)
     }
   }
 }

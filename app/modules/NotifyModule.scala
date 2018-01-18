@@ -86,12 +86,7 @@ class NotifyLogger @Inject() (notifyBase: NotifyBase) extends Notify {
   override def requestStatusChange(request: Request)(implicit requestHeader: RequestHeader): Future[Unit] = {
     notifyBase.requestStatusChange(request) { email =>
       val url = controllers.routes.Application.request(request.slug).absoluteURL()
-      val state = request.state match {
-        case State.OnHold => "put on hold"
-        case State.Cancelled => "cancelled"
-        case State.Completed => "completed"
-      }
-      Logger.info(s"OSS Request ${request.name} was $state $url")
+      Logger.info(s"OSS Request ${request.name} was ${request.state.toHuman} $url")
     }
   }
 }
