@@ -20,6 +20,8 @@ libraryDependencies ++= Seq(
 
   "io.getquill"            %% "quill-async-postgres"               % "2.3.2",
 
+  "com.sparkpost"          %  "sparkpost-lib"                      % "0.19",
+
   "org.webjars"            %% "webjars-play"                       % "2.6.3",
   "org.webjars"            %  "salesforce-lightning-design-system" % "2.4.1",
   "org.webjars"            %  "handlebars"                         % "4.0.5",

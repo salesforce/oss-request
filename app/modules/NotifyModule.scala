@@ -11,7 +11,7 @@ import models.{Comment, Request, State, Task}
 import play.api.inject.{Binding, Module}
 import play.api.mvc.RequestHeader
 import play.api.{Configuration, Environment, Logger}
-import utils.{Metadata, MetadataService}
+import utils.MetadataService
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -19,7 +19,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class NotifyModule extends Module {
   def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = {
     Seq(
-      bind[Notify].to[NotifyLoggerImpl]
+      bind[Notify].to[NotifyLogger]
     )
   }
 }
@@ -30,7 +30,7 @@ trait Notify {
   def requestStatusChange(request: Request)(implicit requestHeader: RequestHeader): Future[Unit]
 }
 
-class NotifyLoggerImpl @Inject() (db: DB, metadataService: MetadataService) (implicit ec: ExecutionContext) extends Notify {
+class NotifyBase @Inject() (db: DB, metadataService: MetadataService) (implicit ec: ExecutionContext) {
   def taskCompletableEmails(task: Task): Future[Set[String]] = {
     task.completableByType match {
       case CompletableByType.Email =>
@@ -43,22 +43,11 @@ class NotifyLoggerImpl @Inject() (db: DB, metadataService: MetadataService) (imp
     }
   }
 
-  override def taskAssigned(task: Task)(implicit requestHeader: RequestHeader): Future[Unit] = {
-    def notify(email: String): Unit = {
-      val url = controllers.routes.Application.request(task.requestSlug).absoluteURL()
-      Logger.info(s"$email has been assigned a task ${task.prototype.label} $url")
-    }
-
-    taskCompletableEmails(task).map(_.foreach(notify))
+  def taskAssigned(task: Task)(f: String => Unit)(implicit requestHeader: RequestHeader): Future[Unit] = {
+    taskCompletableEmails(task).map(_.foreach(f))
   }
 
-  override def taskComment(requestSlug: String, comment: Comment)(implicit requestHeader: RequestHeader): Future[Unit] = {
-    def notify(request: Request, task: Task)(email: String): Unit = {
-      val url = controllers.routes.Application.request(requestSlug).absoluteURL()
-
-      Logger.info(s"${comment.creatorEmail} added a comment to the '${request.name}' OSS Request on the '${task.prototype.label}' task: ${comment.contents}")
-    }
-
+  def taskComment(requestSlug: String, comment: Comment)(f: (Request, Task) => String => Unit)(implicit requestHeader: RequestHeader): Future[Unit] = {
     val requestFuture = db.request(requestSlug)
     val taskFuture = db.taskById(comment.taskId)
 
@@ -69,12 +58,33 @@ class NotifyLoggerImpl @Inject() (db: DB, metadataService: MetadataService) (imp
     } yield {
       // notify those that can complete the task, the request creator, but not the comment creator
       val allEmails = emailsFromTask + request.creatorEmail - comment.creatorEmail
-      allEmails.foreach(notify(request, task))
+      allEmails.foreach(f(request, task))
+    }
+  }
+
+  def requestStatusChange(request: Request)(f: String => Unit)(implicit requestHeader: RequestHeader): Future[Unit] = {
+    Future.successful(f(request.creatorEmail))
+  }
+
+}
+
+class NotifyLogger @Inject() (notifyBase: NotifyBase) extends Notify {
+  override def taskAssigned(task: Task)(implicit requestHeader: RequestHeader): Future[Unit] = {
+    notifyBase.taskAssigned(task) { email =>
+      val url = controllers.routes.Application.request(task.requestSlug).absoluteURL()
+      Logger.info(s"$email has been assigned a task ${task.prototype.label} $url")
+    }
+  }
+
+  override def taskComment(requestSlug: String, comment: Comment)(implicit requestHeader: RequestHeader): Future[Unit] = {
+    notifyBase.taskComment(requestSlug, comment) { case (request, task) => email =>
+      val url = controllers.routes.Application.request(requestSlug).absoluteURL()
+      Logger.info(s"${comment.creatorEmail} added a comment to the '${request.name}' OSS Request on the '${task.prototype.label}' task: ${comment.contents}")
     }
   }
 
   override def requestStatusChange(request: Request)(implicit requestHeader: RequestHeader): Future[Unit] = {
-    def notify(email: String): Unit = {
+    notifyBase.requestStatusChange(request) { email =>
       val url = controllers.routes.Application.request(request.slug).absoluteURL()
       val state = request.state match {
         case State.OnHold => "put on hold"
@@ -83,8 +93,5 @@ class NotifyLoggerImpl @Inject() (db: DB, metadataService: MetadataService) (imp
       }
       Logger.info(s"OSS Request ${request.name} was $state $url")
     }
-
-    Future.successful(notify(request.creatorEmail))
   }
-
 }
