@@ -7,16 +7,26 @@ package modules
 import models.{Request, Task}
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
+import play.api.db.Database
+import play.api.db.evolutions.Evolutions
+import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
 
 class NotifyBaseSpec extends PlaySpec with GuiceOneAppPerTest {
 
   def notifyBase = app.injector.instanceOf[NotifyBase]
+  def database = app.injector.instanceOf[Database]
   def db = app.injector.instanceOf[DB]
 
+  val dbUrl = sys.env.getOrElse("DATABASE_URL", "postgres://ossrequest:password@localhost:5432/ossrequest-test")
+
+  val testConfig = Map("db.default.url" -> dbUrl)
+
+  implicit override def fakeApplication() = new GuiceApplicationBuilder().configure(testConfig).build()
+
   "taskComment" must {
-    "work" in {
+    "work" in Evolutions.withEvolutions(database) {
       implicit val fakeRequest = FakeRequest()
 
       val request = await(db.createRequest("asdf", "asdf@asdf.com"))
@@ -36,7 +46,7 @@ class NotifyBaseSpec extends PlaySpec with GuiceOneAppPerTest {
   }
 
   "taskAssigned" must {
-    "work" in {
+    "work" in Evolutions.withEvolutions(database) {
       implicit val fakeRequest = FakeRequest()
 
       val request = await(db.createRequest("asdf", "asdf@asdf.com"))
@@ -55,7 +65,7 @@ class NotifyBaseSpec extends PlaySpec with GuiceOneAppPerTest {
   }
 
   "requestStatusChange" must {
-    "work" in {
+    "work" in Evolutions.withEvolutions(database) {
       implicit val fakeRequest = FakeRequest()
 
       val request = await(db.createRequest("asdf", "asdf@asdf.com"))
@@ -73,7 +83,7 @@ class NotifyBaseSpec extends PlaySpec with GuiceOneAppPerTest {
   }
 
   "taskCompletableEmails" must {
-    "work" in {
+    "work" in Evolutions.withEvolutions(database) {
       implicit val fakeRequest = FakeRequest()
 
       val request = await(db.createRequest("asdf", "asdf@asdf.com"))

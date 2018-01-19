@@ -13,7 +13,7 @@ import play.api.mvc.RequestHeader
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler, notify: Notify)(implicit ec: ExecutionContext) {
+class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler, notify: Notify, security: Security)(implicit ec: ExecutionContext) {
   def createRequest(name: String, creatorEmail: String): Future[Request] = {
     for {
       request <- db.createRequest(name, creatorEmail)
@@ -34,8 +34,9 @@ class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler, notify: Notify)(
     } yield allRequests
   }
 
-  def updateRequest(requestSlug: String, state: State.State)(implicit requestHeader: RequestHeader): Future[Request] = {
+  def updateRequest(email: String, requestSlug: String, state: State.State)(implicit requestHeader: RequestHeader): Future[Request] = {
     for {
+      _ <- security.updateRequest(email, requestSlug, state)
       request <- db.updateRequest(requestSlug, state)
       _ <- notify.requestStatusChange(request)
     } yield request
@@ -47,14 +48,15 @@ class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler, notify: Notify)(
     } yield requests
   }
 
-  def request(id: String): Future[Request] = {
+  def request(requestSlug: String): Future[Request] = {
     for {
-      request <- db.request(id)
+      request <- db.request(requestSlug)
     } yield request
   }
 
-  def updateTask(taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task] = {
+  def updateTask(email: String, taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task] = {
     for {
+      _ <- security.updateTask(email, taskId)
       task <- db.updateTask(taskId, state, maybeCompletedBy, maybeData)
       _ <- taskEventHandler.process(task.requestSlug, TaskEvent.EventType.StateChange, task)
     } yield task

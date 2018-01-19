@@ -52,6 +52,25 @@ class DAOSpec extends PlaySpec with GuiceOneAppPerTest {
     // todo: fail on unmet conditions for the EventAction's task
   }
 
+  "updateRequest" must {
+    "work for admins" in Evolutions.withEvolutions(database) {
+      implicit val fakeRequest = FakeRequest()
+
+      val request = await(dao.createRequest("foo", "foo@foo.com"))
+      noException must be thrownBy await(dao.updateRequest("foo@bar.com", request.slug, State.Completed))
+
+      await(dao.request(request.slug)).state must equal (State.Completed)
+    }
+    "be denied for non-admin / non-owner" in Evolutions.withEvolutions(database) {
+      implicit val fakeRequest = FakeRequest()
+
+      val request = await(dao.createRequest("foo", "foo@foo.com"))
+      a[Security.NotAllowed] must be thrownBy await(dao.updateRequest("baz@baz.com", request.slug, State.Completed))
+
+      await(dao.request(request.slug)).state must not equal State.Completed
+    }
+  }
+
 }
 
 @Singleton
@@ -67,7 +86,13 @@ class NotifyMock @Inject() (mockState: MockState) extends Notify {
     Future.unit
   }
 
-  override def taskComment(requestSlug: String, comment: Comment)(implicit requestHeader: RequestHeader): Future[Unit] = Future.failed(new NotImplementedError())
+  override def taskComment(requestSlug: String, comment: Comment)(implicit requestHeader: RequestHeader): Future[Unit] = {
+    mockState.taskComment = Some(requestSlug -> comment)
+    Future.unit
+  }
 
-  override def requestStatusChange(request: Request)(implicit requestHeader: RequestHeader): Future[Unit] = Future.failed(new NotImplementedError())
+  override def requestStatusChange(request: Request)(implicit requestHeader: RequestHeader): Future[Unit] = {
+    mockState.requestStatusChange = Some(request)
+    Future.unit
+  }
 }

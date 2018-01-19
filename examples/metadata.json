@@ -3,6 +3,9 @@
     "admin": [
       "foo@bar.com",
       "zxcv@zxcv.com"
+    ],
+    "security": [
+      "baz@baz.com"
     ]
   },
   "tasks": {

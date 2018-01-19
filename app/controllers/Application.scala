@@ -100,7 +100,7 @@ class Application @Inject()
 
   def updateRequest(requestSlug: String, state: State.State) = userAction.async { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
-      dao.updateRequest(requestSlug, state).map { request =>
+      dao.updateRequest(userInfo.email, requestSlug, state).map { request =>
         Redirect(routes.Application.request(request.slug))
       }
     }
@@ -137,7 +137,7 @@ class Application @Inject()
 
   def updateTask(requestSlug: String, taskId: Int, state: State.State) = userAction.async(maybeJsObject) { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
-      dao.updateTask(taskId, state, Some(userInfo.email), userRequest.body).map { task =>
+      dao.updateTask(userInfo.email, taskId, state, Some(userInfo.email), userRequest.body).map { task =>
         render {
           case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
           case Accepts.Json() => Ok(Json.toJson(task))

@@ -16,7 +16,9 @@ import play.api.{Configuration, Environment, Mode}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-case class Metadata(groups: Map[String, Set[String]], tasks: Map[String, Task.Prototype])
+case class Metadata(groups: Map[String, Set[String]], tasks: Map[String, Task.Prototype]) {
+  val admins = groups.getOrElse("admin", Set.empty[String])
+}
 
 object Metadata {
   implicit val jsonReads = Json.reads[Metadata]

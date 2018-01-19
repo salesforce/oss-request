@@ -6,12 +6,15 @@ package modules
 
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
+import play.api.Mode
 
 import scala.util.Try
 
 class NotifySparkPostSpec extends PlaySpec with GuiceOneAppPerTest {
 
   lazy val notifySparkPost = app.injector.instanceOf[NotifySparkPost]
+
+  override implicit def fakeApplication() = DBMock.fakeApplicationBuilder(Mode.Test).build()
 
   "sending an email" must {
     "work" in {
