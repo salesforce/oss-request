@@ -13,19 +13,16 @@ import play.api.mvc.AnyContentAsEmpty
 import play.api.test.Helpers._
 import play.api.test.{FakeHeaders, FakeRequest}
 
-class OauthSpec extends MixedPlaySpec {
+class OAuthSpec extends MixedPlaySpec {
 
   val maybeTestAuthUrl = sys.env.get("TEST_OAUTH_AUTH_URL")
   val maybeTestTokenUrl = sys.env.get("TEST_OAUTH_TOKEN_URL")
-  val maybeTestUserinfoUrl = sys.env.get("TEST_OAUTH_USERINFO_URL")
   val maybeTestClientId = sys.env.get("TEST_OAUTH_CLIENT_ID")
   val maybeTestClientSecret = sys.env.get("TEST_OAUTH_CLIENT_SECRET")
-  val maybeTestUsername = sys.env.get("TEST_OAUTH_USERNAME")
-  val maybeTestPassword = sys.env.get("TEST_OAUTH_PASSWORD")
 
   "getOrThrow" must {
     "produce a default value for clientId in dev mode" in new App(DBMock.fakeApplicationBuilder(Mode.Dev).build()) {
-      val oauth = app.injector.instanceOf[Oauth]
+      val oauth = app.injector.instanceOf[OAuth]
 
       oauth.clientId must not be null
     }
@@ -33,9 +30,9 @@ class OauthSpec extends MixedPlaySpec {
       an[Exception] should be thrownBy DBMock.fakeApplicationBuilder(Mode.Prod, MetadataSpec.defaultConfig).build()
     }
     "work in prod mode with the required config" in { () =>
-      val app = DBMock.fakeApplicationBuilder(Mode.Prod, OauthSpec.defaultConfig ++ MetadataSpec.defaultConfig).build()
+      val app = DBMock.fakeApplicationBuilder(Mode.Prod, OAuthSpec.defaultConfig ++ MetadataSpec.defaultConfig).build()
 
-      val oauth = app.injector.instanceOf[Oauth]
+      val oauth = app.injector.instanceOf[OAuth]
 
       oauth.clientId mustEqual "foo"
     }
@@ -45,26 +42,25 @@ class OauthSpec extends MixedPlaySpec {
     "not have query params when no code is passed" in new App(DBMock.fakeApplicationBuilder(Mode.Dev).build()) {
       implicit val request = FakeRequest("GET", "/")
 
-      val oauth = app.injector.instanceOf[Oauth]
+      val oauth = app.injector.instanceOf[OAuth]
 
       oauth.callbackUrl(None) must equal ("http://localhost/oauth2/callback")
     }
     "have a query param when code is passed" in new App(DBMock.fakeApplicationBuilder(Mode.Dev).build()) {
       implicit val request = FakeRequest("GET", "/")
 
-      val oauth = app.injector.instanceOf[Oauth]
+      val oauth = app.injector.instanceOf[OAuth]
 
       oauth.callbackUrl(Some("asdf")) must equal ("http://localhost/oauth2/callback?code=asdf")
     }
   }
 
   "external service" must {
-    (maybeTestAuthUrl, maybeTestTokenUrl, maybeTestUserinfoUrl, maybeTestClientId, maybeTestClientSecret, maybeTestUsername, maybeTestPassword) match {
-      case (Some(testAuthUrl), Some(testTokenUrl), Some(testUserinfoUrl), Some(testClientId), Some(testClientSecret), Some(testUsername), Some(testPassword)) =>
+    (maybeTestAuthUrl, maybeTestTokenUrl, maybeTestClientId, maybeTestClientSecret) match {
+      case (Some(testAuthUrl), Some(testTokenUrl), Some(testClientId), Some(testClientSecret)) =>
         val config = Map(
           "oauth.auth-url" -> testAuthUrl,
           "oauth.token-url" -> testTokenUrl,
-          "oauth.userinfo-url" -> testUserinfoUrl,
           "oauth.client-id" -> testClientId,
           "oauth.client-secret" -> testClientSecret
         )
@@ -72,7 +68,7 @@ class OauthSpec extends MixedPlaySpec {
         "work for the auth url" in new App(DBMock.fakeApplicationBuilder(Mode.Dev, config).build()) {
           implicit val request = FakeRequest("GET", "/", FakeHeaders(Seq(HeaderNames.HOST -> "localhost:9000")), AnyContentAsEmpty)
 
-          val oauth = app.injector.instanceOf[Oauth]
+          val oauth = app.injector.instanceOf[OAuth]
           val wsClient = app.injector.instanceOf[WSClient]
 
           val callbackUrl = oauth.callbackUrl()
@@ -88,40 +84,13 @@ class OauthSpec extends MixedPlaySpec {
         "create the right url to get a token with a code" in new App(DBMock.fakeApplicationBuilder(Mode.Dev, config).build()) {
           implicit val request = FakeRequest("GET", "/", FakeHeaders(Seq(HeaderNames.HOST -> "localhost:9000")), AnyContentAsEmpty)
 
-          val oauth = app.injector.instanceOf[Oauth]
+          val oauth = app.injector.instanceOf[OAuth]
 
           val callbackUrl = oauth.callbackUrl()
           callbackUrl must equal ("http://localhost:9000/oauth2/callback")
 
           val tokenUrl = oauth.tokenUrl("foo")
           tokenUrl must equal (s"$testTokenUrl?grant_type=authorization_code&code=foo&client_id=$testClientId&client_secret=$testClientSecret&redirect_uri=$callbackUrl")
-        }
-
-        "work to get a token via username and password" in new App(DBMock.fakeApplicationBuilder(Mode.Dev, config).build()) {
-          implicit val request = FakeRequest("GET", "/", FakeHeaders(Seq(HeaderNames.HOST -> "localhost:9000")), AnyContentAsEmpty)
-
-          val oauth = app.injector.instanceOf[Oauth]
-
-          val tokenUrl = oauth.tokenUrl(testUsername, testPassword)
-          tokenUrl must equal (s"$testTokenUrl?grant_type=password&client_id=$testClientId&client_secret=$testClientSecret&username=$testUsername&password=$testPassword")
-
-          val accessToken = await(oauth.accessToken(tokenUrl))
-          accessToken must not be null
-        }
-
-        "work to get an email" in new App(DBMock.fakeApplicationBuilder(Mode.Dev, config).build()) {
-          implicit val request = FakeRequest("GET", "/", FakeHeaders(Seq(HeaderNames.HOST -> "localhost:9000")), AnyContentAsEmpty)
-
-          val oauth = app.injector.instanceOf[Oauth]
-
-          val tokenUrl = oauth.tokenUrl(testUsername, testPassword)
-          tokenUrl must equal (s"$testTokenUrl?grant_type=password&client_id=$testClientId&client_secret=$testClientSecret&username=$testUsername&password=$testPassword")
-
-          val accessToken = await(oauth.accessToken(tokenUrl))
-          accessToken must not be null
-
-          val email = await(oauth.email(oauth.userinfoUrl(), accessToken))
-          email must not be null
         }
       case _ =>
         "be configured to be tested" in { () => cancel() }
@@ -130,7 +99,7 @@ class OauthSpec extends MixedPlaySpec {
 
 }
 
-object OauthSpec {
+object OAuthSpec {
   val defaultConfig = Map(
     "play.http.secret.key" -> "foo",
     "oauth.auth-url" -> "foo",

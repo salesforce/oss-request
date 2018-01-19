@@ -8,7 +8,7 @@ import javax.inject.{Inject, Singleton}
 
 import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.model.Uri.Query
-import play.api.http.{HeaderNames, HttpVerbs}
+import play.api.http.HttpVerbs
 import play.api.libs.ws.WSClient
 import play.api.mvc.RequestHeader
 import play.api.{Configuration, Environment, Mode}
@@ -17,7 +17,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 
 @Singleton
-class Oauth @Inject() (environment: Environment, configuration: Configuration, wsClient: WSClient) (implicit ec: ExecutionContext) {
+class OAuth @Inject() (environment: Environment, configuration: Configuration, wsClient: WSClient) (implicit ec: ExecutionContext) {
 
   def getOrThrow(name: String, default: String, andThen: String => String = identity): String = {
     configuration.getOptional[String](name).map(andThen).getOrElse {
@@ -50,16 +50,6 @@ class Oauth @Inject() (environment: Environment, configuration: Configuration, w
     })
   }
 
-  def tokenUrl(username: String, password: String) = {
-    val url = configuration.get[String]("oauth.token-url")
-    val query = Query("grant_type" -> "password", "client_id" -> clientId, "client_secret" -> clientSecret, "username" -> username, "password" -> password)
-    Uri(url).withQuery(query).toString()
-  }
-
-  def userinfoUrl()(implicit requestHeader: RequestHeader) = {
-    getOrThrow("oauth.userinfo-url", controllers.routes.Application.devOauthUserinfo().absoluteURL())
-  }
-
   val clientId = {
     getOrThrow("oauth.client-id", "DEV-CLIENT-ID")
   }
@@ -71,12 +61,6 @@ class Oauth @Inject() (environment: Environment, configuration: Configuration, w
   def accessToken(url: String): Future[String] = {
     wsClient.url(url).execute(HttpVerbs.POST).map { response =>
       (response.json \ "access_token").as[String]
-    }
-  }
-
-  def email(url: String, token: String): Future[String] = {
-    wsClient.url(url).withHttpHeaders(HeaderNames.AUTHORIZATION -> s"Bearer $token").get().map { response =>
-      (response.json \ "email").as[String]
     }
   }
 

@@ -20,7 +20,7 @@ class MetadataSpec extends MixedPlaySpec {
       metadata.tasks.get("start") must be (defined)
     }
     "fail in prod mode without a value" in { () =>
-      an[Exception] should be thrownBy DBMock.fakeApplicationBuilder(Mode.Prod, OauthSpec.defaultConfig).build()
+      an[Exception] should be thrownBy DBMock.fakeApplicationBuilder(Mode.Prod, OAuthSpec.defaultConfig).build()
     }
     "work with an http value" in new Server(DBMock.fakeApplicationBuilder(Mode.Dev, Map("metadata-url" -> "http://localhost:9999/.dev/metadata.json")).build(), 9999) {
       val metadataService = app.injector.instanceOf[MetadataService]

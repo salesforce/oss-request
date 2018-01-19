@@ -8,7 +8,7 @@ import javax.inject.Inject
 
 import models.{State, Task}
 import models.Task.{CompletableByType, TaskType}
-import modules.DAO
+import modules.{DAO, User}
 import org.webjars.WebJarAssetLocator
 import org.webjars.play.WebJarsUtil
 import play.api.libs.json.{JsObject, Json}
@@ -16,8 +16,7 @@ import play.api.mvc.Results.EmptyContent
 import play.api.mvc._
 import play.api.{Configuration, Environment, Mode}
 import play.twirl.api.Html
-import utils.dev.DevUsers
-import utils.{MetadataService, Oauth, UserAction, UserInfo}
+import utils.{MetadataService, OAuth, UserAction, UserInfo}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -25,7 +24,7 @@ import scala.xml.{Comment, Node}
 
 
 class Application @Inject()
-  (env: Environment, dao: DAO, userAction: UserAction, oauth: Oauth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, devUsers: DevUsers)
+  (env: Environment, dao: DAO, userAction: UserAction, oauth: OAuth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, user: User)
   (indexView: views.html.Index, devSelectUserView: views.html.dev.SelectUser, newRequestView: views.html.NewRequest, newRequestWithNameView: views.html.NewRequestWithName, requestView: views.html.Request, commentsView: views.html.partials.Comments)
   (implicit ec: ExecutionContext)
   extends InjectedController {
@@ -168,7 +167,7 @@ class Application @Inject()
 
   def oauthCallback(code: String, state: Option[String]) = Action.async { implicit request =>
     oauth.accessToken(oauth.tokenUrl(code)).flatMap { accessToken =>
-      oauth.email(oauth.userinfoUrl(), accessToken).flatMap { email =>
+      user.email(accessToken).flatMap { email =>
         metadataService.fetchMetadata.map { metadata =>
           val isAdmin = metadata.groups("admin").contains(email)
           val url = state.getOrElse(controllers.routes.Application.index().url)
@@ -191,27 +190,6 @@ class Application @Inject()
       case _ => Ok(devSelectUserView(request))
     }
   }
-
-  def devOauthUserinfo = Action { implicit request =>
-    env.mode match {
-      case Mode.Prod =>
-        Unauthorized
-      case _ =>
-        val maybeToken = request.headers.get(AUTHORIZATION).map(_.stripPrefix("Bearer "))
-
-        val maybeUser = maybeToken.flatMap { token =>
-          devUsers.users.find(_.token == token)
-        }
-
-        maybeUser.fold(Unauthorized("User not found")) { user =>
-          val json = Json.obj(
-            "email" -> user.email
-          )
-          Ok(json)
-        }
-    }
-  }
-
 
   def devOauthToken(grant_type: String, code: String, redirect_uri: String, client_id: String, client_secret: String) = Action {
     val json = Json.obj(
