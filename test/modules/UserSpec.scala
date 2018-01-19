@@ -35,8 +35,9 @@ class UserSpec extends MixedPlaySpec {
   }
 
   "SalesforceUser" must {
-    assume(maybeTestSalesforceTokenUrl.isDefined && maybeTestSalesforceClientId.isDefined && maybeTestSalesforceClientSecret.isDefined && maybeTestSalesforceUsername.isDefined && maybeTestSalesforcePassword.isDefined)
     "return an email" in new App(DBMock.fakeApplicationBuilder(Mode.Dev).build()) {
+      assume(maybeTestSalesforceTokenUrl.isDefined && maybeTestSalesforceClientId.isDefined && maybeTestSalesforceClientSecret.isDefined && maybeTestSalesforceUsername.isDefined && maybeTestSalesforcePassword.isDefined)
+
       val salesforceUser = app.injector.instanceOf[SalesforceUser]
       val oauth = app.injector.instanceOf[OAuth]
 
@@ -49,8 +50,9 @@ class UserSpec extends MixedPlaySpec {
   }
 
   "GitHubUser" must {
-    assume(maybeTestGitHubToken.isDefined)
     "return an email" in new App(DBMock.fakeApplicationBuilder(Mode.Dev).build()) {
+      assume(maybeTestGitHubToken.isDefined)
+
       val gitHubUser = app.injector.instanceOf[GitHubUser]
 
       noException must be thrownBy await(gitHubUser.email(maybeTestGitHubToken.get))
