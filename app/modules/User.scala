@@ -15,6 +15,16 @@ import utils.dev.DevUsers
 
 import scala.concurrent.{ExecutionContext, Future}
 
+class UserModule extends Module {
+  def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = {
+    configuration.getOptional[String]("user.provider") match {
+      case Some("salesforce") => Seq(bind[User].to[SalesforceUser])
+      case Some("github") => Seq(bind[User].to[GitHubUser])
+      case _ => Seq(bind[User].to[LocalUser])
+    }
+  }
+}
+
 trait User {
   def email(token: String): Future[String]
 }
@@ -32,14 +42,6 @@ class LocalUser @Inject() (devUsers: DevUsers, env: Environment) extends User {
   }
 }
 
-class LocalUserModule extends Module {
-  def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = {
-    Seq(
-      bind[User].to[LocalUser]
-    )
-  }
-}
-
 class SalesforceUser @Inject() (wsClient: WSClient) (implicit ec: ExecutionContext) extends User {
   def email(token: String): Future[String] = {
     wsClient
@@ -49,14 +51,6 @@ class SalesforceUser @Inject() (wsClient: WSClient) (implicit ec: ExecutionConte
       .map { response =>
         (response.json \ "email").as[String]
       }
-  }
-}
-
-class SalesforceUserModule extends Module {
-  def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = {
-    Seq(
-      bind[User].to[SalesforceUser]
-    )
   }
 }
 
@@ -73,13 +67,5 @@ class GitHubUser @Inject() (wsClient: WSClient) (implicit ec: ExecutionContext) 
           Future.successful((jsObject \ "email").as[String])
         }
       }
-  }
-}
-
-class GitHubUserModule extends Module {
-  def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = {
-    Seq(
-      bind[User].to[GitHubUser]
-    )
   }
 }
