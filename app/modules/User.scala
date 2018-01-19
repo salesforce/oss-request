@@ -67,7 +67,9 @@ class GitHubUser @Inject() (wsClient: WSClient) (implicit ec: ExecutionContext) 
       .withHttpHeaders(HeaderNames.AUTHORIZATION -> s"Bearer $token")
       .get()
       .flatMap { response =>
-        response.json.as[Seq[JsObject]].find(_.\("primary").as[Boolean]).fold(Future.failed[String](new Exception("Could not get email"))) { jsObject =>
+        response.json.asOpt[Seq[JsObject]].getOrElse(Seq.empty[JsObject]).find(_.\("primary").asOpt[Boolean].getOrElse(false)).fold {
+          Future.failed[String](new Exception("Could not get email"))
+        } { jsObject =>
           Future.successful((jsObject \ "email").as[String])
         }
       }

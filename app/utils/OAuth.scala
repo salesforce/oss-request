@@ -8,10 +8,11 @@ import javax.inject.{Inject, Singleton}
 
 import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.model.Uri.Query
-import play.api.http.HttpVerbs
+import play.api.http.{HttpVerbs, MimeTypes}
 import play.api.libs.ws.WSClient
 import play.api.mvc.RequestHeader
 import play.api.{Configuration, Environment, Mode}
+import play.mvc.Http.HeaderNames
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -39,7 +40,14 @@ class OAuth @Inject() (environment: Environment, configuration: Configuration, w
   def authUrl(implicit requestHeader: RequestHeader) = {
     getOrThrow("oauth.auth-url", controllers.routes.Application.devOauthAuthorize("code", "DEV", callbackUrl()).url, { url =>
       val query = Query("response_type" -> "code", "client_id" -> clientId, "redirect_uri" -> callbackUrl())
-      Uri(url).withQuery(query).toString()
+
+      val maybeScope = configuration.getOptional[String]("oauth.scope")
+
+      val queryWithMaybeScope = maybeScope.fold(query) { scope =>
+        ("scope" -> scope) +: query
+      }
+
+      Uri(url).withQuery(queryWithMaybeScope).toString()
     })
   }
 
@@ -59,7 +67,7 @@ class OAuth @Inject() (environment: Environment, configuration: Configuration, w
   }
 
   def accessToken(url: String): Future[String] = {
-    wsClient.url(url).execute(HttpVerbs.POST).map { response =>
+    wsClient.url(url).withHttpHeaders(HeaderNames.ACCEPT -> MimeTypes.JSON).execute(HttpVerbs.POST).map { response =>
       (response.json \ "access_token").as[String]
     }
   }
