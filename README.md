@@ -44,7 +44,7 @@ export OAUTH_CLIENT_SECRET=<YOUR CLIENT SECRET>
 Run the Tests
 -------------
 
-Optionall test OAuth (for example Salesforce):
+Optionally test OAuth (for example Salesforce):
 
 ```
 export TEST_OAUTH_AUTH_URL=https://login.salesforce.com/services/oauth2/authorize
@@ -54,6 +54,13 @@ export TEST_OAUTH_CLIENT_ID=<YOUR CLIENT ID>
 export TEST_OAUTH_CLIENT_SECRET=<YOUR CLIENT SECRET>
 export TEST_OAUTH_USERNAME=<YOUR TEST USERNAME>
 export TEST_OAUTH_PASSWORD=<YOUR TEST PASSWORD>
+```
+
+Optionally test SparkPost:
+
+```
+export SPARKPOST_API_KEY=<YOUR SPARKPOST API KEY>
+export SPARKPOST_DOMAIN=<YOUR SPARKPOST DOMAIN>
 ```
 
 1. Run all of the tests continuously:

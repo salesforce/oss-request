@@ -4,7 +4,7 @@
 
 @this()
 
-@(task: models.Task)
+@(task: models.Task, groups: Map[String, Set[String]])
 
 @formWithData(form: play.api.libs.json.JsObject) = @{
     val dataBody = task.data.getOrElse(play.api.libs.json.Json.obj())
@@ -39,6 +39,9 @@
             case models.State.Cancelled => {
                 <div class="panel-footer">Task Cancelled</div>
             }
+            case models.State.InProgress => {
+                <div class="panel-footer">@views.html.utils.AssignedTo(groups, Some(task.completableByType -> task.completableByValue))</div>
+            }
         }
 
     }
@@ -57,6 +60,9 @@
             case models.State.Cancelled => {
                 <div class="panel-footer">Task Cancelled</div>
             }
+            case models.State.InProgress => {
+                <div class="panel-footer">@views.html.utils.AssignedTo(groups, Some(task.completableByType -> task.completableByValue))</div>
+            }
         }
     }
     case models.Task.TaskType.Approval => {
@@ -73,6 +79,9 @@
             }
             case models.State.Cancelled => {
                 <div class="panel-footer">Denied</div>
+            }
+            case models.State.InProgress => {
+                <div class="panel-footer">@views.html.utils.AssignedTo(groups, Some(task.completableByType -> task.completableByValue))</div>
             }
         }
     }

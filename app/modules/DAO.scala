@@ -10,6 +10,7 @@ import models.{Comment, Request, State, Task, TaskEvent}
 import models.Task.CompletableByType.CompletableByType
 import play.api.libs.json.JsObject
 import play.api.mvc.RequestHeader
+import utils.{Security, TaskEventHandler}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -48,10 +49,12 @@ class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler, notify: Notify, 
     } yield requests
   }
 
-  def request(requestSlug: String): Future[Request] = {
+  def request(email: String, requestSlug: String): Future[(Request, Boolean, Boolean)] = {
     for {
       request <- db.request(requestSlug)
-    } yield request
+      isAdmin <- security.isAdmin(email)
+      canCancelRequest <- security.canCancelRequest(email, Left(request))
+    } yield (request, isAdmin, canCancelRequest)
   }
 
   def updateTask(email: String, taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task] = {
@@ -68,10 +71,17 @@ class DAO @Inject()(db: DB, taskEventHandler: TaskEventHandler, notify: Notify, 
     } yield task
   }
 
-  def requestTasks(requestSlug: String, maybeState: Option[State.State] = None): Future[Seq[(Task, Long)]] = {
+  def requestTasks(email: String, requestSlug: String, maybeState: Option[State.State] = None): Future[Seq[(Task, Long, Boolean)]] = {
+    def canEdit(taskWithNumComments: (Task, Long)): Future[(Task, Long, Boolean)] = {
+      security.canEditTask(email, Left(taskWithNumComments._1)).map { canEdit =>
+        (taskWithNumComments._1, taskWithNumComments._2, canEdit)
+      }
+    }
+
     for {
       tasks <- db.requestTasks(requestSlug, maybeState)
-    } yield tasks
+      tasksWithCanEdit <- Future.sequence(tasks.map(canEdit))
+    } yield tasksWithCanEdit
   }
 
   def commentOnTask(requestSlug: String, taskId: Int, email: String, contents: String)(implicit requestHeader: RequestHeader): Future[Comment] = {

@@ -88,10 +88,10 @@ class Application @Inject()
 
   def request(requestSlug: String) = userAction.async { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
-      dao.request(requestSlug).flatMap { request =>
-        dao.requestTasks(request.slug).flatMap { tasks =>
+      dao.request(userInfo.email, requestSlug).flatMap { case (request, isAdmin, canCancelRequest) =>
+        dao.requestTasks(userInfo.email, request.slug).flatMap { tasks =>
           metadataService.fetchMetadata.map { metadata =>
-            Ok(requestView(metadata, request, tasks, userInfo))
+            Ok(requestView(metadata, request, tasks, userInfo, isAdmin, canCancelRequest))
           }
         }
       }
@@ -111,7 +111,7 @@ class Application @Inject()
       val maybeTaskPrototypeKey = userRequest.body.get("taskPrototypeKey").flatMap(_.headOption)
       val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption).filterNot(_.isEmpty)
 
-      dao.request(requestSlug).flatMap { request =>
+      dao.request(userInfo.email, requestSlug).flatMap { case (request, _, _) =>
         maybeTaskPrototypeKey.fold(Future.successful(BadRequest("No taskPrototypeKey specified"))) { taskPrototypeKey =>
           metadataService.fetchMetadata.flatMap { metadata =>
             metadata.tasks.get(taskPrototypeKey).fold(Future.successful(InternalServerError(s"Could not find task prototype $taskPrototypeKey"))) { taskPrototype =>

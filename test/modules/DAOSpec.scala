@@ -5,7 +5,7 @@
 package modules
 
 
-import javax.inject.{Singleton, Inject}
+import javax.inject.{Inject, Singleton}
 
 import models.{Comment, Request, State, Task, TaskEvent}
 import org.scalatestplus.play.PlaySpec
@@ -17,6 +17,7 @@ import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.mvc.RequestHeader
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
+import utils.Security
 
 import scala.concurrent.Future
 
@@ -44,7 +45,7 @@ class DAOSpec extends PlaySpec with GuiceOneAppPerTest {
       val request = await(dao.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", Task.TaskType.Approval, "asdf", None, None, Seq(event))
       val task = await(dao.createTask(request.slug, prototype, Task.CompletableByType.Email, "foo@foo.com"))
-      val allTasks = await(dao.requestTasks(request.slug))
+      val allTasks = await(dao.requestTasks("foo@foo.com", request.slug))
       allTasks must have size 2
 
       mockState.taskAssigned.map(_.completableByValue) must contain ("foo@foo.com")
@@ -59,7 +60,7 @@ class DAOSpec extends PlaySpec with GuiceOneAppPerTest {
       val request = await(dao.createRequest("foo", "foo@foo.com"))
       noException must be thrownBy await(dao.updateRequest("foo@bar.com", request.slug, State.Completed))
 
-      await(dao.request(request.slug)).state must equal (State.Completed)
+      await(dao.request("foo@foo.com", request.slug))._1.state must equal (State.Completed)
     }
     "be denied for non-admin / non-owner" in Evolutions.withEvolutions(database) {
       implicit val fakeRequest = FakeRequest()
@@ -67,7 +68,7 @@ class DAOSpec extends PlaySpec with GuiceOneAppPerTest {
       val request = await(dao.createRequest("foo", "foo@foo.com"))
       a[Security.NotAllowed] must be thrownBy await(dao.updateRequest("baz@baz.com", request.slug, State.Completed))
 
-      await(dao.request(request.slug)).state must not equal State.Completed
+      await(dao.request("foo@foo.com", request.slug))._1.state must not equal State.Completed
     }
   }
 

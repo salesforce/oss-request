@@ -7,7 +7,7 @@
 
 @this(mainView: Main, taskView: utils.Task)
 
-@(metadata: _root_.utils.Metadata, request: models.Request, tasks: Seq[(models.Task, Long)], userInfo: _root_.utils.UserInfo)
+@(metadata: _root_.utils.Metadata, request: models.Request, tasks: Seq[(models.Task, Long, Boolean)], userInfo: _root_.utils.UserInfo, isAdmin: Boolean, canCancelRequest: Boolean)
 
 @tasksWithState(state: State.State) = @{
     tasks.filter(_._1.state == state)
@@ -37,37 +37,53 @@
                     </div>
                 </div>
 
-                @if(completedTasks.size == tasks.size) {
-                    <form action="@routes.Application.updateRequest(request.slug, models.State.Completed)" method="post">
-                        <button type="submit" class="btn btn-success">Mark as Completed</button>
-                    </form>
-                }
-            }
-
-            <form action="@routes.Application.addTask(request.slug)" method="post" class="form-inline">
-                <div class="form-group">
-                    <label for="taskPrototypeKey">Add a Task</label>
-                    <select id="taskPrototypeKeySelect" name="taskPrototypeKey" class="form-control">
-                        <option disabled selected value> -- task type -- </option>
-                        @for((key, taskPrototype) <- metadata.tasks) {
-                            <option value="@key">@taskPrototype.label</option>
-                        }
-                    </select>
-                </div>
-                <div id="completableByEmailDiv" class="form-group">
-                    <label for="completableByEmail">Completable By (Email)</label>
-                    <input id="completableByEmail" type="email" class="form-control">
-                </div>
-                <div id="completableByGroupDiv" class="form-group">
-                    <label for="completableByGroup">Completable By</label>
-                    <select id="completableByGroup" class="form-control">
-                    @for(group <- metadata.groups.keys) {
-                        <option>@group</option>
+                <div class="row">
+                    @if(completedTasks.size == tasks.size && isAdmin) {
+                        <div class="col-md-2">
+                            <form action="@routes.Application.updateRequest(request.slug, models.State.Completed)" method="post">
+                                <button type="submit" class="btn btn-success">Mark as Completed</button>
+                            </form>
+                        </div>
                     }
-                    </select>
+
+                    @if(canCancelRequest) {
+                        <div class="col-md-2">
+                            <form action="@routes.Application.updateRequest(request.slug, models.State.Cancelled)" method="post">
+                                <button type="submit" class="btn btn-success">Cancel Request</button>
+                            </form>
+                        </div>
+                    }
+
+                    @if(isAdmin) {
+                        <div class="col-md-4">
+                            <form action="@routes.Application.addTask(request.slug)" method="post" class="form-inline">
+                                <div class="form-group">
+                                    <label for="taskPrototypeKey">Add a Task</label>
+                                    <select id="taskPrototypeKeySelect" name="taskPrototypeKey" class="form-control">
+                                        <option disabled selected value> -- task type -- </option>
+                                        @for((key, taskPrototype) <- metadata.tasks) {
+                                            <option value="@key">@taskPrototype.label</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div id="completableByEmailDiv" class="form-group">
+                                    <label for="completableByEmail">Completable By (Email)</label>
+                                    <input id="completableByEmail" type="email" class="form-control">
+                                </div>
+                                <div id="completableByGroupDiv" class="form-group">
+                                    <label for="completableByGroup">Completable By</label>
+                                    <select id="completableByGroup" class="form-control">
+                                    @for(group <- metadata.groups.keys) {
+                                        <option>@group</option>
+                                    }
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Add It</button>
+                            </form>
+                        </div>
+                    }
                 </div>
-                <button type="submit" class="btn btn-primary">Add It</button>
-            </form>
+            }
 
             <script>
                 // Only send a completableBy form value if it was needed by the prototype
@@ -115,6 +131,10 @@
             }
         }
 
+        case models.State.Cancelled => {
+            Request Cancelled
+        }
+
         case _ => {
             ???
         }
@@ -131,7 +151,7 @@
     </div>
 
     @for(task <- tasks) {
-        @taskView(task._1, task._2, metadata.groups)
+        @taskView(task._1, task._2, request.state == State.InProgress && task._3, metadata.groups)
     }
 
 }

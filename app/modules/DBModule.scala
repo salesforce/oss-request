@@ -25,7 +25,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class DBModule extends Module {
   def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = {
     Seq(
-      bind[DB].to[DBImpl]
+      bind[DB].to[DBWithCtx]
     )
   }
 }
@@ -44,7 +44,7 @@ trait DB {
   def commentsOnTask(taskId: Int): Future[Seq[Comment]]
 }
 
-class DBImpl @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext) extends DB {
+class DBWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext) extends DB {
   import database.ctx._
 
   implicit val jsObjectDecoder = MappedEncoding[String, JsObject](Json.parse(_).as[JsObject])

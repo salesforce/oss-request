@@ -48,6 +48,7 @@ class MetadataService @Inject() (configuration: Configuration, environment: Envi
     }
   }
 
+  // todo: caching
   def fetchMetadata: Future[Metadata] = {
     maybeMetadataUrl.fold(localMetadata) { metadataUrl =>
       val wsRequest = wsClient.url(metadataUrl.toString)

@@ -2,33 +2,16 @@
  * Copyright (c) Salesforce.com, inc. 2017
  */
 
-package modules
+package utils
 
 import javax.inject.Inject
 
-import models.State.State
-import models.Task.CompletableByType.CompletableByType
 import models.{Task, TaskEvent}
-import play.api.{Configuration, Environment}
-import play.api.inject.{Binding, Module}
-import play.api.libs.json.JsObject
-import utils.MetadataService
+import modules.DB
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class TaskEventHandlerModule extends Module {
-  def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = {
-    Seq(
-      bind[TaskEventHandler].to[TaskEventHandlerImpl]
-    )
-  }
-}
-
-trait TaskEventHandler {
-  def process(requestSlug: String, eventType: TaskEvent.EventType.EventType, task: Task): Future[Seq[_]]
-}
-
-class TaskEventHandlerImpl @Inject()(db: DB, metadataService: MetadataService)(implicit ec: ExecutionContext) extends TaskEventHandler {
+class TaskEventHandler @Inject()(db: DB, metadataService: MetadataService)(implicit ec: ExecutionContext) {
   lazy val taskPrototypesFuture = metadataService.fetchMetadata.map(_.tasks)
 
   def process(requestSlug: String, eventType: TaskEvent.EventType.EventType, task: Task): Future[Seq[_]] = {

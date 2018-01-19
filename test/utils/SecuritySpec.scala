@@ -2,18 +2,18 @@
  * Copyright (c) Salesforce.com, inc. 2017
  */
 
-package modules
+package utils
 
 import models.{State, Task}
+import modules.DB
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.db.Database
 import play.api.db.evolutions.Evolutions
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.Helpers._
-import utils.MetadataService
 
-class SecurityModuleSpec extends PlaySpec with GuiceOneAppPerTest {
+class SecuritySpec extends PlaySpec with GuiceOneAppPerTest {
 
   def security = app.injector.instanceOf[Security]
   def metadata = await(app.injector.instanceOf[MetadataService].fetchMetadata)
