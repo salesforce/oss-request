@@ -26,6 +26,12 @@ class MetadataSpec extends MixedPlaySpec {
       val metadataService = app.injector.instanceOf[MetadataService]
       await(metadataService.fetchMetadata).groups("admin") must contain ("zxcv@zxcv.com")
     }
+    "work with an external metadata file that requires auth" in new App(DBMock.fakeApplicationBuilder(Mode.Dev, MetadataSpec.externalConfig).build()) {
+      assume(MetadataSpec.externalConfig.nonEmpty)
+
+      val metadataService = app.injector.instanceOf[MetadataService]
+      noException must be thrownBy await(metadataService.fetchMetadata)
+    }
   }
 
 }
@@ -35,4 +41,16 @@ object MetadataSpec {
     "play.http.secret.key" -> "foo",
     "metadata-url" -> "foo"
   )
+
+  def externalConfig = {
+    (sys.env.get("TEST_METADATA_URL"), sys.env.get("TEST_METADATA_TOKEN")) match {
+      case (Some(testMetadataUrl), Some(testMetadataToken)) =>
+        Map(
+          "metadata-url" -> testMetadataUrl,
+          "metadata-token" -> testMetadataToken
+        )
+      case _ =>
+        Map.empty[String, String]
+    }
+  }
 }

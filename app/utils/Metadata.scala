@@ -51,9 +51,9 @@ class MetadataService @Inject() (configuration: Configuration, environment: Envi
   // todo: caching
   def fetchMetadata: Future[Metadata] = {
     maybeMetadataUrl.fold(localMetadata) { metadataUrl =>
-      val wsRequest = wsClient.url(metadataUrl.toString)
+      val wsRequest = wsClient.url(metadataUrl)
       val requestWithMaybeAuth = maybeMetadataToken.fold(wsRequest) { token =>
-        wsRequest.withHttpHeaders(HeaderNames.AUTHORIZATION -> s"Bearer $token")
+        wsRequest.withHttpHeaders(HeaderNames.AUTHORIZATION -> s"token $token")
       }
 
       requestWithMaybeAuth.get().flatMap { response =>
