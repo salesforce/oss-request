@@ -9,7 +9,7 @@ import modules.DB
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.db.Database
-import play.api.db.evolutions.Evolutions
+import play.api.db.evolutions.{Evolutions, EvolutionsModule}
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.Helpers._
 
@@ -24,7 +24,7 @@ class SecuritySpec extends PlaySpec with GuiceOneAppPerTest {
 
   val testConfig = Map("db.default.url" -> dbUrl)
 
-  implicit override def fakeApplication() = new GuiceApplicationBuilder().configure(testConfig).build()
+  implicit override def fakeApplication() = new GuiceApplicationBuilder().disable[EvolutionsModule].configure(testConfig).build()
 
   "updateRequest" must {
     "allow all state changes for admins" in Evolutions.withEvolutions(database) {

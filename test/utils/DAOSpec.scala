@@ -11,7 +11,7 @@ import modules.Notify
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.db.Database
-import play.api.db.evolutions.Evolutions
+import play.api.db.evolutions.{Evolutions, EvolutionsModule}
 import play.api.inject.bind
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.mvc.RequestHeader
@@ -28,6 +28,7 @@ class DAOSpec extends PlaySpec with GuiceOneAppPerTest {
 
   implicit override def fakeApplication() = new GuiceApplicationBuilder()
     .configure(testConfig)
+    .disable[EvolutionsModule]
     .overrides(bind[Notify].to[NotifyMock])
     .build()
 

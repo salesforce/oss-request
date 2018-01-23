@@ -8,6 +8,7 @@ import models.State.State
 import models.Task.CompletableByType.CompletableByType
 import models.{Comment, Request, Task}
 import play.api.Mode
+import play.api.db.Database
 import play.api.db.evolutions.EvolutionsModule
 import play.api.inject.bind
 import play.api.inject.guice.GuiceApplicationBuilder
@@ -33,6 +34,7 @@ object DBMock {
   def fakeApplicationBuilder(mode: Mode, additionalConfig: Map[String, Any] = Map.empty[String, Any]) = new GuiceApplicationBuilder()
     .configure(additionalConfig)
     .disable[DBModule]
+    .disable[Database]
     .disable[EvolutionsModule]
     .overrides(bind[DB].to[DBMock])
     .in(mode)

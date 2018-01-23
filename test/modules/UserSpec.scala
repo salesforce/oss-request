@@ -6,8 +6,6 @@ package modules
 
 import org.scalatestplus.play.MixedPlaySpec
 import play.api.Mode
-import play.api.http.HttpVerbs
-import play.api.libs.ws.WSClient
 import play.api.test.Helpers._
 import utils.OAuth
 import utils.dev.DevUsers
