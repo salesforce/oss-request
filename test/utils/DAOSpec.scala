@@ -2,12 +2,12 @@
  * Copyright (c) Salesforce.com, inc. 2017
  */
 
-package modules
-
+package utils
 
 import javax.inject.{Inject, Singleton}
 
 import models.{Comment, Request, State, Task, TaskEvent}
+import modules.Notify
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.db.Database
@@ -17,7 +17,6 @@ import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.mvc.RequestHeader
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
-import utils.Security
 
 import scala.concurrent.Future
 

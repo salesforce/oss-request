@@ -7,10 +7,10 @@ package modules
 import javax.inject.Inject
 
 import play.api.http.HeaderNames
-import play.api.{Configuration, Environment, Mode}
 import play.api.inject.{Binding, Module}
 import play.api.libs.json.JsObject
 import play.api.libs.ws.WSClient
+import play.api.{Configuration, Environment, Mode}
 import utils.dev.DevUsers
 
 import scala.concurrent.{ExecutionContext, Future}

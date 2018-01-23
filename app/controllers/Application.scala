@@ -6,9 +6,9 @@ package controllers
 
 import javax.inject.Inject
 
+import models.Task.CompletableByType
 import models.{State, Task}
-import models.Task.{CompletableByType, TaskType}
-import modules.{DAO, User}
+import modules.User
 import org.webjars.WebJarAssetLocator
 import org.webjars.play.WebJarsUtil
 import play.api.libs.json.{JsObject, Json}
@@ -16,7 +16,7 @@ import play.api.mvc.Results.EmptyContent
 import play.api.mvc._
 import play.api.{Configuration, Environment, Mode}
 import play.twirl.api.Html
-import utils.{MetadataService, OAuth, UserAction, UserInfo}
+import utils.{DAO, MetadataService, OAuth, UserAction}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}

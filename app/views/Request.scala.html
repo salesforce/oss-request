@@ -2,9 +2,6 @@
  * Copyright (c) Salesforce.com, inc. 2017
  *@
 
-@import java.time.format.DateTimeFormatter
-@import java.time.{Instant, ZoneOffset, ZonedDateTime}
-
 @this(mainView: Main, taskView: utils.Task)
 
 @(metadata: _root_.utils.Metadata, request: models.Request, tasks: Seq[(models.Task, Long, Boolean)], userInfo: _root_.utils.UserInfo, isAdmin: Boolean, canCancelRequest: Boolean)

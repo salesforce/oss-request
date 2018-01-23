@@ -2,15 +2,15 @@
  * Copyright (c) Salesforce.com, inc. 2017
  */
 
-package modules
+package utils
 
 import javax.inject.Inject
 
-import models.{Comment, Request, State, Task, TaskEvent}
 import models.Task.CompletableByType.CompletableByType
+import models.{Comment, Request, State, Task, TaskEvent}
+import modules.{DB, Notify}
 import play.api.libs.json.JsObject
 import play.api.mvc.RequestHeader
-import utils.{Security, TaskEventHandler}
 
 import scala.concurrent.{ExecutionContext, Future}
 
