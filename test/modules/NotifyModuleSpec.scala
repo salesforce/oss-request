@@ -13,11 +13,14 @@ import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
 
-class NotifyBaseSpec extends PlaySpec with GuiceOneAppPerTest {
+import scala.util.Try
+
+class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 
   def notifyBase = app.injector.instanceOf[NotifyBase]
   def database = app.injector.instanceOf[Database]
   def db = app.injector.instanceOf[DB]
+  def notifySparkPost = app.injector.instanceOf[NotifySparkPost]
 
   val dbUrl = sys.env.getOrElse("DATABASE_URL", "postgres://ossrequest:password@localhost:5432/ossrequest-test")
 
@@ -94,6 +97,15 @@ class NotifyBaseSpec extends PlaySpec with GuiceOneAppPerTest {
       val task2 = await(db.createTask(request.slug, Task.Prototype("foo", Task.TaskType.Action, "foo"), Task.CompletableByType.Group, "admin"))
       val emails2 = await(notifyBase.taskCompletableEmails(task2))
       emails2 must equal (Set("foo@bar.com", "zxcv@zxcv.com"))
+    }
+  }
+
+  "sending an email" must {
+    "work" in {
+      assume(Try(notifySparkPost.client, notifySparkPost.from).isSuccess)
+
+      val response = notifySparkPost.client.sendMessage(notifySparkPost.from, notifySparkPost.from, "test", "test", "test")
+      response.getResponseCode must equal (200)
     }
   }
 

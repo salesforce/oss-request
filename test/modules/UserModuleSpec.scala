@@ -11,7 +11,7 @@ import utils.OAuth
 import utils.dev.DevUsers
 
 
-class UserSpec extends MixedPlaySpec {
+class UserModuleSpec extends MixedPlaySpec {
 
   val maybeTestSalesforceTokenUrl = sys.env.get("TEST_SALESFORCE_OAUTH_TOKEN_URL")
   val maybeTestSalesforceClientId = sys.env.get("TEST_SALESFORCE_OAUTH_CLIENT_ID")
