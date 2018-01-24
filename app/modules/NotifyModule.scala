@@ -32,7 +32,7 @@ trait Notify {
   def requestStatusChange(request: Request)(implicit requestHeader: RequestHeader): Future[Unit]
 }
 
-class NotifyBase @Inject() (db: DB, metadataService: MetadataService) (implicit ec: ExecutionContext) {
+class NotifyBase @Inject() (dao: DAO, metadataService: MetadataService) (implicit ec: ExecutionContext) {
   def taskCompletableEmails(task: Task): Future[Set[String]] = {
     task.completableByType match {
       case CompletableByType.Email =>
@@ -50,8 +50,8 @@ class NotifyBase @Inject() (db: DB, metadataService: MetadataService) (implicit 
   }
 
   def taskComment(requestSlug: String, comment: Comment)(f: (Request, Task) => String => Unit)(implicit requestHeader: RequestHeader): Future[Unit] = {
-    val requestFuture = db.request(requestSlug)
-    val taskFuture = db.taskById(comment.taskId)
+    val requestFuture = dao.request(requestSlug)
+    val taskFuture = dao.taskById(comment.taskId)
 
     for {
       request <- requestFuture

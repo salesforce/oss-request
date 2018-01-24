@@ -22,7 +22,7 @@ class UserModuleSpec extends MixedPlaySpec {
   val maybeTestGitHubToken = sys.env.get("TEST_GITHUB_TOKEN")
 
   "LocalUser" must {
-    "return an email" in new App(DBMock.fakeApplicationBuilder(Mode.Dev).build()) {
+    "return an email" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
       val localUser = app.injector.instanceOf[LocalUser]
       val devUsers = app.injector.instanceOf[DevUsers]
 
@@ -33,7 +33,7 @@ class UserModuleSpec extends MixedPlaySpec {
   }
 
   "SalesforceUser" must {
-    "return an email" in new App(DBMock.fakeApplicationBuilder(Mode.Dev).build()) {
+    "return an email" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
       assume(maybeTestSalesforceTokenUrl.isDefined && maybeTestSalesforceClientId.isDefined && maybeTestSalesforceClientSecret.isDefined && maybeTestSalesforceUsername.isDefined && maybeTestSalesforcePassword.isDefined)
 
       val salesforceUser = app.injector.instanceOf[SalesforceUser]
@@ -48,7 +48,7 @@ class UserModuleSpec extends MixedPlaySpec {
   }
 
   "GitHubUser" must {
-    "return an email" in new App(DBMock.fakeApplicationBuilder(Mode.Dev).build()) {
+    "return an email" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
       assume(maybeTestGitHubToken.isDefined)
 
       val gitHubUser = app.injector.instanceOf[GitHubUser]

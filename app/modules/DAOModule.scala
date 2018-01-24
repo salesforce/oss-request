@@ -22,15 +22,15 @@ import play.api.{Configuration, Environment}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class DBModule extends Module {
+class DAOModule extends Module {
   def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = {
     Seq(
-      bind[DB].to[DBWithCtx]
+      bind[DAO].to[DAOWithCtx]
     )
   }
 }
 
-trait DB {
+trait DAO {
   def createRequest(name: String, creatorEmail: String): Future[Request]
   def allRequests(): Future[Seq[(Request, Long, Long)]]
   def requestsForUser(email: String): Future[Seq[(Request, Long, Long)]]
@@ -44,7 +44,7 @@ trait DB {
   def commentsOnTask(taskId: Int): Future[Seq[Comment]]
 }
 
-class DBWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext) extends DB {
+class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext) extends DAO {
   import database.ctx._
 
   implicit val jsObjectDecoder = MappedEncoding[String, JsObject](Json.parse(_).as[JsObject])

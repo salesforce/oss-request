@@ -7,11 +7,11 @@ package utils
 import javax.inject.Inject
 
 import models.{Task, TaskEvent}
-import modules.DB
+import modules.DAO
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class TaskEventHandler @Inject()(db: DB, metadataService: MetadataService)(implicit ec: ExecutionContext) {
+class TaskEventHandler @Inject()(dao: DAO, metadataService: MetadataService)(implicit ec: ExecutionContext) {
   lazy val taskPrototypesFuture = metadataService.fetchMetadata.map(_.tasks)
 
   def process(requestSlug: String, eventType: TaskEvent.EventType.EventType, task: Task): Future[Seq[_]] = {
@@ -25,7 +25,7 @@ class TaskEventHandler @Inject()(db: DB, metadataService: MetadataService)(impli
               taskPrototypes.get(taskEvent.action.value).fold(Future.failed[Task](new Exception(s"Could not find task named '${taskEvent.action.value}'"))) { taskPrototype =>
                 taskPrototype.completableBy.fold(Future.failed[Task](new Exception("Could not create task because it does not have completable_by info"))) { completableBy =>
                   completableBy.value.fold(Future.failed[Task](new Exception("Could not create task because it does not have a completable_by value"))) { completableByValue =>
-                    db.createTask(requestSlug, taskPrototype, completableBy.`type`, completableByValue)
+                    dao.createTask(requestSlug, taskPrototype, completableBy.`type`, completableByValue)
                   }
                 }
               }

@@ -16,7 +16,7 @@ import play.api.mvc.Results.EmptyContent
 import play.api.mvc._
 import play.api.{Configuration, Environment, Mode}
 import play.twirl.api.Html
-import utils.{DAO, MetadataService, OAuth, UserAction}
+import utils.{DataFacade, MetadataService, OAuth, UserAction}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -24,7 +24,7 @@ import scala.xml.{Comment, Node}
 
 
 class Application @Inject()
-  (env: Environment, dao: DAO, userAction: UserAction, oauth: OAuth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, user: User)
+  (env: Environment, dataFacade: DataFacade, userAction: UserAction, oauth: OAuth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, user: User)
   (indexView: views.html.Index, devSelectUserView: views.html.dev.SelectUser, newRequestView: views.html.NewRequest, newRequestWithNameView: views.html.NewRequestWithName, requestView: views.html.Request, commentsView: views.html.partials.Comments)
   (implicit ec: ExecutionContext)
   extends InjectedController {
@@ -41,10 +41,10 @@ class Application @Inject()
   def index = userAction.async { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
       val requestsFuture = if (userInfo.isAdmin) {
-        dao.allRequests()
+        dataFacade.allRequests()
       }
       else {
-        dao.requestsForUser(userInfo.email)
+        dataFacade.requestsForUser(userInfo.email)
       }
 
       requestsFuture.map { requests =>
@@ -71,11 +71,11 @@ class Application @Inject()
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
       metadataService.fetchMetadata.flatMap { metadata =>
         metadata.tasks.get("start").fold(Future.successful(InternalServerError("Could not find task named 'start'"))) { metaTask =>
-          dao.createRequest(name, userInfo.email).flatMap { request =>
+          dataFacade.createRequest(name, userInfo.email).flatMap { request =>
             completableByWithDefaults(metaTask.completableBy, Some(userInfo.email), None).fold {
               Future.successful(BadRequest("Could not determine who can complete the task"))
             } { case (completableByType, completableByValue) =>
-              dao.createTask(request.slug, metaTask, completableByType, completableByValue, Some(userInfo.email), Json.toJson(userRequest.body).asOpt[JsObject], State.Completed).map { task =>
+              dataFacade.createTask(request.slug, metaTask, completableByType, completableByValue, Some(userInfo.email), Json.toJson(userRequest.body).asOpt[JsObject], State.Completed).map { task =>
                 Ok(Json.toJson(request))
               }
             }
@@ -87,8 +87,8 @@ class Application @Inject()
 
   def request(requestSlug: String) = userAction.async { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
-      dao.request(userInfo.email, requestSlug).flatMap { case (request, isAdmin, canCancelRequest) =>
-        dao.requestTasks(userInfo.email, request.slug).flatMap { tasks =>
+      dataFacade.request(userInfo.email, requestSlug).flatMap { case (request, isAdmin, canCancelRequest) =>
+        dataFacade.requestTasks(userInfo.email, request.slug).flatMap { tasks =>
           metadataService.fetchMetadata.map { metadata =>
             Ok(requestView(metadata, request, tasks, userInfo, isAdmin, canCancelRequest))
           }
@@ -99,7 +99,7 @@ class Application @Inject()
 
   def updateRequest(requestSlug: String, state: State.State) = userAction.async { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
-      dao.updateRequest(userInfo.email, requestSlug, state).map { request =>
+      dataFacade.updateRequest(userInfo.email, requestSlug, state).map { request =>
         Redirect(routes.Application.request(request.slug))
       }
     }
@@ -110,14 +110,14 @@ class Application @Inject()
       val maybeTaskPrototypeKey = userRequest.body.get("taskPrototypeKey").flatMap(_.headOption)
       val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption).filterNot(_.isEmpty)
 
-      dao.request(userInfo.email, requestSlug).flatMap { case (request, _, _) =>
+      dataFacade.request(userInfo.email, requestSlug).flatMap { case (request, _, _) =>
         maybeTaskPrototypeKey.fold(Future.successful(BadRequest("No taskPrototypeKey specified"))) { taskPrototypeKey =>
           metadataService.fetchMetadata.flatMap { metadata =>
             metadata.tasks.get(taskPrototypeKey).fold(Future.successful(InternalServerError(s"Could not find task prototype $taskPrototypeKey"))) { taskPrototype =>
               completableByWithDefaults(taskPrototype.completableBy, Some(request.creatorEmail), maybeCompletableBy).fold {
                 Future.successful(BadRequest("Could not determine who can complete the task"))
               } { case (completableByType, completableByValue) =>
-                dao.createTask(requestSlug, taskPrototype, completableByType, completableByValue).map { _ =>
+                dataFacade.createTask(requestSlug, taskPrototype, completableByType, completableByValue).map { _ =>
                   Redirect(routes.Application.request(request.slug))
                 }
               }
@@ -136,7 +136,7 @@ class Application @Inject()
 
   def updateTask(requestSlug: String, taskId: Int, state: State.State) = userAction.async(maybeJsObject) { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
-      dao.updateTask(userInfo.email, taskId, state, Some(userInfo.email), userRequest.body).map { task =>
+      dataFacade.updateTask(userInfo.email, taskId, state, Some(userInfo.email), userRequest.body).map { task =>
         render {
           case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
           case Accepts.Json() => Ok(Json.toJson(task))
@@ -150,7 +150,7 @@ class Application @Inject()
       val maybeContents = userRequest.body.get("contents").flatMap(_.headOption).filterNot(_.isEmpty)
 
       maybeContents.fold(Future.successful(BadRequest("The contents were empty"))) { contents =>
-        dao.commentOnTask(requestSlug, taskId, userInfo.email, contents).map { comment =>
+        dataFacade.commentOnTask(requestSlug, taskId, userInfo.email, contents).map { comment =>
           Redirect(routes.Application.request(requestSlug))
         }
       }
@@ -159,7 +159,7 @@ class Application @Inject()
 
   def commentsOnTask(requestSlug: String, taskId: Int) = userAction.async(maybeJsObject) { implicit userRequest =>
     userRequest.maybeUserInfo.fold(Future.successful(Redirect(oauth.authUrl))) { userInfo =>
-      dao.commentsOnTask(taskId).map { comments =>
+      dataFacade.commentsOnTask(taskId).map { comments =>
         Ok(commentsView(comments))
       }
     }

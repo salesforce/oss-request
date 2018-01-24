@@ -7,11 +7,11 @@ package utils
 import javax.inject.Inject
 
 import models.{Request, State, Task}
-import modules.DB
+import modules.DAO
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class Security @Inject() (db: DB, metadataService: MetadataService) (implicit ec: ExecutionContext) {
+class Security @Inject() (dao: DAO, metadataService: MetadataService) (implicit ec: ExecutionContext) {
 
   def isAdmin(email: String): Future[Boolean] = {
     metadataService.fetchMetadata.map { metadata =>
@@ -29,7 +29,7 @@ class Security @Inject() (db: DB, metadataService: MetadataService) (implicit ec
         Future.successful(true)
       }
       else {
-        val requestFuture = requestOrRequestSlug.fold(Future.successful, db.request)
+        val requestFuture = requestOrRequestSlug.fold(Future.successful, dao.request)
         requestFuture.map { request =>
           isRequestOwner(email, request)
         }
@@ -60,7 +60,7 @@ class Security @Inject() (db: DB, metadataService: MetadataService) (implicit ec
         Future.successful(true)
       }
       else {
-        val taskFuture = taskOrTaskId.fold(Future.successful, db.taskById)
+        val taskFuture = taskOrTaskId.fold(Future.successful, dao.taskById)
         val metadataFuture = metadataService.fetchMetadata
 
         taskFuture.flatMap { task =>

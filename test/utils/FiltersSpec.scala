@@ -4,9 +4,8 @@
 
 package utils
 
-import modules.DBMock
+import modules.DAOMock
 import org.scalatestplus.play.MixedPlaySpec
-import play.api.Mode
 import play.api.http.HeaderNames
 import play.api.mvc._
 import play.api.test.Helpers._
@@ -14,7 +13,7 @@ import play.api.test._
 
 class FiltersSpec extends MixedPlaySpec {
 
-  def defaultApp = DBMock.fakeApplicationBuilder(Mode.Test).build()
+  def defaultApp = DAOMock.noDatabaseAppBuilder().build()
 
   "Filters" must {
     "redirect to https if the request was forwarded and not https" in new App(defaultApp) {
@@ -34,13 +33,13 @@ class FiltersSpec extends MixedPlaySpec {
       status(result) mustEqual OK
     }
     "return the well known value when the WELL_KNOWN env var is set" in { () =>
-      implicit val app = DBMock.fakeApplicationBuilder(Mode.Test).configure("wellknown" -> "foo=bar").build()
+      implicit val app = DAOMock.noDatabaseAppBuilder().configure("wellknown" -> "foo=bar").build()
       val Some(result) = route(app, FakeRequest(GET, controllers.routes.Application.wellKnown("foo").url))
       status(result) mustEqual OK
       contentAsString(result) mustEqual "bar"
     }
     "not leak well known values" in { () =>
-      implicit val app = DBMock.fakeApplicationBuilder(Mode.Test).configure("wellknown" -> "foo=bar").build()
+      implicit val app = DAOMock.noDatabaseAppBuilder().configure("wellknown" -> "foo=bar").build()
       val Some(result) = route(app, FakeRequest(GET, controllers.routes.Application.wellKnown("").url))
       status(result) mustEqual NOT_FOUND
     }
