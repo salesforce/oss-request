@@ -23,9 +23,9 @@
 @main(Some(userInfo))("OSS Requests") {
     @if(requests.nonEmpty) {
         @if(userInfo.isAdmin) {
-            Your Requests:
-        } else {
             All Requests:
+        } else {
+            Your Requests:
         }
 
         <div class="list-group">
