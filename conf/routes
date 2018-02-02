@@ -15,6 +15,7 @@ POST        /request/:requestSlug/task/:taskId                 controllers.Appli
 GET         /request/:requestSlug/task/:taskId/comments        controllers.Application.commentsOnTask(requestSlug: String, taskId: Int)
 POST        /request/:requestSlug/task/:taskId/comments        controllers.Application.commentOnTask(requestSlug: String, taskId: Int)
 
+GET         /form-test                                         controllers.Application.formTest()
 
 GET         /.well-known/acme-challenge/:key                   controllers.Application.wellKnown(key)
 

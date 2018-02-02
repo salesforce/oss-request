@@ -1,0 +1,65 @@
+@*
+ * Copyright (c) Salesforce.com, inc. 2017
+ *@
+
+@this(mainView: Main)
+
+@(userInfo: _root_.utils.UserInfo)
+
+@mainView(Some(userInfo))("Form Test") {
+
+    <form>
+        <div class="form-group">
+            <textarea id="editor" class="form-control" rows="30">
+{
+    "schema": {
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "title": "Name"
+            },
+            "favorite_color": {
+                "type": "string",
+                "enum": ["Green", "Blue", "Yellow"],
+                "required": true
+            }
+        }
+    },
+    "options": {
+        "fields": {
+            "favorite_color": {
+                "type": "select",
+                "noneLabel": "-- Select --",
+                "removeDefaultNone": false
+            }
+        }
+    }
+}
+            </textarea>
+        </div>
+
+        <button id="tryit" class="btn btn-default btn-block">Try it!</button>
+    </form>
+
+    <div id="form" class="well" style="margin-top: 20px"></div>
+
+    <script type="text/javascript">
+
+        function render(event) {
+            $("#form").empty();
+            event.preventDefault();
+            try {
+                var json = JSON.parse($("#editor").val());
+                $("#form").alpaca(json);
+            } catch (e) {
+              $("#form").text(e.message);
+            }
+        }
+
+        $("#tryit").click(render);
+
+        render(new Event("click"));
+    </script>
+
+}

@@ -25,7 +25,7 @@ import scala.xml.{Comment, Node}
 
 class Application @Inject()
   (env: Environment, dataFacade: DataFacade, userAction: UserAction, oauth: OAuth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, user: User)
-  (indexView: views.html.Index, devSelectUserView: views.html.dev.SelectUser, newRequestView: views.html.NewRequest, newRequestWithNameView: views.html.NewRequestWithName, requestView: views.html.Request, commentsView: views.html.partials.Comments)
+  (indexView: views.html.Index, devSelectUserView: views.html.dev.SelectUser, newRequestView: views.html.NewRequest, newRequestWithNameView: views.html.NewRequestWithName, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest)
   (implicit ec: ExecutionContext)
   extends InjectedController {
 
@@ -162,6 +162,12 @@ class Application @Inject()
       dataFacade.commentsOnTask(taskId).map { comments =>
         Ok(commentsView(comments))
       }
+    }
+  }
+
+  def formTest = userAction { implicit userRequest =>
+    userRequest.maybeUserInfo.fold(Redirect(oauth.authUrl)) { userInfo =>
+      Ok(formTestView(userInfo))
     }
   }
 
