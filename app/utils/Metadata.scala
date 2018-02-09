@@ -4,13 +4,16 @@
 
 package utils
 
-import java.io.FileInputStream
-import javax.inject.Inject
+import java.io.{File, FileInputStream}
+import java.nio.file.Files
+import javax.inject.{Inject, Singleton}
 
+import com.jcraft.jsch.{JSch, Session}
 import models.Task
-import play.api.http.{HeaderNames, Status}
+import org.eclipse.jgit.api.Git
+import org.eclipse.jgit.transport.{JschConfigSessionFactory, OpenSshConfig, SshTransport}
+import org.eclipse.jgit.util.FS
 import play.api.libs.json.Json
-import play.api.libs.ws.WSClient
 import play.api.{Configuration, Environment, Mode}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -24,17 +27,21 @@ object Metadata {
   implicit val jsonReads = Json.reads[Metadata]
 }
 
-class MetadataService @Inject() (configuration: Configuration, environment: Environment, wsClient: WSClient) (implicit ec: ExecutionContext) {
+@Singleton
+class MetadataService @Inject() (configuration: Configuration, environment: Environment) (implicit ec: ExecutionContext) {
 
   val defaultMetadataFile = "examples/metadata.json"
 
-  val maybeMetadataUrl = configuration.getOptional[String]("metadata-url").orElse {
+  lazy val cacheDir = Files.createTempDirectory("git")
+
+  lazy val maybeMetadataGitUrl = configuration.getOptional[String]("metadata-git-url").orElse {
     if (environment.mode == Mode.Prod)
-      throw new Exception("metadata-url must be set in prod mode")
+      throw new Exception("metadata-git-url must be set in prod mode")
     else
       None
   }
-  val maybeMetadataToken = configuration.getOptional[String]("metadata-token")
+  lazy val maybeMetadataGitFile = configuration.getOptional[String]("metadata-git-file")
+  lazy val maybeMetadataGitSshKey = configuration.getOptional[String]("metadata-git-ssh-key")
 
   def localMetadata: Future[Metadata] = {
     environment.getExistingFile(defaultMetadataFile).fold(Future.failed[Metadata](new Exception(s"Could not open $defaultMetadataFile"))) { metadataFile =>
@@ -48,20 +55,66 @@ class MetadataService @Inject() (configuration: Configuration, environment: Envi
     }
   }
 
-  // todo: caching
   def fetchMetadata: Future[Metadata] = {
-    maybeMetadataUrl.fold(localMetadata) { metadataUrl =>
-      val wsRequest = wsClient.url(metadataUrl)
-      val requestWithMaybeAuth = maybeMetadataToken.fold(wsRequest) { token =>
-        wsRequest.withHttpHeaders(HeaderNames.AUTHORIZATION -> s"token $token")
-      }
+    maybeMetadataGitUrl.fold(localMetadata) { metadataGitUrl =>
 
-      requestWithMaybeAuth.get().flatMap { response =>
-        response.status match {
-          case Status.OK => Future.fromTry(Try(response.json.as[Metadata]))
-          case _ => Future.failed(new Exception(response.body))
+      def readMetadata(metadataGitFile: String, metdataGitSshKey: String): Future[Metadata] = {
+        val baseDir = new File(cacheDir.toFile, "metadata")
+
+        val baseDirFuture = if (!baseDir.exists()) {
+          Future.fromTry {
+            Try {
+
+              val sshSessionFactory = new JschConfigSessionFactory() {
+                override def configure(hc: OpenSshConfig.Host, session: Session): Unit = {
+                  session.setConfig("StrictHostKeyChecking", "no")
+                }
+
+                override def createDefaultJSch(fs: FS): JSch = {
+                  val jsch = new JSch()
+                  jsch.addIdentity("key", metdataGitSshKey.getBytes, Array.emptyByteArray, Array.emptyByteArray)
+                  jsch
+                }
+              }
+
+              val clone = Git.cloneRepository()
+                .setURI(metadataGitUrl)
+                .setDirectory(baseDir)
+                .setCloneAllBranches(true)
+                .setTransportConfigCallback { transport =>
+                  val sshTransport = transport.asInstanceOf[SshTransport]
+                  sshTransport.setSshSessionFactory(sshSessionFactory)
+                }
+
+              clone.call()
+
+              baseDir
+            }
+          }
+        }
+        else {
+          Future.successful(baseDir)
+        }
+
+        baseDirFuture.flatMap { baseDir =>
+          val metadataFile = new File(baseDir, metadataGitFile)
+          if (metadataFile.exists()) {
+            val fis = new FileInputStream(metadataFile)
+            val metadataTry = Try(Json.parse(fis).as[Metadata])
+            fis.close()
+            Future.fromTry(metadataTry)
+          }
+          else {
+            Future.failed(new Exception(metadataGitFile + " does not exist"))
+          }
         }
       }
+
+      (maybeMetadataGitFile, maybeMetadataGitSshKey) match {
+        case (Some(metadataGitFile), Some(metadataGitSshKey)) => readMetadata(metadataGitFile, metadataGitSshKey)
+        case _ => Future.failed(new Exception("metadata-git-file and metadata-git-ssh-key config must be set"))
+      }
+
     }
   }
 

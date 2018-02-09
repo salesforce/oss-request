@@ -95,6 +95,14 @@ export SPARKPOST_API_KEY=<YOUR SPARKPOST API KEY>
 export SPARKPOST_DOMAIN=<YOUR SPARKPOST DOMAIN>
 ```
 
+To test external Metadata, create a metadata file on a git host and create a public/private key pair that can access the repo.  Set env vars, like:
+
+```
+export TEST_METADATA_GIT_URL='git@github.com:foo/oss-request-test.git'
+export TEST_METADATA_GIT_FILE=metadata.json
+export TEST_METADATA_GIT_SSH_KEY=$(< id_rsa)
+```
+
 1. Run all of the tests continuously:
 
         $ ./sbt ~test

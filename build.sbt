@@ -20,6 +20,8 @@ libraryDependencies ++= Seq(
 
   "io.getquill"            %% "quill-async-postgres"               % "2.3.2",
 
+  "org.eclipse.jgit"       %  "org.eclipse.jgit"                   % "4.10.0.201712302008-r",
+
   "com.sparkpost"          %  "sparkpost-lib"                      % "0.19",
 
   "org.webjars"            %% "webjars-play"                       % "2.6.3",

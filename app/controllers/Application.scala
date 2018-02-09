@@ -208,17 +208,6 @@ class Application @Inject()
     }
   }
 
-  def devMetadata = Action {
-    env.mode match {
-      case Mode.Prod =>
-        Unauthorized
-      case _ =>
-        env.getExistingFile(metadataService.defaultMetadataFile).fold(InternalServerError(s"${metadataService.defaultMetadataFile} not found")) { metadataFile =>
-          Ok.sendFile(metadataFile)
-        }
-    }
-  }
-
   def wellKnown(key: String) = Action {
     configuration.getOptional[String]("wellknown").fold(NotFound(EmptyContent())) { wellKnownKeyValue =>
       if (wellKnownKeyValue.startsWith(key + "=")) {

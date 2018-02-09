@@ -20,14 +20,13 @@ class MetadataSpec extends MixedPlaySpec {
       metadata.tasks.get("start") must be (defined)
     }
     "fail in prod mode without a value" in { () =>
-      an[Exception] should be thrownBy DAOMock.noDatabaseAppBuilder(Mode.Prod, OAuthSpec.defaultConfig).build()
+      val app = DAOMock.noDatabaseAppBuilder(Mode.Prod, OAuthSpec.defaultConfig).build()
+      an[Exception] should be thrownBy app.injector.instanceOf[MetadataService].maybeMetadataGitUrl
     }
-    "work with an http value" in new Server(DAOMock.noDatabaseAppBuilder(Mode.Dev, Map("metadata-url" -> "http://localhost:9999/.dev/metadata.json")).build(), 9999) {
-      val metadataService = app.injector.instanceOf[MetadataService]
-      await(metadataService.fetchMetadata).groups("admin") must contain ("zxcv@zxcv.com")
-    }
-    "work with an external metadata file that requires auth" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev, MetadataSpec.externalConfig).build()) {
-      assume(MetadataSpec.externalConfig.nonEmpty)
+    "work with an external ssh metadata file that requires auth" in new App(DAOMock.noDatabaseAppBuilder(Mode.Prod, OAuthSpec.defaultConfig ++ MetadataSpec.gitConfig).build()) {
+      assume(MetadataSpec.gitConfig.get("metadata-git-url").isDefined)
+      assume(MetadataSpec.gitConfig.get("metadata-git-file").isDefined)
+      assume(MetadataSpec.gitConfig.get("metadata-git-ssh-key").isDefined)
 
       val metadataService = app.injector.instanceOf[MetadataService]
       noException must be thrownBy await(metadataService.fetchMetadata)
@@ -39,18 +38,16 @@ class MetadataSpec extends MixedPlaySpec {
 object MetadataSpec {
   val defaultConfig = Map(
     "play.http.secret.key" -> "foo",
-    "metadata-url" -> "foo"
+    "metadata-git-url" -> "foo"
   )
 
-  def externalConfig = {
-    (sys.env.get("TEST_METADATA_URL"), sys.env.get("TEST_METADATA_TOKEN")) match {
-      case (Some(testMetadataUrl), Some(testMetadataToken)) =>
-        Map(
-          "metadata-url" -> testMetadataUrl,
-          "metadata-token" -> testMetadataToken
-        )
-      case _ =>
-        Map.empty[String, String]
-    }
+  def gitConfig = Map(
+    "play.http.secret.key" -> Some("foo"),
+    "metadata-git-url" -> sys.env.get("TEST_METADATA_GIT_URL"),
+    "metadata-git-file" -> sys.env.get("TEST_METADATA_GIT_FILE"),
+    "metadata-git-ssh-key" -> sys.env.get("TEST_METADATA_GIT_SSH_KEY")
+  ).flatMap { case (k, v) =>
+    v.fold(Map.empty[String, String])(s => Map(k -> s))
   }
+
 }

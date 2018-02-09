@@ -25,7 +25,6 @@ GET         /logout                                            controllers.Appli
 
 GET         /.dev/oauth2/authorize                             controllers.Application.devOauthAuthorize(response_type: String, client_id: String, redirect_uri: String)
 POST        /.dev/oauth2/token                                 controllers.Application.devOauthToken(grant_type: String, code: String, redirect_uri: String, client_id: String, client_secret: String)
-GET         /.dev/metadata.json                                controllers.Application.devMetadata
 
 
 # Map static resources from the /public folder to the /assets URL path
