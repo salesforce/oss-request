@@ -77,10 +77,18 @@ class MetadataService @Inject() (configuration: Configuration, environment: Envi
                 }
               }
 
+              val (gitUrl, branch) = if (metadataGitUrl.contains("#")) {
+                val parts = metadataGitUrl.split("#")
+                parts.head -> parts.last
+              }
+              else {
+                metadataGitUrl -> "master"
+              }
+
               val clone = Git.cloneRepository()
-                .setURI(metadataGitUrl)
+                .setURI(gitUrl)
                 .setDirectory(baseDir)
-                .setCloneAllBranches(true)
+                .setBranch(branch)
                 .setTransportConfigCallback { transport =>
                   val sshTransport = transport.asInstanceOf[SshTransport]
                   sshTransport.setSshSessionFactory(sshSessionFactory)
