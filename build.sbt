@@ -34,6 +34,8 @@ libraryDependencies ++= Seq(
 
 pipelineStages := Seq(digest, gzip)
 
+WebKeys.webJars in Assets := Seq.empty[File]
+
 headerLicense := Some(HeaderLicense.Custom("Copyright (c) Salesforce.com, inc. 2017"))
 
 headerMappings += FileType("html") -> HeaderCommentStyle.twirlStyleBlockComment
