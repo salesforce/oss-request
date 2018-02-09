@@ -20,6 +20,7 @@ GET         /form-test                                         controllers.Appli
 GET         /.well-known/acme-challenge/:key                   controllers.Application.wellKnown(key)
 
 GET         /oauth2/callback                                   controllers.Application.oauthCallback(code: String, state: Option[String])
+GET         /select-email                                      controllers.Application.selectEmail(email: String)
 
 GET         /logout                                            controllers.Application.logout()
 

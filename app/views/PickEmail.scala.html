@@ -1,0 +1,16 @@
+@*
+ * Copyright (c) Salesforce.com, inc. 2017
+ *@
+
+@this(main: Main)
+
+@(emails: Set[String])
+
+@main(None)("Select Email") {
+    <h2>That account has multiple emails, pick one</h2>
+    <ul>
+        @for(email <- emails) {
+            <li><a href="@routes.Application.selectEmail(email)">@email</a></li>
+        }
+    </ul>
+}

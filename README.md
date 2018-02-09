@@ -59,13 +59,28 @@ Local Dev Setup
 Run the Web App
 ---------------
 
-Optionally test with a real OAuth provider (for example Salesforce):
+# Optionally test with a real OAuth provider
+
+Salesforce:
+
 ```
 export OAUTH_AUTH_URL=https://login.salesforce.com/services/oauth2/authorize
 export OAUTH_TOKEN_URL=https://login.salesforce.com/services/oauth2/token
 export OAUTH_USERINFO_URL=https://login.salesforce.com/services/oauth2/userinfo
 export OAUTH_CLIENT_ID=<YOUR CLIENT ID>
 export OAUTH_CLIENT_SECRET=<YOUR CLIENT SECRET>
+export USER_PROVIDER=salesforce
+```
+
+GitHub:
+
+```
+export OAUTH_AUTH_URL=https://github.com/login/oauth/authorize
+export OAUTH_TOKEN_URL=https://github.com/login/oauth/access_token
+export OAUTH_USERINFO_URL=https://api.github.com/user
+export OAUTH_CLIENT_ID=<YOUR CLIENT ID>
+export OAUTH_CLIENT_SECRET=<YOUR CLIENT SECRET>
+export USER_PROVIDER=github
 ```
 
 1. Start the web app:
@@ -76,26 +91,37 @@ export OAUTH_CLIENT_SECRET=<YOUR CLIENT SECRET>
 Run the Tests
 -------------
 
-Optionally test OAuth (for example Salesforce):
+Optionally config to test OAuth:
 
 ```
-export TEST_OAUTH_AUTH_URL=https://login.salesforce.com/services/oauth2/authorize
-export TEST_OAUTH_TOKEN_URL=https://login.salesforce.com/services/oauth2/token
-export TEST_OAUTH_USERINFO_URL=https://login.salesforce.com/services/oauth2/userinfo
+export TEST_OAUTH_AUTH_URL=https://github.com/login/oauth/authorize
+export TEST_OAUTH_TOKEN_URL=https://github.com/login/oauth/access_token
+export TEST_OAUTH_USERINFO_URL=https://api.github.com/user
 export TEST_OAUTH_CLIENT_ID=<YOUR CLIENT ID>
 export TEST_OAUTH_CLIENT_SECRET=<YOUR CLIENT SECRET>
 export TEST_OAUTH_USERNAME=<YOUR TEST USERNAME>
 export TEST_OAUTH_PASSWORD=<YOUR TEST PASSWORD>
+export TEST_SALESFORCE_OAUTH_TOKEN_URL=https://login.salesforce.com/services/oauth2/token
+export TEST_SALESFORCE_OAUTH_CLIENT_ID=<YOUR CLIENT ID>
+export TEST_SALESFORCE_OAUTH_CLIENT_SECRET=<YOUR CLIENT SECRET>
+export TEST_SALESFORCE_USERNAME=<YOUR TEST USERNAME>
+export TEST_SALESFORCE_PASSWORD=<YOUR TEST PASSWORD>
 ```
 
-Optionally test SparkPost:
+Optionally config to test GitHub user provider:
+
+```
+export TEST_GITHUB_TOKEN=7da3a80644246a777b0745c43d97dcdd3dd75cf4
+```
+
+Optionally config to test SparkPost:
 
 ```
 export SPARKPOST_API_KEY=<YOUR SPARKPOST API KEY>
 export SPARKPOST_DOMAIN=<YOUR SPARKPOST DOMAIN>
 ```
 
-To test external Metadata, create a metadata file on a git host and create a public/private key pair that can access the repo.  Set env vars, like:
+To test external Metadata, create a metadata file on GitHub, create a public/private key pair, and add a read-only deploy key to the repo.  Set env vars, like:
 
 ```
 export TEST_METADATA_GIT_URL='git@github.com:foo/oss-request-test.git'

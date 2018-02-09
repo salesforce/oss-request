@@ -28,7 +28,7 @@ class UserModuleSpec extends MixedPlaySpec {
 
       val user = devUsers.users.head
 
-      await(localUser.email(user.token)) must equal (user.email)
+      await(localUser.emails(user.token)) must equal (Set(user.email))
     }
   }
 
@@ -43,7 +43,7 @@ class UserModuleSpec extends MixedPlaySpec {
 
       val token = await(oauth.accessToken(url))
 
-      noException must be thrownBy await(salesforceUser.email(token))
+      noException must be thrownBy await(salesforceUser.emails(token))
     }
   }
 
@@ -53,7 +53,7 @@ class UserModuleSpec extends MixedPlaySpec {
 
       val gitHubUser = app.injector.instanceOf[GitHubUser]
 
-      noException must be thrownBy await(gitHubUser.email(maybeTestGitHubToken.get))
+      noException must be thrownBy await(gitHubUser.emails(maybeTestGitHubToken.get))
     }
   }
 

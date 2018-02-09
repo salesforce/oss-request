@@ -25,7 +25,7 @@ import scala.xml.{Comment, Node}
 
 class Application @Inject()
   (env: Environment, dataFacade: DataFacade, userAction: UserAction, oauth: OAuth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, user: User)
-  (indexView: views.html.Index, devSelectUserView: views.html.dev.SelectUser, newRequestView: views.html.NewRequest, newRequestWithNameView: views.html.NewRequestWithName, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest, loginView: views.html.Login)
+  (indexView: views.html.Index, devSelectUserView: views.html.dev.SelectUser, newRequestView: views.html.NewRequest, newRequestWithNameView: views.html.NewRequestWithName, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest, loginView: views.html.Login, pickEmailView: views.html.PickEmail)
   (implicit ec: ExecutionContext)
   extends InjectedController {
 
@@ -173,20 +173,43 @@ class Application @Inject()
 
   def oauthCallback(code: String, state: Option[String]) = Action.async { implicit request =>
     oauth.accessToken(oauth.tokenUrl(code)).flatMap { accessToken =>
-      user.email(accessToken).flatMap { email =>
-        metadataService.fetchMetadata.map { metadata =>
-          val isAdmin = metadata.groups("admin").contains(email)
-          val url = state.getOrElse(controllers.routes.Application.index().url)
+      user.emails(accessToken).flatMap { emails =>
+        if (emails.size > 1) {
+          Future.successful(Ok(pickEmailView(emails)).withSession("emails" -> emails.mkString(",")))
+        }
+        else if (emails.size == 1) {
+          val email = emails.head
 
-          // todo: putting this info in the session means we can't easily invalidate it later
-          Redirect(url).withSession("email" -> email, "isAdmin" -> isAdmin.toString)
+          metadataService.fetchMetadata.map { metadata =>
+            val isAdmin = metadata.groups("admin").contains(email)
+            val url = state.getOrElse(controllers.routes.Application.index().url)
+
+            // todo: putting this info in the session means we can't easily invalidate it later
+            Redirect(url).withSession("email" -> email, "isAdmin" -> isAdmin.toString)
+          }
+        }
+        else {
+          Future.successful(BadRequest("Could not determine user email"))
         }
       }
     }
   }
 
-  def logout() = Action {
-    Ok(loginView()).withNewSession
+  def selectEmail(email: String) = Action.async { request =>
+    val maybeValidEmail = request.session.get("emails").map(_.split(",")).getOrElse(Array.empty[String]).find(_ == email)
+    maybeValidEmail.fold(Future.successful(Unauthorized("Email invalid"))) { validEmail =>
+      metadataService.fetchMetadata.map { metadata =>
+        val isAdmin = metadata.groups("admin").contains(validEmail)
+        val url = controllers.routes.Application.index().url
+
+        // todo: putting this info in the session means we can't easily invalidate it later
+        Redirect(url).withSession("email" -> validEmail, "isAdmin" -> isAdmin.toString)
+      }
+    }
+  }
+
+  def logout() = Action { request =>
+    Ok(loginView(request)).withNewSession
   }
 
 

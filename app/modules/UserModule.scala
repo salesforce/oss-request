@@ -26,46 +26,43 @@ class UserModule extends Module {
 }
 
 trait User {
-  def email(token: String): Future[String]
+  def emails(token: String): Future[Set[String]]
 }
 
 class LocalUser @Inject() (devUsers: DevUsers, env: Environment) extends User {
-  def email(token: String): Future[String] = {
+  def emails(token: String): Future[Set[String]] = {
     env.mode match {
       case Mode.Prod =>
         Future.failed(new Exception("Not allowed in production mode"))
       case _ =>
-        devUsers.users.find(_.token == token).fold(Future.failed[String](new Exception("User not found"))) { user =>
-          Future.successful(user.email)
+        devUsers.users.find(_.token == token).fold(Future.failed[Set[String]](new Exception("User not found"))) { user =>
+          Future.successful(Set(user.email))
         }
     }
   }
 }
 
 class SalesforceUser @Inject() (wsClient: WSClient) (implicit ec: ExecutionContext) extends User {
-  def email(token: String): Future[String] = {
+  def emails(token: String): Future[Set[String]] = {
     wsClient
       .url("https://login.salesforce.com/services/oauth2/userinfo")
       .withHttpHeaders(HeaderNames.AUTHORIZATION -> s"Bearer $token")
       .get()
       .map { response =>
-        (response.json \ "email").as[String]
+        Set((response.json \ "email").as[String])
       }
   }
 }
 
 class GitHubUser @Inject() (wsClient: WSClient) (implicit ec: ExecutionContext) extends User {
-  def email(token: String): Future[String] = {
+  def emails(token: String): Future[Set[String]] = {
     wsClient
       .url("https://api.github.com/user/emails")
       .withHttpHeaders(HeaderNames.AUTHORIZATION -> s"Bearer $token")
       .get()
       .flatMap { response =>
-        response.json.asOpt[Seq[JsObject]].getOrElse(Seq.empty[JsObject]).find(_.\("primary").asOpt[Boolean].getOrElse(false)).fold {
-          Future.failed[String](new Exception("Could not get email"))
-        } { jsObject =>
-          Future.successful((jsObject \ "email").as[String])
-        }
+        val emails = response.json.as[Seq[JsObject]].filter(_.\("verified").as[Boolean]).map(_.\("email").as[String]).toSet
+        Future.successful(emails)
       }
   }
 }
