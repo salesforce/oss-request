@@ -47,7 +47,13 @@ class OAuth @Inject() (environment: Environment, configuration: Configuration, w
         ("scope" -> scope) +: query
       }
 
-      Uri(url).withQuery(queryWithMaybeScope).toString()
+      val maybePrompt = configuration.getOptional[String]("oauth.prompt")
+
+      val queryWithMaybePrompt = maybePrompt.fold(queryWithMaybeScope) { prompt =>
+        ("prompt" -> prompt) +: queryWithMaybeScope
+      }
+
+      Uri(url).withQuery(queryWithMaybePrompt).toString()
     })
   }
 
