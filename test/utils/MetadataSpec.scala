@@ -20,10 +20,10 @@ class MetadataSpec extends MixedPlaySpec {
       metadata.tasks.get("start") must be (defined)
     }
     "fail in prod mode without a value" in { () =>
-      val app = DAOMock.noDatabaseAppBuilder(Mode.Prod, OAuthSpec.defaultConfig).build()
+      val app = DAOMock.noDatabaseAppBuilder(Mode.Prod, MetadataSpec.prodConfig).build()
       an[Exception] should be thrownBy app.injector.instanceOf[MetadataService].maybeMetadataGitUrl
     }
-    "work with an external ssh metadata file that requires auth" in new App(DAOMock.noDatabaseAppBuilder(Mode.Prod, OAuthSpec.defaultConfig ++ MetadataSpec.gitConfig).build()) {
+    "work with an external ssh metadata file that requires auth" in new App(DAOMock.noDatabaseAppBuilder(Mode.Prod, MetadataSpec.gitConfig).build()) {
       assume(MetadataSpec.gitConfig.get("metadata-git-url").isDefined)
       assume(MetadataSpec.gitConfig.get("metadata-git-file").isDefined)
       assume(MetadataSpec.gitConfig.get("metadata-git-ssh-key").isDefined)
@@ -36,6 +36,10 @@ class MetadataSpec extends MixedPlaySpec {
 }
 
 object MetadataSpec {
+  val prodConfig = Map(
+    "play.http.secret.key" -> "foo"
+  )
+
   val defaultConfig = Map(
     "play.http.secret.key" -> "foo",
     "metadata-git-url" -> "foo"
@@ -46,8 +50,8 @@ object MetadataSpec {
     "metadata-git-url" -> sys.env.get("TEST_METADATA_GIT_URL"),
     "metadata-git-file" -> sys.env.get("TEST_METADATA_GIT_FILE"),
     "metadata-git-ssh-key" -> sys.env.get("TEST_METADATA_GIT_SSH_KEY")
-  ).flatMap { case (k, v) =>
-    v.fold(Map.empty[String, String])(s => Map(k -> s))
+  ).collect {
+    case (k, Some(v)) => k -> v
   }
 
 }

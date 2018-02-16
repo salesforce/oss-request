@@ -24,6 +24,8 @@ libraryDependencies ++= Seq(
 
   "com.sparkpost"          %  "sparkpost-lib"                      % "0.19",
 
+  "com.onelogin"           %  "java-saml-core"                     % "2.2.0",
+
   "org.webjars"            %% "webjars-play"                       % "2.6.3",
   "org.webjars"            %  "salesforce-lightning-design-system" % "2.4.1",
   "org.webjars"            %  "handlebars"                         % "4.0.5",

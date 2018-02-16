@@ -19,14 +19,11 @@ GET         /form-test                                         controllers.Appli
 
 GET         /.well-known/acme-challenge/:key                   controllers.Application.wellKnown(key)
 
-GET         /oauth2/callback                                   controllers.Application.oauthCallback(code: String, state: Option[String])
+GET         /callback                                          controllers.Application.callback(code: Option[String], state: Option[String])
+
 GET         /select-email                                      controllers.Application.selectEmail(email: String)
 
 GET         /logout                                            controllers.Application.logout()
-
-GET         /.dev/oauth2/authorize                             controllers.Application.devOauthAuthorize(response_type: String, client_id: String, redirect_uri: String)
-POST        /.dev/oauth2/token                                 controllers.Application.devOauthToken(grant_type: String, code: String, redirect_uri: String, client_id: String, client_secret: String)
-
 
 # Map static resources from the /public folder to the /assets URL path
 GET         /assets/*file                                      controllers.Assets.versioned(path="/public", file: Asset)

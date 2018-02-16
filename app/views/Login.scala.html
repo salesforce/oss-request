@@ -2,10 +2,10 @@
  * Copyright (c) Salesforce.com, inc. 2017
  *@
 
-@this(main: Main, oauth: _root_.utils.OAuth)
+@this(main: Main, auth: _root_.modules.Auth)
 
 @(implicit request: RequestHeader)
 
 @main(None)("Login") {
-    You need to <a href="@oauth.authUrl">login</a> to do anything.
+    You need to <a href="@auth.authUrl">login</a> to do anything.
 }

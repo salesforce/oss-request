@@ -4,13 +4,13 @@
 
 @this(main: Main)
 
-@(emails: Set[String])
+@(emails: Map[String, Boolean])
 
 @main(None)("Select Email") {
     <h2>That account has multiple emails, pick one</h2>
     <ul>
-        @for(email <- emails) {
-            <li><a href="@routes.Application.selectEmail(email)">@email</a></li>
+        @for((email, isAdmin) <- emails) {
+            <li><a href="@routes.Application.selectEmail(email)">@email</a> @if(isAdmin) { (admin) }</li>
         }
     </ul>
 }
