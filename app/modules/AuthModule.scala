@@ -4,10 +4,14 @@
 
 package modules
 
+import java.net.URL
 import javax.inject.Inject
 
 import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.model.Uri.Query
+import com.onelogin.saml2.authn.{AuthnRequest, SamlResponse}
+import com.onelogin.saml2.http.HttpRequest
+import com.onelogin.saml2.settings.{Saml2Settings, SettingsBuilder}
 import play.api.http.{HeaderNames, HttpVerbs, MimeTypes, Status}
 import play.api.inject.{Binding, Module}
 import play.api.libs.json.JsObject
@@ -18,6 +22,8 @@ import utils.dev.DevUsers
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
+import scala.xml.NodeSeq
+import scala.collection.JavaConverters._
 
 class AuthModule extends Module {
   def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = {
@@ -30,21 +36,17 @@ class AuthModule extends Module {
 }
 
 sealed trait Auth {
-  def callbackUrl(maybeCode: Option[String] = None)(implicit requestHeader: RequestHeader): String
-
-  def authUrl(implicit requestHeader: RequestHeader): String
+  def authUrl(implicit requestHeader: RequestHeader): Future[String]
 
   def emails(maybeToken: Option[String])(implicit requestHeader: RequestHeader): Future[Set[String]]
 }
 
 class LocalAuth @Inject() (devUsers: DevUsers) extends Auth {
 
-  def callbackUrl(maybeCode: Option[String] = None)(implicit requestHeader: RequestHeader): String = {
-    controllers.routes.Application.callback(None, None).absoluteURL()
-  }
-
-  def authUrl(implicit requestHeader: RequestHeader): String = {
-    controllers.routes.Application.callback(None, None).absoluteURL()
+  def authUrl(implicit requestHeader: RequestHeader): Future[String] = {
+    Future.successful {
+      controllers.routes.Application.callback(None, None).absoluteURL()
+    }
   }
 
   def emails(maybeCode: Option[String])(implicit requestHeader: RequestHeader): Future[Set[String]] = {
@@ -54,7 +56,7 @@ class LocalAuth @Inject() (devUsers: DevUsers) extends Auth {
 }
 
 
-class OAuth @Inject() (environment: Environment, configuration: Configuration, wsClient: WSClient) (implicit ec: ExecutionContext) extends Auth {
+class OAuth @Inject() (configuration: Configuration, wsClient: WSClient) (implicit ec: ExecutionContext) extends Auth {
 
   sealed trait Provider
   case object GitHub extends Provider
@@ -92,11 +94,11 @@ class OAuth @Inject() (environment: Environment, configuration: Configuration, w
     Uri(url).withQuery(query).toString()
   }
 
-  override def callbackUrl(maybeCode: Option[String])(implicit requestHeader: RequestHeader): String = {
+  def callbackUrl(maybeCode: Option[String])(implicit requestHeader: RequestHeader): String = {
     controllers.routes.Application.callback(maybeCode, None).absoluteURL()
   }
 
-  override def authUrl(implicit requestHeader: RequestHeader): String = {
+  override def authUrl(implicit requestHeader: RequestHeader): Future[String] = {
     val query = Query("response_type" -> "code", "client_id" -> clientId, "redirect_uri" -> callbackUrl(None))
 
     val queryWithProviderParams = provider match {
@@ -106,7 +108,9 @@ class OAuth @Inject() (environment: Environment, configuration: Configuration, w
         ("prompt" -> "") +: query
     }
 
-    Uri(authorizeUrl).withQuery(queryWithProviderParams).toString()
+    Future.successful {
+      Uri(authorizeUrl).withQuery(queryWithProviderParams).toString()
+    }
   }
 
   def accessToken(url: String): Future[String] = {
@@ -156,10 +160,61 @@ class OAuth @Inject() (environment: Environment, configuration: Configuration, w
 
 }
 
-class SamlAuth @Inject() (wsClient: WSClient) (implicit ec: ExecutionContext) extends Auth {
-  override def callbackUrl(maybeCode: Option[String])(implicit requestHeader: RequestHeader): String = ???
+class SamlAuth @Inject() (configuration: Configuration, wsClient: WSClient) (implicit ec: ExecutionContext) extends Auth {
 
-  override def authUrl(implicit requestHeader: RequestHeader): String = ???
+  //lazy val samlCert = configuration.get[String]("saml.cert")
+  lazy val entityId = configuration.get[String]("saml.entity-id")
+  lazy val metadataUrl = configuration.get[String]("saml.metadata-url")
 
-  override def emails(code: Option[String])(implicit requestHeader: RequestHeader): Future[Set[String]] = ???
+  lazy val metadataFuture = wsClient.url(metadataUrl).get().map(_.body[NodeSeq])
+
+  def settings(metadata: NodeSeq)(implicit requestHeader: RequestHeader): Saml2Settings = {
+    val cert = (metadata \ "IDPSSODescriptor" \ "KeyDescriptor" \ "KeyInfo" \ "X509Data" \ "X509Certificate").text
+
+    val samlConfig = Map[String, Object](
+      "onelogin.saml2.sp.entityid" -> entityId,
+      "onelogin.saml2.sp.assertion_consumer_service.url" -> callbackUrl,
+      "onelogin.saml2.sp.x509cert" -> cert
+    )
+
+    new SettingsBuilder().fromValues(samlConfig.asJava).build()
+  }
+
+  override def authUrl(implicit requestHeader: RequestHeader): Future[String] = {
+    metadataFuture.flatMap { metadata =>
+      val maybeUrl = (metadata \ "IDPSSODescriptor" \ "SingleSignOnService").find { node =>
+        (node \@ "Binding") == "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+      } map { node =>
+        node \@ "Location"
+      }
+
+      maybeUrl.fold(Future.failed[String](new Exception("Could not get the redirect url"))) { url =>
+        val authnRequest = new AuthnRequest(settings(metadata))
+
+        val query = Query("SAMLRequest" -> authnRequest.getEncodedAuthnRequest, "RelayState" -> "token")
+
+        Future.successful(Uri(url).withQuery(query).toString())
+      }
+    }
+  }
+
+  def callbackUrl(implicit requestHeader: RequestHeader): String = {
+    controllers.routes.Application.acs().absoluteURL()
+  }
+
+  override def emails(maybeSamlResponse: Option[String])(implicit requestHeader: RequestHeader): Future[Set[String]] = {
+    maybeSamlResponse.fold(Future.failed[Set[String]](new Exception("No SAML Response"))) { samlResponseText =>
+      metadataFuture.flatMap { metadata =>
+        val httpRequest = new HttpRequest("", Map("SAMLResponse" -> List(samlResponseText).asJava).asJava, "")
+
+        val samlResponse = new SamlResponse(settings(metadata), httpRequest)
+
+        Future.fromTry(Try(samlResponse.checkStatus())).flatMap { _ =>
+          samlResponse.getAttributes.asScala.get("email").fold(Future.failed[Set[String]](new Exception("No emails"))) { emails =>
+            Future.successful(emails.asScala.toSet)
+          }
+        }
+      }
+    }
+  }
 }

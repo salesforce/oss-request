@@ -59,33 +59,41 @@ Local Dev Setup
 Run the Web App
 ---------------
 
-# Optionally test with a real OAuth provider
+# Optionally test with an OAuth provider
 
 Salesforce:
 
 ```
-export OAUTH_AUTH_URL=https://login.salesforce.com/services/oauth2/authorize
-export OAUTH_TOKEN_URL=https://login.salesforce.com/services/oauth2/token
-export OAUTH_USERINFO_URL=https://login.salesforce.com/services/oauth2/userinfo
 export OAUTH_CLIENT_ID=<YOUR CLIENT ID>
 export OAUTH_CLIENT_SECRET=<YOUR CLIENT SECRET>
-export USER_PROVIDER=salesforce
+export AUTH_PROVIDER=oauth
+export OAUTH_PROVIDER=salesforce
 ```
 
 GitHub:
 
 ```
-export OAUTH_AUTH_URL=https://github.com/login/oauth/authorize
-export OAUTH_TOKEN_URL=https://github.com/login/oauth/access_token
-export OAUTH_USERINFO_URL=https://api.github.com/user
 export OAUTH_CLIENT_ID=<YOUR CLIENT ID>
 export OAUTH_CLIENT_SECRET=<YOUR CLIENT SECRET>
-export USER_PROVIDER=github
+export AUTH_PROVIDER=oauth
+export OAUTH_PROVIDER=github
 ```
 
 1. Start the web app:
 
         $ ./sbt ~run
+
+# To run with a SAML provider
+
+```
+export AUTH_PROVIDER=oauth
+export SAML_ENTITY_ID="YOUR SAML ENTITY ID"
+export SAML_METADATA_URL="YOUR SAML METADATA URL"
+```
+
+1. Start the web app with https enabled:
+
+         $ ./sbt -Dhttps.port=9443
 
 
 Run the Tests
@@ -94,24 +102,14 @@ Run the Tests
 Optionally config to test OAuth:
 
 ```
-export TEST_OAUTH_AUTH_URL=https://github.com/login/oauth/authorize
-export TEST_OAUTH_TOKEN_URL=https://github.com/login/oauth/access_token
-export TEST_OAUTH_USERINFO_URL=https://api.github.com/user
-export TEST_OAUTH_CLIENT_ID=<YOUR CLIENT ID>
-export TEST_OAUTH_CLIENT_SECRET=<YOUR CLIENT SECRET>
-export TEST_OAUTH_USERNAME=<YOUR TEST USERNAME>
-export TEST_OAUTH_PASSWORD=<YOUR TEST PASSWORD>
-export TEST_SALESFORCE_OAUTH_TOKEN_URL=https://login.salesforce.com/services/oauth2/token
 export TEST_SALESFORCE_OAUTH_CLIENT_ID=<YOUR CLIENT ID>
 export TEST_SALESFORCE_OAUTH_CLIENT_SECRET=<YOUR CLIENT SECRET>
 export TEST_SALESFORCE_USERNAME=<YOUR TEST USERNAME>
 export TEST_SALESFORCE_PASSWORD=<YOUR TEST PASSWORD>
-```
 
-Optionally config to test GitHub user provider:
-
-```
-export TEST_GITHUB_TOKEN=7da3a80644246a777b0745c43d97dcdd3dd75cf4
+export TEST_GITHUB_OAUTH_CLIENT_ID=<YOUR CLIENT ID>
+export TEST_GITHUB_OAUTH_CLIENT_SECRET=<YOUR CLIENT SECRET>
+export TEST_GITHUB_TOKEN=<YOUR_GITHUB_TEST_TOKEN>
 ```
 
 Optionally config to test SparkPost:
@@ -127,6 +125,13 @@ To test external Metadata, create a metadata file on GitHub, create a public/pri
 export TEST_METADATA_GIT_URL='git@github.com:foo/oss-request-test.git'
 export TEST_METADATA_GIT_FILE=metadata.json
 export TEST_METADATA_GIT_SSH_KEY=$(< id_rsa)
+```
+
+To test with SAML:
+
+```
+export SAML_ENTITY_ID="YOUR SAML ENTITY ID"
+export SAML_METADATA_URL="YOUR SAML METADATA URL"
 ```
 
 1. Run all of the tests continuously:

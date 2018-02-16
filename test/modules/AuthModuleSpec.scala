@@ -4,8 +4,10 @@
 
 package modules
 
+import akka.http.scaladsl.model.Uri
 import org.scalatestplus.play.MixedPlaySpec
-import play.api.Mode
+import play.api.libs.ws.WSClient
+import play.api.{Configuration, Mode}
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
 
@@ -17,7 +19,7 @@ class AuthModuleSpec extends MixedPlaySpec {
   val maybeTestSalesforceUsername = sys.env.get("TEST_SALESFORCE_USERNAME")
   val maybeTestSalesforcePassword = sys.env.get("TEST_SALESFORCE_PASSWORD")
 
-  lazy val salesforceConfig = Map(
+  lazy val salesforceOAuthConfig = Map(
     "auth.provider" -> Some("oauth"),
     "oauth.provider" -> Some("salesforce"),
     "oauth.client-id" -> maybeTestSalesforceClientId,
@@ -30,7 +32,7 @@ class AuthModuleSpec extends MixedPlaySpec {
   val maybeTestGitHubClientSecret = sys.env.get("TEST_GITHUB_OAUTH_CLIENT_SECRET")
   val maybeTestGitHubToken = sys.env.get("TEST_GITHUB_TOKEN")
 
-  lazy val gitHubConfig = Map(
+  lazy val gitHubOAuthConfig = Map(
     "auth.provider" -> Some("oauth"),
     "oauth.provider" -> Some("github"),
     "oauth.client-id" -> maybeTestGitHubClientId,
@@ -42,18 +44,20 @@ class AuthModuleSpec extends MixedPlaySpec {
   implicit val request = FakeRequest()
 
   "LocalAuth" must {
-    "return a emails" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
-      val auth = app.injector.instanceOf[Auth]
+    "return a emails" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev, Map("auth.provider" -> "local")).build()) {
+      app.injector.instanceOf[Auth] mustBe an [LocalAuth]
+
+      val auth = app.injector.instanceOf[LocalAuth]
 
       await(auth.emails(None)) must not be 'empty
     }
   }
 
   "OAuth" must {
-    "work with GitHub" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev, gitHubConfig).build()) {
+    "work with GitHub" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev, gitHubOAuthConfig).build()) {
       assume(maybeTestGitHubClientId.isDefined && maybeTestGitHubClientSecret.isDefined && maybeTestGitHubToken.isDefined)
 
-      app.injector.instanceOf[Auth] mustBe a [OAuth]
+      app.injector.instanceOf[Auth] mustBe an [OAuth]
 
       val auth = app.injector.instanceOf[OAuth]
 
@@ -62,10 +66,10 @@ class AuthModuleSpec extends MixedPlaySpec {
       val emails = await(auth.emails(maybeTestGitHubToken.get))
       emails must not be 'empty
     }
-    "work with Salesforce" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev, salesforceConfig).build()) {
+    "work with Salesforce" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev, salesforceOAuthConfig).build()) {
       assume(maybeTestSalesforceClientId.isDefined && maybeTestSalesforceClientSecret.isDefined && maybeTestSalesforceUsername.isDefined, maybeTestSalesforcePassword.isDefined)
 
-      app.injector.instanceOf[Auth] mustBe a [OAuth]
+      app.injector.instanceOf[Auth] mustBe an [OAuth]
 
       val auth = app.injector.instanceOf[OAuth]
 
@@ -75,6 +79,28 @@ class AuthModuleSpec extends MixedPlaySpec {
 
       val emails = await(auth.emails(token))
       emails must not be 'empty
+    }
+  }
+
+  "SamlAuth" must {
+    "work" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev, Map("auth.provider" -> "saml")).build()) {
+      val configuration = app.injector.instanceOf[Configuration]
+      assume(configuration.getOptional[String]("saml.metadata-url").isDefined)
+
+      app.injector.instanceOf[Auth] mustBe an [SamlAuth]
+
+      val auth = app.injector.instanceOf[SamlAuth]
+
+      val wsClient = app.injector.instanceOf[WSClient]
+
+      val authUrl = await(auth.authUrl)
+
+      val authResponse = await(wsClient.url(authUrl).withFollowRedirects(false).get())
+
+      authResponse.status must equal (FOUND)
+      authResponse.header(LOCATION).flatMap(Uri(_).query().get("app")) mustBe defined
+
+      // todo: somehow test auth.emails
     }
   }
 

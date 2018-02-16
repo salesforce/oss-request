@@ -13,10 +13,11 @@ import org.webjars.WebJarAssetLocator
 import org.webjars.play.WebJarsUtil
 import play.api.libs.json.{JsObject, Json}
 import play.api.mvc.Results.EmptyContent
+import play.api.mvc.Security.AuthenticatedBuilder
 import play.api.mvc._
 import play.api.{Configuration, Environment}
 import play.twirl.api.Html
-import utils.{DataFacade, MetadataService, UserAction}
+import utils.{DataFacade, MetadataService, UserAction, UserInfo, UserRequest}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -38,8 +39,12 @@ class Application @Inject()
     }
   }
 
+  private def withUserInfo[A](f: UserInfo => Future[Result])(implicit userRequest: UserRequest[A]): Future[Result] = {
+    userRequest.maybeUserInfo.fold(auth.authUrl.map(Redirect(_)))(f)
+  }
+
   def index = userAction.async { implicit userRequest =>
-    userRequest.maybeUserInfo.fold(Future.successful(Redirect(auth.authUrl))) { userInfo =>
+    withUserInfo { userInfo =>
       val requestsFuture = if (userInfo.isAdmin) {
         dataFacade.allRequests()
       }
@@ -54,7 +59,7 @@ class Application @Inject()
   }
 
   def newRequest(maybeName: Option[String]) = userAction.async { implicit userRequest =>
-    userRequest.maybeUserInfo.fold(Future.successful(Redirect(auth.authUrl))) { userInfo =>
+    withUserInfo { userInfo =>
       maybeName.fold {
         Future.successful(Ok(newRequestView(userInfo)))
       } { name =>
@@ -68,7 +73,7 @@ class Application @Inject()
   }
 
   def createRequest(name: String) = userAction.async(parse.json) { implicit userRequest =>
-    userRequest.maybeUserInfo.fold(Future.successful(Redirect(auth.authUrl))) { userInfo =>
+    withUserInfo { userInfo =>
       metadataService.fetchMetadata.flatMap { metadata =>
         metadata.tasks.get("start").fold(Future.successful(InternalServerError("Could not find task named 'start'"))) { metaTask =>
           dataFacade.createRequest(name, userInfo.email).flatMap { request =>
@@ -86,7 +91,7 @@ class Application @Inject()
   }
 
   def request(requestSlug: String) = userAction.async { implicit userRequest =>
-    userRequest.maybeUserInfo.fold(Future.successful(Redirect(auth.authUrl))) { userInfo =>
+    withUserInfo { userInfo =>
       dataFacade.request(userInfo.email, requestSlug).flatMap { case (request, isAdmin, canCancelRequest) =>
         dataFacade.requestTasks(userInfo.email, request.slug).flatMap { tasks =>
           metadataService.fetchMetadata.map { metadata =>
@@ -98,7 +103,7 @@ class Application @Inject()
   }
 
   def updateRequest(requestSlug: String, state: State.State) = userAction.async { implicit userRequest =>
-    userRequest.maybeUserInfo.fold(Future.successful(Redirect(auth.authUrl))) { userInfo =>
+    withUserInfo { userInfo =>
       dataFacade.updateRequest(userInfo.email, requestSlug, state).map { request =>
         Redirect(routes.Application.request(request.slug))
       }
@@ -106,7 +111,7 @@ class Application @Inject()
   }
 
   def addTask(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
-    userRequest.maybeUserInfo.fold(Future.successful(Redirect(auth.authUrl))) { userInfo =>
+    withUserInfo { userInfo =>
       val maybeTaskPrototypeKey = userRequest.body.get("taskPrototypeKey").flatMap(_.headOption)
       val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption).filterNot(_.isEmpty)
 
@@ -135,7 +140,7 @@ class Application @Inject()
   }
 
   def updateTask(requestSlug: String, taskId: Int, state: State.State) = userAction.async(maybeJsObject) { implicit userRequest =>
-    userRequest.maybeUserInfo.fold(Future.successful(Redirect(auth.authUrl))) { userInfo =>
+    withUserInfo { userInfo =>
       dataFacade.updateTask(userInfo.email, taskId, state, Some(userInfo.email), userRequest.body).map { task =>
         render {
           case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
@@ -146,7 +151,7 @@ class Application @Inject()
   }
 
   def commentOnTask(requestSlug: String, taskId: Int) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
-    userRequest.maybeUserInfo.fold(Future.successful(Redirect(auth.authUrl))) { userInfo =>
+    withUserInfo { userInfo =>
       val maybeContents = userRequest.body.get("contents").flatMap(_.headOption).filterNot(_.isEmpty)
 
       maybeContents.fold(Future.successful(BadRequest("The contents were empty"))) { contents =>
@@ -158,45 +163,55 @@ class Application @Inject()
   }
 
   def commentsOnTask(requestSlug: String, taskId: Int) = userAction.async(maybeJsObject) { implicit userRequest =>
-    userRequest.maybeUserInfo.fold(Future.successful(Redirect(auth.authUrl))) { userInfo =>
+    withUserInfo { userInfo =>
       dataFacade.commentsOnTask(taskId).map { comments =>
         Ok(commentsView(comments))
       }
     }
   }
 
-  def formTest = userAction { implicit userRequest =>
-    userRequest.maybeUserInfo.fold(Redirect(auth.authUrl)) { userInfo =>
-      Ok(formTestView(userInfo))
+  def formTest = userAction.async { implicit userRequest =>
+    withUserInfo { userInfo =>
+      Future.successful(Ok(formTestView(userInfo)))
+    }
+  }
+
+  private def login(state: Option[String])(emails: Set[String]): Future[Result] = {
+    if (emails.size > 1) {
+      metadataService.fetchMetadata.map { metadata =>
+        val emailsWithIsAdmin = emails.map { email =>
+          email -> metadata.admins.contains(email)
+        }.toMap
+
+        Ok(pickEmailView(emailsWithIsAdmin)).withSession("emails" -> emails.mkString(","))
+      }
+
+    }
+    else if (emails.size == 1) {
+      val email = emails.head
+
+      metadataService.fetchMetadata.map { metadata =>
+        val isAdmin = metadata.groups("admin").contains(email)
+        val url = state.getOrElse(controllers.routes.Application.index().url)
+
+        // todo: putting this info in the session means we can't easily invalidate it later
+        Redirect(url).withSession("email" -> email, "isAdmin" -> isAdmin.toString)
+      }
+    }
+    else {
+      Future.successful(BadRequest("Could not determine user email"))
     }
   }
 
   def callback(code: Option[String], state: Option[String]) = Action.async { implicit request =>
-    auth.emails(code).flatMap { emails =>
-      if (emails.size > 1) {
-        metadataService.fetchMetadata.map { metadata =>
-          val emailsWithIsAdmin = emails.map { email =>
-            email -> metadata.admins.contains(email)
-          }.toMap
+    auth.emails(code).flatMap(login(state)).recover {
+      case e: Exception => Unauthorized(e.getMessage)
+    }
+  }
 
-          Ok(pickEmailView(emailsWithIsAdmin)).withSession("emails" -> emails.mkString(","))
-        }
-
-      }
-      else if (emails.size == 1) {
-        val email = emails.head
-
-        metadataService.fetchMetadata.map { metadata =>
-          val isAdmin = metadata.groups("admin").contains(email)
-          val url = state.getOrElse(controllers.routes.Application.index().url)
-
-          // todo: putting this info in the session means we can't easily invalidate it later
-          Redirect(url).withSession("email" -> email, "isAdmin" -> isAdmin.toString)
-        }
-      }
-      else {
-        Future.successful(BadRequest("Could not determine user email"))
-      }
+  def acs() = Action.async(parse.formUrlEncoded) { implicit request =>
+    auth.emails(request.body.get("SAMLResponse").flatMap(_.headOption)).flatMap(login(None)).recover {
+      case e: Exception => Unauthorized(e.getMessage)
     }
   }
 
@@ -213,8 +228,10 @@ class Application @Inject()
     }
   }
 
-  def logout() = Action { request =>
-    Ok(loginView(request)).withNewSession
+  def logout() = Action.async { implicit request =>
+    auth.authUrl.map { authUrl =>
+      Ok(loginView(authUrl)).withNewSession
+    }
   }
 
   def wellKnown(key: String) = Action {

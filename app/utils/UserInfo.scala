@@ -21,6 +21,7 @@ class UserAction @Inject()(val parser: BodyParsers.Default)(implicit val executi
       val isAdmin = request.session.get("isAdmin").exists(_.toBoolean)
       UserInfo(email, isAdmin)
     }
+
     Future.successful(new UserRequest[A](maybeUser, request))
   }
 }
