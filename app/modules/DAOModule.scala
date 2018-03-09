@@ -31,15 +31,19 @@ class DAOModule extends Module {
 }
 
 trait DAO {
+  type NumTotalTasks = Long
+  type NumCompletedTasks = Long
+  type NumComments = Long
+
   def createRequest(name: String, creatorEmail: String): Future[Request]
-  def allRequests(): Future[Seq[(Request, Long, Long)]]
-  def requestsForUser(email: String): Future[Seq[(Request, Long, Long)]]
+  def allRequests(): Future[Seq[(Request, NumTotalTasks, NumCompletedTasks)]]
+  def requestsForUser(email: String): Future[Seq[(Request, NumTotalTasks, NumCompletedTasks)]]
   def request(requestSlug: String): Future[Request]
   def updateRequest(requestSlug: String, state: State.State): Future[Request]
   def createTask(requestSlug: String, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task]
   def updateTask(taskId: Int, state: State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task]
   def taskById(taskId: Int): Future[Task]
-  def requestTasks(requestSlug: String, maybeState: Option[State] = None): Future[Seq[(Task, Long)]]
+  def requestTasks(requestSlug: String, maybeState: Option[State] = None): Future[Seq[(Task, NumComments)]]
   def commentOnTask(taskId: Int, email: String, contents: String): Future[Comment]
   def commentsOnTask(taskId: Int): Future[Seq[Comment]]
 }
@@ -79,7 +83,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def allRequests(): Future[Seq[(Request, Long, Long)]] = {
+  override def allRequests(): Future[Seq[(Request, NumTotalTasks, NumCompletedTasks)]] = {
     run {
       quote {
         for {
@@ -106,7 +110,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     updateFuture.flatMap(_ => request(requestSlug))
   }
 
-  override def requestsForUser(email: String): Future[Seq[(Request, Long, Long)]] = {
+  override def requestsForUser(email: String): Future[Seq[(Request, NumTotalTasks, NumCompletedTasks)]] = {
     run {
       quote {
         for {
@@ -187,7 +191,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def requestTasks(requestSlug: String, maybeState: Option[State] = None): Future[Seq[(Task, Long)]] = {
+  override def requestTasks(requestSlug: String, maybeState: Option[State] = None): Future[Seq[(Task, NumComments)]] = {
     maybeState.fold {
       run {
         quote {

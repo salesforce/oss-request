@@ -7,7 +7,7 @@ package models
 import play.api.libs.json._
 
 // todo: parameterize value
-case class TaskEvent(`type`: TaskEvent.EventType.EventType, value: String, action: TaskEvent.EventAction)
+case class TaskEvent(`type`: TaskEvent.EventType.EventType, value: String, action: TaskEvent.EventAction, criteria: Option[TaskEvent.Criteria])
 
 object TaskEvent {
 
@@ -36,6 +36,23 @@ object TaskEvent {
   object EventAction {
     implicit val jsonReads = Json.reads[EventAction]
     implicit val jsonWrites = Json.writes[EventAction]
+  }
+
+  object CriteriaType extends Enumeration {
+    type CriteriaType = Value
+
+    val FieldValue = Value("FIELD_VALUE")
+
+    implicit val jsonReads = Reads[CriteriaType] { jsValue =>
+      values.find(_.toString == jsValue.as[String]).fold[JsResult[CriteriaType]](JsError("Could not find that type"))(JsSuccess(_))
+    }
+  }
+
+  case class Criteria(`type`: CriteriaType.CriteriaType, value: String)
+
+  object Criteria {
+    implicit val jsonReads = Json.reads[Criteria]
+    implicit val jsonWrites = Json.writes[Criteria]
   }
 
   implicit val jsonReads = Json.reads[TaskEvent]

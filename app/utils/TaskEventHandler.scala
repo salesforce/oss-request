@@ -19,19 +19,40 @@ class TaskEventHandler @Inject()(dao: DAO, metadataService: MetadataService)(imp
       task.prototype.taskEvents.filter { taskEvent =>
         taskEvent.`type` == eventType && taskEvent.value == task.state.toString
       } map { taskEvent =>
-        taskEvent.action.`type` match {
-          case TaskEvent.EventActionType.CreateTask =>
-            taskPrototypesFuture.flatMap { taskPrototypes =>
-              taskPrototypes.get(taskEvent.action.value).fold(Future.failed[Task](new Exception(s"Could not find task named '${taskEvent.action.value}'"))) { taskPrototype =>
-                taskPrototype.completableBy.fold(Future.failed[Task](new Exception("Could not create task because it does not have completable_by info"))) { completableBy =>
-                  completableBy.value.fold(Future.failed[Task](new Exception("Could not create task because it does not have a completable_by value"))) { completableByValue =>
-                    dao.createTask(requestSlug, taskPrototype, completableBy.`type`, completableByValue)
+
+        val skipAction = taskEvent.criteria.exists { criteria =>
+          criteria.`type` match {
+            case TaskEvent.CriteriaType.FieldValue =>
+              criteria.value.split("=") match {
+                case Array(field, value) =>
+                  task.data.fold(true) { data =>
+                    // only string values work
+                    !(data \ field).asOpt[String].contains(value)
+                  }
+                case _ =>
+                  false
+              }
+          }
+        }
+
+        if (skipAction) {
+          Future.successful(Seq.empty[Seq[Task]])
+        }
+        else {
+          taskEvent.action.`type` match {
+            case TaskEvent.EventActionType.CreateTask =>
+              taskPrototypesFuture.flatMap { taskPrototypes =>
+                taskPrototypes.get(taskEvent.action.value).fold(Future.failed[Task](new Exception(s"Could not find task named '${taskEvent.action.value}'"))) { taskPrototype =>
+                  taskPrototype.completableBy.fold(Future.failed[Task](new Exception("Could not create task because it does not have completable_by info"))) { completableBy =>
+                    completableBy.value.fold(Future.failed[Task](new Exception("Could not create task because it does not have a completable_by value"))) { completableByValue =>
+                      dao.createTask(requestSlug, taskPrototype, completableBy.`type`, completableByValue)
+                    }
                   }
                 }
               }
-            }
-          case _ =>
-            Future.failed[Task](new Exception(s"Could not process action type: ${taskEvent.action.`type`}"))
+            case _ =>
+              Future.failed[Task](new Exception(s"Could not process action type: ${taskEvent.action.`type`}"))
+          }
         }
       }
     }

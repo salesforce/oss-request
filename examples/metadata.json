@@ -52,6 +52,18 @@
             "type": "CREATE_TASK",
             "value": "review_request"
           }
+        },
+        {
+          "type": "STATE_CHANGE",
+          "value": "COMPLETED",
+          "criteria": {
+            "type": "FIELD_VALUE",
+            "value": "github_org=Foo"
+          },
+          "action": {
+            "type": "CREATE_TASK",
+            "value": "ip_approval"
+          }
         }
       ]
     },

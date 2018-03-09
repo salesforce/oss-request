@@ -30,6 +30,10 @@ The request system is driven by a metadata definition which includes system grou
             - `type` (enum, required) - Currently only `CREATE_TASK` is supported
             - `value` (string) - The identifier of the task
 
+        - `criteria` (object) - Defines critera for when the action should be run
+            - `type` - Currently only `FIELD_VALUE` is supported and allows filtering on a field's value
+            - `value` - Matches a field name and value, e.g. foo=bar
+
 
 Architecture
 ------------
