@@ -4,12 +4,10 @@
 
 package utils
 
-import javax.inject.Inject
-
 import akka.stream.Materializer
-import play.api.http.{HeaderNames, HttpFilters}
+import javax.inject.Inject
+import play.api.http.HeaderNames
 import play.api.mvc._
-import play.filters.gzip.GzipFilter
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -27,8 +25,4 @@ class OnlyHttpsFilter @Inject() (implicit val mat: Materializer, ec: ExecutionCo
       }
     }
   }
-}
-
-class Filters @Inject() (gzip: GzipFilter, onlyHttpsFilter: OnlyHttpsFilter) extends HttpFilters {
-  val filters = Seq(gzip, onlyHttpsFilter)
 }

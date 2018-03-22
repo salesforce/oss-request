@@ -4,7 +4,7 @@
 
 @this(main: Main)
 
-@(requests: Seq[(models.Request, Long, Long)], userInfo: _root_.utils.UserInfo)
+@(requests: Seq[(models.Request, Long, Long)], userInfo: _root_.utils.UserInfo)(implicit request: RequestHeader)
 
 @stateClass(state: models.State.State) = {
     @state match {

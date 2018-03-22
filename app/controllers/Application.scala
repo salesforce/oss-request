@@ -176,7 +176,7 @@ class Application @Inject()
     }
   }
 
-  private def login(state: Option[String])(emails: Set[String]): Future[Result] = {
+  private def login(state: Option[String])(emails: Set[String])(implicit request: RequestHeader): Future[Result] = {
     if (emails.size > 1) {
       metadataService.fetchMetadata.map { metadata =>
         val emailsWithIsAdmin = emails.map { email =>

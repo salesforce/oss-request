@@ -4,7 +4,7 @@
 
 @this(main: Main)
 
-@(emails: Map[String, Boolean])
+@(emails: Map[String, Boolean])(implicit request: RequestHeader)
 
 @main(None)("Select Email") {
     <h2>That account has multiple emails, pick one</h2>

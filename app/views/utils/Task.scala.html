@@ -4,7 +4,7 @@
 
 @this(taskEditView: TaskEdit, taskShowView: TaskShow)
 
-@(task: models.Task, commentCount: Long, canEdit: Boolean, groups: Map[String, Set[String]])
+@(task: models.Task, commentCount: Long, canEdit: Boolean, groups: Map[String, Set[String]])(implicit request: RequestHeader)
 
 @panelType = {
     @task.state match {

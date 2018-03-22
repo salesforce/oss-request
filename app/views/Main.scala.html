@@ -4,7 +4,7 @@
 
 @this(webJarsUtil: org.webjars.play.WebJarsUtil)
 
-@(maybeUserInfo: Option[_root_.utils.UserInfo])(title: String)(body: Html)
+@(maybeUserInfo: Option[_root_.utils.UserInfo])(title: String)(body: Html)(implicit request: RequestHeader)
 
 <!DOCTYPE html>
 <html>
@@ -57,6 +57,7 @@
                         </div>
                         <div class="modal-footer">
                             <form id="newComment" method="post">
+                                @helper.CSRF.formField
                                 <div class="form-group">
                                     <textarea name="contents" class="form-control" rows="3" placeholder="Your comments..."></textarea>
                                 </div>

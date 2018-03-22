@@ -4,7 +4,7 @@
 
 @this(mainView: Main)
 
-@(userInfo: _root_.utils.UserInfo)
+@(userInfo: _root_.utils.UserInfo)(implicit request: RequestHeader)
 
 @mainView(Some(userInfo))("New Request") {
 

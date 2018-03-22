@@ -4,7 +4,9 @@
 
 @this()
 
-@(newOrExistingTask: Either[(String, models.Task.Prototype), models.Task], groups: Map[String, Set[String]])
+@(newOrExistingTask: Either[(String, models.Task.Prototype), models.Task], groups: Map[String, Set[String]])(implicit request: RequestHeader)
+
+@import helper._
 
 @taskPrototype = @{
     newOrExistingTask match {
@@ -28,8 +30,8 @@
 
 @formUrl(state: models.State.State = State.Completed) = @{
     newOrExistingTask match {
-        case Left((name, _)) => routes.Application.createRequest(name).url
-        case Right(task) => routes.Application.updateTask(task.requestSlug, task.id, state).url
+        case Left((name, _)) => CSRF(routes.Application.createRequest(name)).url
+        case Right(task) => CSRF(routes.Application.updateTask(task.requestSlug, task.id, state)).url
     }
 }
 
@@ -95,7 +97,7 @@
         <div class="panel-footer clearfix">
             <span>@utils.AssignedTo(groups, maybeCompletableBy)</span>
 
-            <form action="@formUrl()" method="post" class="pull-right">
+            <form action="@Html(formUrl())" method="post" class="pull-right">
                 <button type="submit" class="btn btn-success">Mark as Completed</button>
             </form>
         </div>
@@ -111,12 +113,12 @@
             <div class="pull-right">
                 <div class="row">
                     <div class="col-md-6">
-                        <form action="@formUrl()" method="post">
+                        <form action="@Html(formUrl())" method="post">
                             <button type="submit" class="btn btn-success">Approve</button>
                         </form>
                     </div>
                     <div class="col-md-6">
-                        <form action="@formUrl(models.State.Cancelled)" method="post">
+                        <form action="@Html(formUrl(models.State.Cancelled))" method="post">
                             <button type="submit" class="btn btn-danger">Deny</button>
                         </form>
                     </div>

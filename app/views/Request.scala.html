@@ -4,7 +4,7 @@
 
 @this(mainView: Main, taskView: utils.Task)
 
-@(metadata: _root_.utils.Metadata, request: models.Request, tasks: Seq[(models.Task, Long, Boolean)], userInfo: _root_.utils.UserInfo, isAdmin: Boolean, canCancelRequest: Boolean)
+@(metadata: _root_.utils.Metadata, request: models.Request, tasks: Seq[(models.Task, Long, Boolean)], userInfo: _root_.utils.UserInfo, isAdmin: Boolean, canCancelRequest: Boolean)(implicit requestHeader: RequestHeader)
 
 @tasksWithState(state: State.State) = @{
     tasks.filter(_._1.state == state)
@@ -37,7 +37,7 @@
                 <div class="row">
                     @if(completedTasks.size == tasks.size && isAdmin) {
                         <div class="col-md-2">
-                            <form action="@routes.Application.updateRequest(request.slug, models.State.Completed)" method="post">
+                            <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Completed))" method="post">
                                 <button type="submit" class="btn btn-success">Mark as Completed</button>
                             </form>
                         </div>
@@ -45,7 +45,7 @@
 
                     @if(canCancelRequest) {
                         <div class="col-md-2">
-                            <form action="@routes.Application.updateRequest(request.slug, models.State.Cancelled)" method="post">
+                            <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Cancelled))" method="post">
                                 <button type="submit" class="btn btn-success">Cancel Request</button>
                             </form>
                         </div>
@@ -53,7 +53,7 @@
 
                     @if(isAdmin) {
                         <div class="col-md-4">
-                            <form action="@routes.Application.addTask(request.slug)" method="post" class="form-inline">
+                            <form action="@helper.CSRF(routes.Application.addTask(request.slug))" method="post" class="form-inline">
                                 <div class="form-group">
                                     <label for="taskPrototypeKey">Add a Task</label>
                                     <select id="taskPrototypeKeySelect" name="taskPrototypeKey" class="form-control">
