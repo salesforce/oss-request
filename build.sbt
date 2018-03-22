@@ -5,7 +5,7 @@ lazy val root = project.in(file(".")).enablePlugins(PlayScala, AutomateHeaderPlu
 
 name := "oss-request"
 
-scalaVersion := "2.12.4"
+scalaVersion := "2.12.5"
 
 resolvers ++= Seq(Resolver.mavenLocal, Resolver.jcenterRepo)
 
