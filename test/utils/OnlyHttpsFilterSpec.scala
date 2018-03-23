@@ -17,7 +17,7 @@ class OnlyHttpsFilterSpec extends MixedPlaySpec with HeaderNames {
 
   "OnlyHttpsFilter" must {
     "redirect to https if the request was forwarded and not https" in new App(defaultApp) {
-      val request = FakeRequest(GET, controllers.routes.Application.index().url, Headers(X_FORWARDED_PROTO -> "http", HOST -> "localhost"), AnyContentAsEmpty)
+      val request = FakeRequest(GET, controllers.routes.Application.index().url).withBody(AnyContentAsEmpty).withHeaders(X_FORWARDED_PROTO -> "http")
       val Some(result) = route(app, request)
       status(result) mustEqual MOVED_PERMANENTLY
     }
@@ -30,7 +30,7 @@ class OnlyHttpsFilterSpec extends MixedPlaySpec with HeaderNames {
       status(result) mustEqual OK
     }
     "keep https for non-well-known requests" in new App(defaultApp) {
-      val request = FakeRequest(GET, controllers.routes.Assets.at().url, Headers(X_FORWARDED_PROTO -> "https", HOST -> "localhost"), AnyContentAsEmpty)
+      val request = FakeRequest(GET, controllers.routes.Assets.at().url).withBody(AnyContentAsEmpty).withHeaders(X_FORWARDED_PROTO -> "https")
       val Some(result) = route(app, request)
       status(result) mustEqual OK
     }
