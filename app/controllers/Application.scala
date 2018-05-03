@@ -234,17 +234,6 @@ class Application @Inject()
     }
   }
 
-  def wellKnown(key: String) = Action {
-    configuration.getOptional[String]("wellknown").fold(NotFound(EmptyContent())) { wellKnownKeyValue =>
-      if (wellKnownKeyValue.startsWith(key + "=")) {
-        Ok(wellKnownKeyValue.stripPrefix(key + "="))
-      }
-      else {
-        NotFound(EmptyContent())
-      }
-    }
-  }
-
   private[controllers] def svgSymbol(path: String, symbol: String): Node = {
     webJarsUtil.locate(path).path.flatMap { filePath =>
       val maybeInputStream = env.resourceAsStream(WebJarAssetLocator.WEBJARS_PATH_PREFIX + "/" + filePath)
