@@ -5,7 +5,7 @@ lazy val root = project.in(file(".")).enablePlugins(PlayScala, AutomateHeaderPlu
 
 name := "oss-request"
 
-scalaVersion := "2.12.5"
+scalaVersion := "2.12.6"
 
 resolvers ++= Seq(Resolver.mavenLocal, Resolver.jcenterRepo)
 
@@ -18,7 +18,7 @@ libraryDependencies ++= Seq(
 
   "org.postgresql"         %  "postgresql"                         % "42.1.4",
 
-  "io.getquill"            %% "quill-async-postgres"               % "2.3.2",
+  "io.getquill"            %% "quill-async-postgres"               % "2.4.2",
 
   "org.eclipse.jgit"       %  "org.eclipse.jgit"                   % "4.10.0.201712302008-r",
 
