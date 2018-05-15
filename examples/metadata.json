@@ -31,6 +31,10 @@
                 "Personal"
               ],
               "required": true
+            },
+            "patentable": {
+              "type": "boolean",
+              "enum": [true, false]
             }
           }
         },
@@ -40,6 +44,11 @@
               "type": "select",
               "noneLabel": "-- Select --",
               "removeDefaultNone": false
+            },
+            "patentable": {
+              "type": "radio",
+              "label": "Is this patentable?",
+              "optionLabels": ["Yes", "No"]
             }
           }
         }
@@ -59,6 +68,18 @@
           "criteria": {
             "type": "FIELD_VALUE",
             "value": "github_org=Foo"
+          },
+          "action": {
+            "type": "CREATE_TASK",
+            "value": "create_github_repo"
+          }
+        },
+        {
+          "type": "STATE_CHANGE",
+          "value": "COMPLETED",
+          "criteria": {
+            "type": "FIELD_VALUE",
+            "value": "patentable=true"
           },
           "action": {
             "type": "CREATE_TASK",

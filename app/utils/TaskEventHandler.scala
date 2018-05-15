@@ -5,11 +5,11 @@
 package utils
 
 import javax.inject.Inject
-
 import models.{Task, TaskEvent}
 import modules.DAO
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 class TaskEventHandler @Inject()(dao: DAO, metadataService: MetadataService)(implicit ec: ExecutionContext) {
   lazy val taskPrototypesFuture = metadataService.fetchMetadata.map(_.tasks)
@@ -26,8 +26,17 @@ class TaskEventHandler @Inject()(dao: DAO, metadataService: MetadataService)(imp
               criteria.value.split("=") match {
                 case Array(field, value) =>
                   task.data.fold(true) { data =>
-                    // only string values work
-                    !(data \ field).asOpt[String].contains(value)
+                    // only string and boolean values work
+
+                    val containsString = (data \ field).asOpt[String].contains(value)
+                    val containsBoolean = {
+                      val maybeValueBoolean = Try(value.toBoolean).toOption
+                      maybeValueBoolean.fold(false) { valueBoolean =>
+                        (data \ field).asOpt[Boolean].contains(valueBoolean)
+                      }
+                    }
+
+                    !containsString && !containsBoolean
                   }
                 case _ =>
                   false
