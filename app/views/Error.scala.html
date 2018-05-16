@@ -1,0 +1,16 @@
+@*
+ * Copyright (c) Salesforce.com, inc. 2017
+ *@
+
+@this(mainView: Main)
+
+@(message: String, userInfo: _root_.utils.UserInfo)(implicit requestHeader: RequestHeader)
+
+@mainView(Some(userInfo))("Request Not Found") {
+
+    <div class="jumbotron">
+        <h1>Error</h1>
+        <p>@message</p>
+    </div>
+
+}

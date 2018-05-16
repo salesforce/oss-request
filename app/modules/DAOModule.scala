@@ -129,7 +129,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
         query[Request].filter(_.slug == lift(slug))
       }
     } flatMap { result =>
-      result.headOption.fold(Future.failed[Request](new Exception("Request not found")))(Future.successful)
+      result.headOption.fold(Future.failed[Request](DB.RequestNotFound(slug)))(Future.successful)
     }
   }
 
@@ -252,6 +252,10 @@ object DB {
     else {
       Stream.from(1).map(default + "-" + _).dropWhile(existingSlugs.contains).head
     }
+  }
+
+  case class RequestNotFound(slug: String) extends Exception {
+    override def getMessage: String = s"Request $slug not found"
   }
 }
 
