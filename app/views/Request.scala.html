@@ -2,7 +2,7 @@
  * Copyright (c) Salesforce.com, inc. 2017
  *@
 
-@this(mainView: Main, taskView: utils.Task)
+@this(mainView: Main, taskView: utils.TaskEditOrShow)
 
 @(metadata: _root_.utils.Metadata, request: models.Request, tasks: Seq[(models.Task, Long, Boolean)], userInfo: _root_.utils.UserInfo, isAdmin: Boolean, canCancelRequest: Boolean)(implicit requestHeader: RequestHeader)
 

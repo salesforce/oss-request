@@ -38,7 +38,7 @@
 @(taskPrototype.`type`) match {
     case models.Task.TaskType.Input => {
         <div class="panel-body">
-            @taskPrototype.info
+            @Html(taskPrototype.infoMarkdownToHtml)
 
             @defining(scala.util.Random.alphanumeric.take(8).mkString) { formid =>
                 @for(form <- taskPrototype.form) {
@@ -92,7 +92,7 @@
     }
     case models.Task.TaskType.Action => {
         <div class="panel-body">
-            <p>@taskPrototype.info</p>
+            <p>@Html(taskPrototype.infoMarkdownToHtml)</p>
         </div>
         <div class="panel-footer clearfix">
             <span>@utils.AssignedTo(groups, maybeCompletableBy)</span>
@@ -104,7 +104,7 @@
     }
     case models.Task.TaskType.Approval => {
         <div class="panel-body">
-            <p>@taskPrototype.info</p>
+            <p>@Html(taskPrototype.infoMarkdownToHtml)</p>
         </div>
 
         <div class="panel-footer clearfix">

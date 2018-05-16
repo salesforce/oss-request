@@ -7,6 +7,9 @@ package models
 import java.time.ZonedDateTime
 
 import io.getquill.MappedEncoding
+import laika.api.Transform
+import laika.parse.markdown.Markdown
+import laika.render.HTML
 import models.Task.CompletableByType.CompletableByType
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
@@ -15,7 +18,11 @@ case class Task(id: Int, completableByType: CompletableByType, completableByValu
 
 object Task {
 
-  case class Prototype(label: String, `type`: TaskType.TaskType, info: String, completableBy: Option[CompletableBy] = None, form: Option[JsObject] = None, taskEvents: Seq[TaskEvent] = Seq.empty[TaskEvent])
+  case class Prototype(label: String, `type`: TaskType.TaskType, info: String, completableBy: Option[CompletableBy] = None, form: Option[JsObject] = None, taskEvents: Seq[TaskEvent] = Seq.empty[TaskEvent]) {
+    lazy val infoMarkdownToHtml = {
+      Transform.from(Markdown).to(HTML).fromString(info).toString()
+    }
+  }
 
   object TaskType extends Enumeration {
     type TaskType = Value

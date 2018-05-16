@@ -47,7 +47,7 @@
     }
     case models.Task.TaskType.Action => {
         <div class="panel-body">
-            <p>@task.prototype.info</p>
+            <p>@Html(task.prototype.infoMarkdownToHtml)</p>
         </div>
         @task.state match {
             case models.State.Completed => {
@@ -67,7 +67,7 @@
     }
     case models.Task.TaskType.Approval => {
         <div class="panel-body">
-            <p>@task.prototype.info</p>
+            <p>@Html(task.prototype.infoMarkdownToHtml)</p>
         </div>
         @task.state match {
             case models.State.Completed => {
