@@ -6,8 +6,8 @@ package modules
 
 import java.time.ZonedDateTime
 import java.util.concurrent.ConcurrentHashMap
-import javax.inject.Singleton
 
+import javax.inject.Singleton
 import models.State.State
 import models.Task.CompletableByType.CompletableByType
 import models.{Comment, Request, State, Task}
@@ -19,8 +19,8 @@ import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.json.JsObject
 
 import scala.collection.JavaConverters._
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.util.Try
 
 @Singleton

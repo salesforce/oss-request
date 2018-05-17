@@ -7,9 +7,9 @@ package modules
 import akka.http.scaladsl.model.Uri
 import org.scalatestplus.play.MixedPlaySpec
 import play.api.libs.ws.WSClient
-import play.api.{Configuration, Mode}
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
+import play.api.{Configuration, Mode}
 
 
 class AuthModuleSpec extends MixedPlaySpec {

@@ -5,16 +5,15 @@
 package utils
 
 import javax.inject.Inject
-
 import models.Task.CompletableByType.CompletableByType
 import models.{Comment, Request, State, Task, TaskEvent}
-import modules.{DAO, Notify}
+import modules.{DAO, Notifier}
 import play.api.libs.json.JsObject
 import play.api.mvc.RequestHeader
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notify: Notify, security: Security)(implicit ec: ExecutionContext) {
+class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notifier: Notifier, security: Security)(implicit ec: ExecutionContext) {
   def createRequest(name: String, creatorEmail: String): Future[Request] = {
     for {
       request <- dao.createRequest(name, creatorEmail)
@@ -25,7 +24,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notify:
     for {
       task <- dao.createTask(requestSlug, prototype, completableByType, completableByValue, maybeCompletedBy, maybeData, state)
       _ <- taskEventHandler.process(requestSlug, TaskEvent.EventType.StateChange, task)
-      _ <- if (state == State.InProgress) notify.taskAssigned(task) else Future.unit
+      _ <- if (state == State.InProgress) notifier.taskAssigned(task) else Future.unit
     } yield task
   }
 
@@ -39,7 +38,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notify:
     for {
       _ <- security.updateRequest(email, requestSlug, state)
       request <- dao.updateRequest(requestSlug, state)
-      _ <- notify.requestStatusChange(request)
+      _ <- notifier.requestStatusChange(request)
     } yield request
   }
 
@@ -87,7 +86,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notify:
   def commentOnTask(requestSlug: String, taskId: Int, email: String, contents: String)(implicit requestHeader: RequestHeader): Future[Comment] = {
     for {
       comment <- dao.commentOnTask(taskId, email, contents)
-      _ <- notify.taskComment(requestSlug, comment)
+      _ <- notifier.taskComment(requestSlug, comment)
     } yield comment
   }
 

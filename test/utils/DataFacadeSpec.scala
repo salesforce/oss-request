@@ -4,31 +4,26 @@
 
 package utils
 
-import javax.inject.{Inject, Singleton}
-
-import models.{Comment, Request, State, Task, TaskEvent}
-import modules.{DAOMock, Notify}
+import models.{State, Task, TaskEvent}
+import modules.{DAOMock, NotifyMock, NotifyProvider}
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.db.Database
 import play.api.db.evolutions.Evolutions
 import play.api.inject.bind
-import play.api.mvc.RequestHeader
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
 
-import scala.concurrent.Future
-
 class DataFacadeSpec extends PlaySpec with GuiceOneAppPerTest {
 
-  implicit override def fakeApplication() = DAOMock.databaseAppBuilder().overrides(bind[Notify].to[NotifyMock]).build()
+  implicit override def fakeApplication() = DAOMock.databaseAppBuilder().overrides(bind[NotifyProvider].to[NotifyMock]).build()
 
   def database = app.injector.instanceOf[Database]
   def dataFacade = app.injector.instanceOf[DataFacade]
 
   "createTask" must {
     "work with events" in Evolutions.withEvolutions(database) {
-      val mockState = app.injector.instanceOf[MockState]
+      val notifyMock = app.injector.instanceOf[NotifyMock]
 
       implicit val fakeRequest = FakeRequest()
 
@@ -39,7 +34,8 @@ class DataFacadeSpec extends PlaySpec with GuiceOneAppPerTest {
       val allTasks = await(dataFacade.requestTasks("foo@foo.com", request.slug))
       allTasks must have size 2
 
-      mockState.taskAssigned.map(_.completableByValue) must contain ("foo@foo.com")
+      //mockState.taskAssigned.map(_.completableByValue) must contain ("foo@foo.com")
+      fail()
     }
     // todo: fail on unmet conditions for the EventAction's task
   }
@@ -63,28 +59,4 @@ class DataFacadeSpec extends PlaySpec with GuiceOneAppPerTest {
     }
   }
 
-}
-
-@Singleton
-class MockState {
-  var taskAssigned: Option[Task] = None
-  var taskComment: Option[(String, Comment)] = None
-  var requestStatusChange: Option[Request] = None
-}
-
-class NotifyMock @Inject() (mockState: MockState) extends Notify {
-  override def taskAssigned(task: Task)(implicit requestHeader: RequestHeader): Future[Unit] = {
-    mockState.taskAssigned = Some(task)
-    Future.unit
-  }
-
-  override def taskComment(requestSlug: String, comment: Comment)(implicit requestHeader: RequestHeader): Future[Unit] = {
-    mockState.taskComment = Some(requestSlug -> comment)
-    Future.unit
-  }
-
-  override def requestStatusChange(request: Request)(implicit requestHeader: RequestHeader): Future[Unit] = {
-    mockState.requestStatusChange = Some(request)
-    Future.unit
-  }
 }

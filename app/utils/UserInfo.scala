@@ -5,7 +5,6 @@
 package utils
 
 import javax.inject.Inject
-
 import play.api.mvc.{ActionBuilder, ActionTransformer, AnyContent, BodyParsers, Request, WrappedRequest}
 
 import scala.concurrent.{ExecutionContext, Future}

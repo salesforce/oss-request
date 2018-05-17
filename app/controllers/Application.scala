@@ -11,8 +11,6 @@ import modules.{Auth, DB}
 import org.webjars.WebJarAssetLocator
 import org.webjars.play.WebJarsUtil
 import play.api.libs.json.{JsObject, Json}
-import play.api.mvc.Results.EmptyContent
-import play.api.mvc.Security.AuthenticatedBuilder
 import play.api.mvc._
 import play.api.{Configuration, Environment}
 import play.twirl.api.Html

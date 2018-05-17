@@ -16,13 +16,15 @@ libraryDependencies ++= Seq(
   jdbc,
   evolutions,
 
+  "org.slf4j"              %  "log4j-over-slf4j"                   % "1.7.25",
+
   "org.postgresql"         %  "postgresql"                         % "42.1.4",
 
   "io.getquill"            %% "quill-async-postgres"               % "2.4.2",
 
   "org.eclipse.jgit"       %  "org.eclipse.jgit"                   % "4.10.0.201712302008-r",
 
-  "com.sparkpost"          %  "sparkpost-lib"                      % "0.19",
+  "com.sparkpost"          %  "sparkpost-lib"                      % "0.21",
 
   "com.onelogin"           %  "java-saml-core"                     % "2.2.0",
 

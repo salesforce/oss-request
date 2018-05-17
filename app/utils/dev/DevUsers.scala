@@ -5,7 +5,6 @@
 package utils.dev
 
 import javax.inject.{Inject, Singleton}
-
 import play.api.{Environment, Mode}
 
 @Singleton

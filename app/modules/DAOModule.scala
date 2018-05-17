@@ -5,13 +5,13 @@
 package modules
 
 import java.time.ZonedDateTime
-import javax.inject.{Inject, Singleton}
 
 import com.github.mauricio.async.db.SSLConfiguration
 import com.github.mauricio.async.db.pool.{PartitionedConnectionPool, PoolConfiguration}
 import com.github.mauricio.async.db.postgresql.pool.PostgreSQLConnectionFactory
 import com.github.mauricio.async.db.postgresql.util.URLParser
 import io.getquill.{PostgresAsyncContext, SnakeCase}
+import javax.inject.{Inject, Singleton}
 import models.State.State
 import models.Task.CompletableByType.CompletableByType
 import models.{Comment, Request, State, Task}

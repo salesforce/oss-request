@@ -4,14 +4,12 @@
 
 package modules
 
-import java.net.URL
-import javax.inject.Inject
-
 import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.model.Uri.Query
 import com.onelogin.saml2.authn.{AuthnRequest, SamlResponse}
 import com.onelogin.saml2.http.HttpRequest
 import com.onelogin.saml2.settings.{Saml2Settings, SettingsBuilder}
+import javax.inject.Inject
 import play.api.http.{HeaderNames, HttpVerbs, MimeTypes, Status}
 import play.api.inject.{Binding, Module}
 import play.api.libs.json.JsObject
@@ -20,10 +18,10 @@ import play.api.mvc.RequestHeader
 import play.api.{Configuration, Environment}
 import utils.dev.DevUsers
 
+import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 import scala.xml.NodeSeq
-import scala.collection.JavaConverters._
 
 class AuthModule extends Module {
   def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = {

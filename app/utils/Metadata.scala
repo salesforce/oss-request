@@ -6,9 +6,9 @@ package utils
 
 import java.io.{File, FileInputStream}
 import java.nio.file.Files
-import javax.inject.{Inject, Singleton}
 
 import com.jcraft.jsch.{JSch, Session}
+import javax.inject.{Inject, Singleton}
 import models.Task
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.transport.{JschConfigSessionFactory, OpenSshConfig, SshTransport}

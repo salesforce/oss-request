@@ -5,7 +5,6 @@
 package utils
 
 import javax.inject.Inject
-
 import models.{Request, State, Task}
 import modules.DAO
 
