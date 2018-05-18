@@ -24,8 +24,6 @@ libraryDependencies ++= Seq(
 
   "org.eclipse.jgit"       %  "org.eclipse.jgit"                   % "4.10.0.201712302008-r",
 
-  "com.sparkpost"          %  "sparkpost-lib"                      % "0.21",
-
   "com.onelogin"           %  "java-saml-core"                     % "2.2.0",
 
   "javax.cache"            %  "cache-api"                          % "1.1.0",

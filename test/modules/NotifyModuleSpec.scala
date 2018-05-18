@@ -16,6 +16,7 @@ import play.api.test.FakeRequest
 import play.api.test.Helpers._
 
 import scala.concurrent.Future
+import scala.util.Try
 
 class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 
@@ -78,11 +79,11 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 
   "sending an email" must {
     "work" in {
-      assume(notifySparkPost.clientTry.isSuccess)
+      assume(Try(notifySparkPost.apiKey).isSuccess)
 
-      val responseTry = notifySparkPost.sendMessageWithResponse(Set(notifySparkPost.from), "test", "test")
+      val response = await(notifySparkPost.sendMessageWithResponse(Set(notifySparkPost.from), "test", "test"))
 
-      responseTry.success.value.getResponseCode must equal (200)
+      response.status must equal (OK)
     }
   }
 

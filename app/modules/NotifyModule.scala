@@ -4,19 +4,18 @@
 
 package modules
 
-import com.sparkpost.Client
-import com.sparkpost.model.responses.Response
 import javax.inject.{Inject, Singleton}
 import models.Task.CompletableByType
 import models.{Comment, Request, Task}
+import play.api.http.HeaderNames
 import play.api.inject.{Binding, Module}
-import play.api.mvc.RequestHeader
+import play.api.libs.json.Json
+import play.api.libs.ws.{WSClient, WSResponse}
+import play.api.mvc.{Headers, RequestHeader}
 import play.api.{Configuration, Environment, Logger}
 import utils.MetadataService
 
-import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
 
 
 class NotifyModule extends Module {
@@ -111,30 +110,45 @@ class NotifyLogger @Inject()(implicit executionContext: ExecutionContext) extend
 }
 
 @Singleton
-class NotifySparkPost @Inject()(configuration: Configuration)(implicit ec: ExecutionContext) extends NotifyProvider {
+class NotifySparkPost @Inject()(configuration: Configuration, wSClient: WSClient)(implicit ec: ExecutionContext) extends NotifyProvider {
+
+  val baseUrl = "https://api.sparkpost.com/api/v1"
 
   lazy val apiKey = configuration.get[String]("sparkpost.apikey")
-  lazy val domain = configuration.get[String]("sparkpost.domain")
+  lazy val maybeDomain = configuration.getOptional[String]("sparkpost.domain")
   lazy val user = configuration.get[String]("sparkpost.user")
-  lazy val from = user + "@" + domain
-
-  lazy val clientTry = Try(new Client(apiKey))
+  lazy val from = user + "@" + maybeDomain.getOrElse("sparkpostbox.com")
 
   override def sendMessage(emails: Set[String], subject: String, message: String): Future[Unit] = {
-    val f = Future.fromTry {
-      sendMessageWithResponse(emails, subject, message).map(_ => Unit)
-    }
-
+    val f = sendMessageWithResponse(emails, subject, message)
     f.failed.foreach(Logger.error("Email sending failure", _))
-
     f.map(_ => Unit)
   }
 
-  def sendMessageWithResponse(emails: Set[String], subject: String, message: String): Try[Response] = {
-    clientTry.flatMap { client =>
-      Try {
-        client.sendMessage(from, emails.toList.asJava, subject, message, message)
-      }
-    }
+
+  def sendMessageWithResponse(emails: Set[String], subject: String, message: String): Future[WSResponse] = {
+
+    val json = Json.obj(
+      "options" -> Json.obj(
+        "sandbox" -> maybeDomain.isEmpty
+      ),
+      "recipients" -> emails.map { email =>
+        Json.obj(
+          "address" -> Json.obj(
+            "email" -> email
+          )
+        )
+      },
+      "content" -> Json.obj(
+        "from" -> Json.obj(
+          "email" -> from
+        ),
+        "subject" -> subject,
+        "text" -> message,
+        "html" -> message
+      )
+    )
+
+    wSClient.url(baseUrl + "/transmissions").withHttpHeaders(HeaderNames.AUTHORIZATION -> apiKey).post(json)
   }
 }
