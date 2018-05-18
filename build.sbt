@@ -28,9 +28,11 @@ libraryDependencies ++= Seq(
 
   "com.onelogin"           %  "java-saml-core"                     % "2.2.0",
 
+  "javax.cache"            %  "cache-api"                          % "1.1.0",
+
   "org.webjars"            %% "webjars-play"                       % "2.6.3",
   "org.webjars"            %  "salesforce-lightning-design-system" % "2.4.1",
-  "org.webjars"            %  "handlebars"                         % "4.0.5",
+  "org.webjars"            %  "handlebars"                         % "4.0.11-1",
   "org.webjars"            %  "alpaca"                             % "1.5.23",
   "org.planet42"           %% "laika-core"                         % "0.7.5",
 
