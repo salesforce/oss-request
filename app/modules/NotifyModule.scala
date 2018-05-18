@@ -7,7 +7,7 @@ package modules
 import javax.inject.{Inject, Singleton}
 import models.Task.CompletableByType
 import models.{Comment, Request, Task}
-import play.api.http.HeaderNames
+import play.api.http.{HeaderNames, Status}
 import play.api.inject.{Binding, Module}
 import play.api.libs.json.Json
 import play.api.libs.ws.{WSClient, WSResponse}
@@ -120,7 +120,12 @@ class NotifySparkPost @Inject()(configuration: Configuration, wSClient: WSClient
   lazy val from = user + "@" + maybeDomain.getOrElse("sparkpostbox.com")
 
   override def sendMessage(emails: Set[String], subject: String, message: String): Future[Unit] = {
-    val f = sendMessageWithResponse(emails, subject, message)
+    val f = sendMessageWithResponse(emails, subject, message).flatMap { response =>
+      response.status match {
+        case Status.OK => Future.successful(response.body)
+        case _ => Future.failed(new Exception(response.body))
+      }
+    }
     f.failed.foreach(Logger.error("Email sending failure", _))
     f.map(_ => Unit)
   }
