@@ -21,11 +21,12 @@ class DataFacadeSpec extends PlaySpec with GuiceOneAppPerTest {
   def database = app.injector.instanceOf[Database]
   def dataFacade = app.injector.instanceOf[DataFacade]
 
+  implicit val fakeRequest = FakeRequest()
+
+
   "createTask" must {
     "work with events" in Evolutions.withEvolutions(database) {
       val notifyMock = app.injector.instanceOf[NotifyMock]
-
-      implicit val fakeRequest = FakeRequest()
 
       val event = TaskEvent(TaskEvent.EventType.StateChange, State.InProgress.toString, TaskEvent.EventAction(TaskEvent.EventActionType.CreateTask, "review_request"), None)
       val request = await(dataFacade.createRequest("foo", "foo@bar.com"))
@@ -34,24 +35,19 @@ class DataFacadeSpec extends PlaySpec with GuiceOneAppPerTest {
       val allTasks = await(dataFacade.requestTasks("foo@foo.com", request.slug))
       allTasks must have size 2
 
-      //mockState.taskAssigned.map(_.completableByValue) must contain ("foo@foo.com")
-      fail()
+      notifyMock.notifications.map(_._1) must contain (Set("foo@foo.com"))
     }
     // todo: fail on unmet conditions for the EventAction's task
   }
 
   "updateRequest" must {
     "work for admins" in Evolutions.withEvolutions(database) {
-      implicit val fakeRequest = FakeRequest()
-
       val request = await(dataFacade.createRequest("foo", "foo@foo.com"))
       noException must be thrownBy await(dataFacade.updateRequest("foo@bar.com", request.slug, State.Completed))
 
       await(dataFacade.request("foo@foo.com", request.slug))._1.state must equal (State.Completed)
     }
     "be denied for non-admin / non-owner" in Evolutions.withEvolutions(database) {
-      implicit val fakeRequest = FakeRequest()
-
       val request = await(dataFacade.createRequest("foo", "foo@foo.com"))
       a[Security.NotAllowed] must be thrownBy await(dataFacade.updateRequest("baz@baz.com", request.slug, State.Completed))
 
