@@ -22,3 +22,7 @@ body {
 .modal-body .list-group-item:nth-child(odd) {
     background: ghostwhite;
 }
+
+.text-white-space-pre {
+    white-space: pre;
+}
