@@ -198,8 +198,12 @@ class Application @Inject()
       maybeInfo.fold {
         Future.successful(BadRequest(notifyTestView(userInfo, Some(Failure(new Exception("Missing form value"))))))
       } { case (recipient, message) =>
-        notifyProvider.sendMessage(Set(recipient), "Notify Test", message).map { _ =>
-          Ok(notifyTestView(userInfo, Some(Success("Test Successful"))))
+        notifyProvider.sendMessage(Set(recipient), "Notify Test", message).map { result =>
+          val message = result match {
+            case s: String => s
+            case _ => "Test Successful"
+          }
+          Ok(notifyTestView(userInfo, Some(Success(message))))
         } recover {
           case t: Throwable => Ok(notifyTestView(userInfo, Some(Failure(t))))
         }

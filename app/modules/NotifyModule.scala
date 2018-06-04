@@ -9,13 +9,14 @@ import models.Task.CompletableByType
 import models.{Comment, Request, Task}
 import play.api.http.{HeaderNames, Status}
 import play.api.inject.{Binding, Module}
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 import play.api.libs.ws.{WSClient, WSResponse}
 import play.api.mvc.{Headers, RequestHeader}
 import play.api.{Configuration, Environment, Logger}
 import utils.MetadataService
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 
 class NotifyModule extends Module {
@@ -28,13 +29,13 @@ class NotifyModule extends Module {
 }
 
 trait NotifyProvider {
-  def sendMessage(emails: Set[String], subject: String, message: String): Future[Unit]
+  def sendMessage(emails: Set[String], subject: String, message: String): Future[_]
 }
 
 class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvider: NotifyProvider)(implicit ec: ExecutionContext) {
   // todo: move content to templates
 
-  def taskAssigned(task: Task)(implicit requestHeader: RequestHeader): Future[Unit] = {
+  def taskAssigned(task: Task)(implicit requestHeader: RequestHeader): Future[_] = {
     val url = controllers.routes.Application.request(task.requestSlug).absoluteURL()
 
     val subject = s"OSS Request - Task Assigned - ${task.prototype.label}"
@@ -47,7 +48,7 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
     taskCompletableEmails(task).flatMap(notifyProvider.sendMessage(_, subject, message))
   }
 
-  def taskComment(requestSlug: String, comment: Comment)(implicit requestHeader: RequestHeader): Future[Unit] = {
+  def taskComment(requestSlug: String, comment: Comment)(implicit requestHeader: RequestHeader): Future[_] = {
     val url = controllers.routes.Application.request(requestSlug).absoluteURL()
 
     taskCommentInfo(requestSlug, comment).flatMap { case (request, task, emails) =>
@@ -64,7 +65,7 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
     }
   }
 
-  def requestStatusChange(request: Request)(implicit requestHeader: RequestHeader): Future[Unit] = {
+  def requestStatusChange(request: Request)(implicit requestHeader: RequestHeader): Future[_] = {
     val url = controllers.routes.Application.request(request.slug).absoluteURL()
     val subject = s"OSS Request ${request.name} was ${request.state.toHuman}"
     val message =
@@ -119,15 +120,19 @@ class NotifySparkPost @Inject()(configuration: Configuration, wSClient: WSClient
   lazy val user = configuration.get[String]("sparkpost.user")
   lazy val from = user + "@" + maybeDomain.getOrElse("sparkpostbox.com")
 
-  override def sendMessage(emails: Set[String], subject: String, message: String): Future[Unit] = {
+  override def sendMessage(emails: Set[String], subject: String, message: String): Future[String] = {
     val f = sendMessageWithResponse(emails, subject, message).flatMap { response =>
       response.status match {
-        case Status.OK => Future.successful(response.body)
-        case _ => Future.failed(new Exception(response.body))
+        case Status.OK =>
+          Future.successful(response.body)
+        case _ =>
+          val errorTry = Try(((response.json \ "errors").as[Seq[JsObject]].head \ "message").as[String])
+          val message = errorTry.getOrElse(response.body)
+          Future.failed(new Exception(message))
       }
     }
     f.failed.foreach(Logger.error("Email sending failure", _))
-    f.map(_ => Unit)
+    f
   }
 
 
