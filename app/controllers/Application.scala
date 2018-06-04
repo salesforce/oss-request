@@ -7,7 +7,7 @@ package controllers
 import javax.inject.Inject
 import models.Task.CompletableByType
 import models.{State, Task}
-import modules.{Auth, DB}
+import modules.{Auth, DB, NotifyProvider}
 import org.webjars.WebJarAssetLocator
 import org.webjars.play.WebJarsUtil
 import play.api.libs.json.{JsObject, Json}
@@ -22,8 +22,8 @@ import scala.xml.{Comment, Node}
 
 
 class Application @Inject()
-  (env: Environment, dataFacade: DataFacade, userAction: UserAction, auth: Auth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil)
-  (indexView: views.html.Index, newRequestView: views.html.NewRequest, newRequestWithNameView: views.html.NewRequestWithName, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest, loginView: views.html.Login, pickEmailView: views.html.PickEmail, errorView: views.html.Error)
+  (env: Environment, dataFacade: DataFacade, userAction: UserAction, auth: Auth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, notifyProvider: NotifyProvider)
+  (indexView: views.html.Index, newRequestView: views.html.NewRequest, newRequestWithNameView: views.html.NewRequestWithName, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest, notifyTestView: views.html.NotifyTest, loginView: views.html.Login, pickEmailView: views.html.PickEmail, errorView: views.html.Error)
   (implicit ec: ExecutionContext)
   extends InjectedController {
 
@@ -172,6 +172,38 @@ class Application @Inject()
   def formTest = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
       Future.successful(Ok(formTestView(userInfo)))
+    }
+  }
+
+  def notifyTest = userAction.async { implicit userRequest =>
+    withUserInfo { userInfo =>
+      Future.successful(Ok(notifyTestView(userInfo)))
+    }
+  }
+
+  def notifyTestSend = userAction.async { implicit userRequest =>
+    withUserInfo { userInfo =>
+      val maybeInfo = for {
+        form <- userRequest.body.asFormUrlEncoded
+
+        recipients <- form.get("recipient")
+        recipient <- recipients.headOption
+        if !recipient.isEmpty
+
+        messages <- form.get("message")
+        message <- messages.headOption
+        if !message.isEmpty
+      } yield recipient -> message
+
+      maybeInfo.fold {
+        Future.successful(BadRequest(notifyTestView(userInfo, Some(Failure(new Exception("Missing form value"))))))
+      } { case (recipient, message) =>
+        notifyProvider.sendMessage(Set(recipient), "Notify Test", message).map { _ =>
+          Ok(notifyTestView(userInfo, Some(Success("Test Successful"))))
+        } recover {
+          case t: Throwable => Ok(notifyTestView(userInfo, Some(Failure(t))))
+        }
+      }
     }
   }
 

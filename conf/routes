@@ -16,6 +16,8 @@ GET         /request/:requestSlug/task/:taskId/comments        controllers.Appli
 POST        /request/:requestSlug/task/:taskId/comments        controllers.Application.commentOnTask(requestSlug: String, taskId: Int)
 
 GET         /form-test                                         controllers.Application.formTest()
+GET         /notify-test                                       controllers.Application.notifyTest()
+POST        /notify-test                                       controllers.Application.notifyTestSend()
 
 GET         /callback                                          controllers.Application.callback(code: Option[String], state: Option[String])
 POST        /acs                                               controllers.Application.acs()
