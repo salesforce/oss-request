@@ -20,6 +20,7 @@ GET         /notify-test                                       controllers.Appli
 POST        /notify-test                                       controllers.Application.notifyTestSend()
 
 GET         /callback                                          controllers.Application.callback(code: Option[String], state: Option[String])
++ nocsrf
 POST        /acs                                               controllers.Application.acs()
 
 GET         /select-email                                      controllers.Application.selectEmail(email: String)
