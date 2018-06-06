@@ -13,6 +13,7 @@ import com.github.mauricio.async.db.postgresql.util.URLParser
 import io.getquill.{PostgresAsyncContext, SnakeCase}
 import javax.inject.{Inject, Singleton}
 import models.State.State
+import models.Task.CompletableByType
 import models.Task.CompletableByType.CompletableByType
 import models.{Comment, Request, State, Task}
 import org.slf4j.LoggerFactory
@@ -31,21 +32,25 @@ class DAOModule extends Module {
 }
 
 trait DAO {
-  type NumTotalTasks = Long
-  type NumCompletedTasks = Long
-  type NumComments = Long
-
   def createRequest(name: String, creatorEmail: String): Future[Request]
-  def allRequests(): Future[Seq[(Request, NumTotalTasks, NumCompletedTasks)]]
-  def requestsForUser(email: String): Future[Seq[(Request, NumTotalTasks, NumCompletedTasks)]]
+  def allRequests(): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]]
+  def requestsForUser(email: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]]
   def request(requestSlug: String): Future[Request]
   def updateRequest(requestSlug: String, state: State.State): Future[Request]
   def createTask(requestSlug: String, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task]
   def updateTask(taskId: Int, state: State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task]
   def taskById(taskId: Int): Future[Task]
-  def requestTasks(requestSlug: String, maybeState: Option[State] = None): Future[Seq[(Task, NumComments)]]
+  def requestTasks(requestSlug: String, maybeState: Option[State] = None): Future[Seq[(Task, DAO.NumComments)]]
   def commentOnTask(taskId: Int, email: String, contents: String): Future[Comment]
   def commentsOnTask(taskId: Int): Future[Seq[Comment]]
+  def tasksForUser(email: String, state: State): Future[Seq[(Task, DAO.NumComments, Request)]]
+  def tasksForGroups(groups: Set[String], state: State): Future[Seq[(Task, DAO.NumComments, Request)]]
+}
+
+object DAO {
+  type NumTotalTasks = Long
+  type NumCompletedTasks = Long
+  type NumComments = Long
 }
 
 class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionContext) extends DAO {
@@ -83,7 +88,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def allRequests(): Future[Seq[(Request, NumTotalTasks, NumCompletedTasks)]] = {
+  override def allRequests(): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
     run {
       quote {
         for {
@@ -110,7 +115,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     updateFuture.flatMap(_ => request(requestSlug))
   }
 
-  override def requestsForUser(email: String): Future[Seq[(Request, NumTotalTasks, NumCompletedTasks)]] = {
+  override def requestsForUser(email: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
     run {
       quote {
         for {
@@ -191,7 +196,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def requestTasks(requestSlug: String, maybeState: Option[State] = None): Future[Seq[(Task, NumComments)]] = {
+  override def requestTasks(requestSlug: String, maybeState: Option[State] = None): Future[Seq[(Task, DAO.NumComments)]] = {
     maybeState.fold {
       run {
         quote {
@@ -235,6 +240,48 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     run {
       quote {
         query[Comment].filter(_.taskId == lift(taskId))
+      }
+    }
+  }
+
+  override def tasksForUser(email: String, state: State): Future[Seq[(Task, DAO.NumComments, Request)]] = {
+    run {
+      quote {
+        for {
+          task <- query[Task].filter { task =>
+            task.completableByType == lift(CompletableByType.Email) &&
+            task.completableByValue == lift(email) &&
+            task.state == lift(state)
+          }
+
+          numComments = query[Comment].filter(_.taskId == task.id).size
+
+          request <- query[Request].filter { request =>
+            request.slug == task.requestSlug &&
+            request.state == lift(State.InProgress)
+          }
+        } yield (task, numComments, request)
+      }
+    }
+  }
+
+  def tasksForGroups(groups: Set[String], state: State): Future[Seq[(Task, DAO.NumComments, Request)]] = {
+    run {
+      quote {
+        for {
+          task <- query[Task].filter { task =>
+            task.completableByType == lift(CompletableByType.Group) &&
+            liftQuery(groups).contains(task.completableByValue) &&
+            task.state == lift(state)
+          }
+
+          numComments = query[Comment].filter(_.taskId == task.id).size
+
+          request <- query[Request].filter { request =>
+            request.slug == task.requestSlug &&
+            request.state == lift(State.InProgress)
+          }
+        } yield (task, numComments, request)
       }
     }
   }

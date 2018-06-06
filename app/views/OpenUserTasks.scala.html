@@ -1,0 +1,20 @@
+@*
+ * Copyright (c) Salesforce.com, inc. 2017
+ *@
+
+@this(main: Main, taskView: utils.TaskEditOrShow)
+
+@(tasks: Seq[(models.Task, modules.DAO.NumComments, models.Request)], allGroups: Map[String, Set[String]], userInfo: _root_.utils.UserInfo)(implicit request: RequestHeader)
+
+@main(Some(userInfo))("Your Open Tasks") {
+
+    @if(tasks.isEmpty) {
+        You have no open tasks. Woot!
+    } else {
+        @for(task <- tasks) {
+            <h1>Request: <a href="@routes.Application.request(task._1.requestSlug)">@task._3.name</a></h1>
+            @taskView(task._1, task._2, true, allGroups)
+        }
+    }
+
+}

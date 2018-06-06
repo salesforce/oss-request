@@ -3,7 +3,8 @@
 # ~~~~
 
 # User Visible URLs
-GET         /                                                  controllers.Application.index
+GET         /                                                  controllers.Application.openUserTasks
+GET         /requests                                          controllers.Application.requests
 GET         /request                                           controllers.Application.newRequest(name: Option[String])
 GET         /request/:requestSlug                              controllers.Application.request(requestSlug: String)
 

@@ -31,7 +31,8 @@
 
                 @for(userInfo <- maybeUserInfo) {
                     <ul class="nav navbar-nav">
-                        <li @if(title == "OSS Requests") { class="active" }><a href="/">Requests</a></li>
+                        <li @if(title == "Your Open Tasks") { class="active" }><a href="@routes.Application.openUserTasks()">Your Open Tasks</a></li>
+                        <li @if(title == "OSS Requests") { class="active" }><a href="@routes.Application.requests()">Requests</a></li>
                         <li @if(title == "New Request") { class="active" }><a href="@routes.Application.newRequest(None)">New Request</a></li>
                     </ul>
 

@@ -23,7 +23,7 @@ import scala.xml.{Comment, Node}
 
 class Application @Inject()
   (env: Environment, dataFacade: DataFacade, userAction: UserAction, auth: Auth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, notifyProvider: NotifyProvider)
-  (indexView: views.html.Index, newRequestView: views.html.NewRequest, newRequestWithNameView: views.html.NewRequestWithName, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest, notifyTestView: views.html.NotifyTest, loginView: views.html.Login, pickEmailView: views.html.PickEmail, errorView: views.html.Error)
+  (requestsView: views.html.Requests, newRequestView: views.html.NewRequest, newRequestWithNameView: views.html.NewRequestWithName, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest, notifyTestView: views.html.NotifyTest, loginView: views.html.Login, pickEmailView: views.html.PickEmail, errorView: views.html.Error, openUserTasksView: views.html.OpenUserTasks)
   (implicit ec: ExecutionContext)
   extends InjectedController {
 
@@ -40,7 +40,7 @@ class Application @Inject()
     userRequest.maybeUserInfo.fold(auth.authUrl.map(Redirect(_)))(f)
   }
 
-  def index = userAction.async { implicit userRequest =>
+  def requests = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
       val requestsFuture = if (userInfo.isAdmin) {
         dataFacade.allRequests()
@@ -50,7 +50,7 @@ class Application @Inject()
       }
 
       requestsFuture.map { requests =>
-        Ok(indexView(requests, userInfo))
+        Ok(requestsView(requests, userInfo))
       }
     }
   }
@@ -169,6 +169,22 @@ class Application @Inject()
     }
   }
 
+  def openUserTasks = userAction.async { implicit userRequest =>
+    withUserInfo { userInfo =>
+      for {
+        metadata <- metadataService.fetchMetadata
+        userGroups = metadata.groups.collect {
+          case (group, emails) if emails.contains(userInfo.email) => group
+        }
+        tasksForUser <- dataFacade.tasksForUser(userInfo.email, State.InProgress)
+        tasksForGroups <- dataFacade.tasksForGroups(userGroups.toSet, State.InProgress)
+      } yield {
+        val tasks = (tasksForUser ++ tasksForGroups).distinct
+        Ok(openUserTasksView(tasks, metadata.groups, userInfo))
+      }
+    }
+  }
+
   def formTest = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
       Future.successful(Ok(formTestView(userInfo)))
@@ -227,7 +243,7 @@ class Application @Inject()
 
       metadataService.fetchMetadata.map { metadata =>
         val isAdmin = metadata.groups("admin").contains(email)
-        val url = state.getOrElse(controllers.routes.Application.index().url)
+        val url = state.getOrElse(controllers.routes.Application.openUserTasks().url)
 
         // todo: putting this info in the session means we can't easily invalidate it later
         Redirect(url).withSession("email" -> email, "isAdmin" -> isAdmin.toString)
@@ -255,7 +271,7 @@ class Application @Inject()
     maybeValidEmail.fold(Future.successful(Unauthorized("Email invalid"))) { validEmail =>
       metadataService.fetchMetadata.map { metadata =>
         val isAdmin = metadata.groups("admin").contains(validEmail)
-        val url = controllers.routes.Application.index().url
+        val url = controllers.routes.Application.openUserTasks().url
 
         // todo: putting this info in the session means we can't easily invalidate it later
         Redirect(url).withSession("email" -> validEmail, "isAdmin" -> isAdmin.toString)

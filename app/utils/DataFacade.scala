@@ -28,7 +28,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notifie
     } yield task
   }
 
-  def allRequests(): Future[Seq[(Request, Long, Long)]] = {
+  def allRequests(): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
     for {
       allRequests <- dao.allRequests()
     } yield allRequests
@@ -94,6 +94,14 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notifie
     for {
       comments <- dao.commentsOnTask(taskId)
     } yield comments
+  }
+
+  def tasksForUser(email: String, state: State.State): Future[Seq[(Task, DAO.NumComments, Request)]] = {
+    dao.tasksForUser(email, state)
+  }
+
+  def tasksForGroups(groups: Set[String], state: State.State): Future[Seq[(Task, DAO.NumComments, Request)]] = {
+    dao.tasksForGroups(groups, state)
   }
 
 }

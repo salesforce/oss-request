@@ -48,6 +48,7 @@
             "patentable": {
               "type": "radio",
               "label": "Is this patentable?",
+              "removeDefaultNone": true,
               "optionLabels": ["Yes", "No"]
             }
           }
