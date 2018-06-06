@@ -8,8 +8,7 @@ import java.time.ZonedDateTime
 import java.util.concurrent.ConcurrentHashMap
 
 import javax.inject.Singleton
-import models.State.State
-import models.Task.CompletableByType.CompletableByType
+import models.Task.CompletableByType
 import models.{Comment, Request, State, Task}
 import play.api.Mode
 import play.api.db.evolutions.EvolutionsModule
@@ -37,7 +36,7 @@ class DAOMock extends DAO {
     }
   }
 
-  override def allRequests(): Future[Seq[(Request, NumTotalTasks, NumCompletedTasks)]] = {
+  override def allRequests(): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
     Future.sequence {
       requests.map { request =>
         requestTasks(request.slug).map { requestTasks =>
@@ -48,11 +47,11 @@ class DAOMock extends DAO {
     }
   }
 
-  override def requestsForUser(email: String): Future[Seq[(Request, NumTotalTasks, NumCompletedTasks)]] = {
+  override def requestsForUser(email: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
     allRequests().map(_.filter(_._1.creatorEmail == email))
   }
 
-  override def updateTask(taskId: Int, state: State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task] = {
+  override def updateTask(taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task] = {
     tasks.find(_.id == taskId).fold(Future.failed[Task](new Exception("Task not found"))) { task =>
       val updatedTask = task.copy(
         state = state,
@@ -80,7 +79,7 @@ class DAOMock extends DAO {
     requests.find(_.slug == requestSlug).fold(Future.failed[Request](new Exception("Request not found")))(Future.successful)
   }
 
-  override def updateRequest(requestSlug: String, state: State): Future[Request] = {
+  override def updateRequest(requestSlug: String, state: State.State): Future[Request] = {
     request(requestSlug).map { request =>
       val updatedRequest = request.copy(state = state)
       requests -= request
@@ -89,7 +88,7 @@ class DAOMock extends DAO {
     }
   }
 
-  override def createTask(requestSlug: String, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedBy: Option[String], maybeData: Option[JsObject], state: State): Future[Task] = {
+  override def createTask(requestSlug: String, prototype: Task.Prototype, completableByType: CompletableByType.CompletableByType, completableByValue: String, maybeCompletedBy: Option[String], maybeData: Option[JsObject], state: State.State): Future[Task] = {
     Future.successful {
       val id = Try(tasks.map(_.id).max).getOrElse(0) + 1
       val task = Task(id, completableByType, completableByValue, maybeCompletedBy, maybeCompletedBy.map(_ => ZonedDateTime.now()), state, prototype, maybeData, requestSlug)
@@ -102,7 +101,7 @@ class DAOMock extends DAO {
     tasks.find(_.id == taskId).fold(Future.failed[Task](new Exception("Task not found")))(Future.successful)
   }
 
-  override def requestTasks(requestSlug: String, maybeState: Option[State]): Future[Seq[(Task, NumComments)]] = {
+  override def requestTasks(requestSlug: String, maybeState: Option[State.State]): Future[Seq[(Task, DAO.NumComments)]] = {
     val requestTasks = tasks.filter(_.requestSlug == requestSlug)
 
     val requestTasksWithMaybeState = maybeState.fold(requestTasks) { state =>
@@ -110,7 +109,7 @@ class DAOMock extends DAO {
     }
 
     Future.sequence {
-      requestTasksWithMaybeState.toSeq.map { task =>
+      requestTasksWithMaybeState.map { task =>
         commentsOnTask(task.id).map { comments =>
           task -> comments.size.toLong
         }
@@ -119,6 +118,36 @@ class DAOMock extends DAO {
   }
   override def commentsOnTask(taskId: Int): Future[Seq[Comment]] = {
     Future.successful(comments.filter(_.taskId == taskId))
+  }
+
+  override def tasksForUser(email: String, state: State.State): Future[Seq[(Task, DAO.NumComments, Request)]] = {
+    Future.successful {
+      tasks.filter { task =>
+        task.completableByType == CompletableByType.Email &&
+        task.completableByValue == email &&
+        task.state == state
+      } flatMap { task =>
+        val numTaskComments = comments.count(_.taskId == task.id).toLong
+        requests.find(_.slug == task.requestSlug).map { request =>
+          (task, numTaskComments, request)
+        }
+      }
+    }
+  }
+
+  override def tasksForGroups(groups: Set[String], state: State.State): Future[Seq[(Task, DAO.NumComments, Request)]] = {
+    Future.successful {
+      tasks.filter { task =>
+        task.completableByType == CompletableByType.Group &&
+        groups.contains(task.completableByValue) &&
+        task.state == state
+      } flatMap { task =>
+        val numTaskComments = comments.count(_.taskId == task.id).toLong
+        requests.find(_.slug == task.requestSlug).map { request =>
+          (task, numTaskComments, request)
+        }
+      }
+    }
   }
 }
 
