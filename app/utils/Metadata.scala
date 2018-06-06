@@ -15,7 +15,9 @@ import org.eclipse.jgit.transport.{JschConfigSessionFactory, OpenSshConfig, SshT
 import org.eclipse.jgit.util.FS
 import play.api.libs.json.Json
 import play.api.{Configuration, Environment, Mode}
+import play.api.cache.SyncCacheApi
 
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
@@ -28,7 +30,7 @@ object Metadata {
 }
 
 @Singleton
-class MetadataService @Inject() (configuration: Configuration, environment: Environment) (implicit ec: ExecutionContext) {
+class MetadataService @Inject() (cache: SyncCacheApi, configuration: Configuration, environment: Environment) (implicit ec: ExecutionContext) {
 
   val defaultMetadataFile = "examples/metadata.json"
 
@@ -118,8 +120,16 @@ class MetadataService @Inject() (configuration: Configuration, environment: Envi
         }
       }
 
+      def cached(metadataGitFile: String, metdataGitSshKey: String): Future[Metadata] = {
+        cache.get("metadata").fold {
+          val f = readMetadata(metadataGitFile, metdataGitSshKey)
+          f.foreach(cache.set("metadata", _, 5.minutes))
+          f
+        } (Future.successful)
+      }
+
       (maybeMetadataGitFile, maybeMetadataGitSshKey) match {
-        case (Some(metadataGitFile), Some(metadataGitSshKey)) => readMetadata(metadataGitFile, metadataGitSshKey)
+        case (Some(metadataGitFile), Some(metadataGitSshKey)) => cached(metadataGitFile, metadataGitSshKey)
         case _ => Future.failed(new Exception("metadata-git-file and metadata-git-ssh-key config must be set"))
       }
 
