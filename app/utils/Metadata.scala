@@ -121,7 +121,7 @@ class MetadataService @Inject() (cache: SyncCacheApi, configuration: Configurati
       }
 
       def cached(metadataGitFile: String, metdataGitSshKey: String): Future[Metadata] = {
-        cache.get("metadata").fold {
+        cache.get[Metadata]("metadata").fold[Future[Metadata]] {
           val f = readMetadata(metadataGitFile, metdataGitSshKey)
           f.foreach(cache.set("metadata", _, 5.minutes))
           f
