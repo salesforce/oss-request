@@ -187,7 +187,9 @@ class Application @Inject()
 
   def formTest = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      Future.successful(Ok(formTestView(userInfo)))
+      metadataService.fetchMetadata.map { metadata =>
+        Ok(formTestView(userInfo, metadata.tasks))
+      }
     }
   }
 

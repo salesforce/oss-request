@@ -2,64 +2,60 @@
  * Copyright (c) Salesforce.com, inc. 2017
  *@
 
-@this(mainView: Main)
+@this(mainView: Main, webJarsUtil: org.webjars.play.WebJarsUtil)
 
-@(userInfo: _root_.utils.UserInfo)(implicit request: RequestHeader)
+@(userInfo: _root_.utils.UserInfo, tasks: Map[String, Task.Prototype])(implicit request: RequestHeader)
 
-@mainView(Some(userInfo))("Form Test") {
-
-    <form>
-        <div class="form-group">
-            <textarea id="editor" class="form-control" rows="30">
-{
-    "schema": {
-        "type": "object",
-        "properties": {
-            "name": {
-                "type": "string",
-                "title": "Name"
-            },
-            "favorite_color": {
-                "type": "string",
-                "enum": ["Green", "Blue", "Yellow"],
-                "required": true
-            }
-        }
-    },
-    "options": {
-        "fields": {
-            "favorite_color": {
-                "type": "select",
-                "noneLabel": "-- Select --",
-                "removeDefaultNone": false
-            }
-        }
-    }
+@extraHead() =  {
+    @webJarsUtil.locate("jsoneditor.min.css").css()
+    @webJarsUtil.locate("jsoneditor.min.js").script()
 }
-            </textarea>
-        </div>
 
-        <button id="tryit" class="btn btn-default btn-block">Try it!</button>
+@mainView(Some(userInfo))("Form Test", extraHead()) {
+
+    <form class="form-inline">
+        <div class="form-group">
+            <label for="formSelect">Form to Test</label>
+            <select id="formSelect" class="form-control input-small">
+                <option disabled selected>Select a Form</option>
+                @for(task <- tasks) {
+                    @for(form <- task._2.form) {
+                        <option value="@task._1" data-json="@JavaScript(form.toString())">@task._2.label</option>
+                    }
+                }
+            </select>
+        </div>
     </form>
+
+    <div id="jsoneditor" style="height: 600px; margin-top: 20px;"></div>
+
+    <button id="tryit" class="btn btn-default btn-block" style="margin-top: 20px">Try it!</button>
 
     <div id="form" class="well" style="margin-top: 20px"></div>
 
+
     <script type="text/javascript">
+        var container = document.getElementById("jsoneditor");
+        var editor = new JSONEditor(container, {"mode": "code"});
+        var form = $("#form");
 
         function render(event) {
-            $("#form").empty();
             event.preventDefault();
+            form.empty();
             try {
-                var json = JSON.parse($("#editor").val());
-                $("#form").alpaca(json);
+                var json = editor.get();
+                form.alpaca(json);
             } catch (e) {
-              $("#form").text(e.message);
+              form.text(e.message);
             }
         }
 
         $("#tryit").click(render);
 
-        render(new Event("click"));
+        $("#formSelect").change(function() {
+          var json = $(this).find(':selected').data('json');
+          editor.set(json);
+        });
     </script>
 
 }
