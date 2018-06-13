@@ -7,7 +7,14 @@
 @for((completableByType, completableByValue) <- maybeCompletableBy) {
     @completableByType match {
         case models.Task.CompletableByType.Group => {
-            Assigned to any of: @groups(completableByValue).mkString(", ")
+            @defining(groups(completableByValue)) { emails =>
+                @if(emails.size == 1) {
+                    Assigned to: @emails.head
+                } else {
+                    Assigned to any of: @emails.mkString(", ")
+                }
+            }
+
         }
         case models.Task.CompletableByType.Email => {
             Assigned to: @completableByValue
