@@ -13,6 +13,7 @@ POST        /request                                           controllers.Appli
 POST        /request/:requestSlug                              controllers.Application.updateRequest(requestSlug: String, state: models.State.State)
 POST        /request/:requestSlug/task                         controllers.Application.addTask(requestSlug: String)
 POST        /request/:requestSlug/task/:taskId                 controllers.Application.updateTask(requestSlug: String, taskId: Int, state: models.State.State)
+DELETE      /request/:requestSlug/task/:taskId                 controllers.Application.deleteTask(requestSlug: String, taskId: Int)
 GET         /request/:requestSlug/task/:taskId/comments        controllers.Application.commentsOnTask(requestSlug: String, taskId: Int)
 POST        /request/:requestSlug/task/:taskId/comments        controllers.Application.commentOnTask(requestSlug: String, taskId: Int)
 

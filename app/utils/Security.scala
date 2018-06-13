@@ -44,11 +44,11 @@ class Security @Inject() (dao: DAO, metadataService: MetadataService) (implicit 
       else if (state == State.Cancelled) {
         canCancelRequest(email, Right(requestSlug)).flatMap { canCancelRequest =>
           if (canCancelRequest) Future.unit
-          else Future.failed(Security.NotAllowed())
+          else Future.failed(Security.NotAllowed)
         }
       }
       else {
-        Future.failed(Security.NotAllowed())
+        Future.failed(Security.NotAllowed)
       }
     }
   }
@@ -81,12 +81,19 @@ class Security @Inject() (dao: DAO, metadataService: MetadataService) (implicit 
   def updateTask(email: String, taskId: Int): Future[Unit] = {
     canEditTask(email, Right(taskId)).flatMap { canEdit =>
       if (canEdit) Future.unit
-      else Future.failed(Security.NotAllowed())
+      else Future.failed(Security.NotAllowed)
+    }
+  }
+
+  def deleteTask(email: String, taskId: Int): Future[Unit] = {
+    isAdmin(email).flatMap { canDelete =>
+      if (canDelete) Future.unit
+      else Future.failed(Security.NotAllowed)
     }
   }
 
 }
 
 object Security {
-  case class NotAllowed() extends Exception
+  case object NotAllowed extends Exception
 }

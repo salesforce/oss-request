@@ -66,6 +66,13 @@ class DAOMock extends DAO {
     }
   }
 
+  override def deleteTask(taskId: Int): Future[Unit] = {
+    tasks.find(_.id == taskId).fold(Future.failed[Unit](new Exception("Task not found"))) { task =>
+      tasks -= task
+      Future.unit
+    }
+  }
+
   override def commentOnTask(taskId: Int, email: String, contents: String): Future[Comment] = {
     Future.successful {
       val id = Try(comments.map(_.id).max).getOrElse(0) + 1

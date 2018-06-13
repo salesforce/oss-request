@@ -92,7 +92,7 @@ class Application @Inject()
       dataFacade.request(userInfo.email, requestSlug).flatMap { case (request, isAdmin, canCancelRequest) =>
         dataFacade.requestTasks(userInfo.email, request.slug).flatMap { tasks =>
           metadataService.fetchMetadata.map { metadata =>
-            Ok(requestView(metadata, request, tasks, userInfo, isAdmin, canCancelRequest))
+            Ok(requestView(metadata, request, tasks, userInfo, canCancelRequest))
           }
         }
       } recover {
@@ -144,6 +144,17 @@ class Application @Inject()
         render {
           case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
           case Accepts.Json() => Ok(Json.toJson(task))
+        }
+      }
+    }
+  }
+
+  def deleteTask(requestSlug: String, taskId: Int) = userAction.async { implicit userRequest =>
+    withUserInfo { userInfo =>
+      dataFacade.deleteTask(userInfo.email, taskId).map { _ =>
+        render {
+          case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
+          case Accepts.Json() => Ok
         }
       }
     }

@@ -1,6 +1,6 @@
 $(function () {
 
-  $('#myModal').on('show.bs.modal', function (event) {
+  $('#commentsModal').on('show.bs.modal', function (event) {
     var button = $(event.relatedTarget);
     var modal = $(this);
     modal.find('.modal-body').empty();
@@ -23,6 +23,28 @@ $(function () {
         modal.find('.modal-body').html(data);
       });
     }
+  });
+
+  $('#confirmModal').on('show.bs.modal', function (event) {
+    var button = $(event.relatedTarget);
+    var modal = $(this);
+
+    var action = button.data('action');
+    var url = button.data('url');
+
+    $("#confirmButton").click(function () {
+      $.ajax({
+        url: url,
+        type: action,
+        success: function() {
+          location.reload();
+        },
+        error: function (error) {
+          var body = $(".modal-body").html(error.responseText);
+          modal.find('.modal-header').after(body);
+        }
+      });
+    });
   });
 
 });

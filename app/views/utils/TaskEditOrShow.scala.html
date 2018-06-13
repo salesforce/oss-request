@@ -4,7 +4,7 @@
 
 @this(taskEditView: TaskEdit, taskShowView: TaskShow)
 
-@(task: models.Task, commentCount: Long, canEdit: Boolean, groups: Map[String, Set[String]])(implicit request: RequestHeader)
+@(task: models.Task, commentCount: Long, canEdit: Boolean, isAdmin: Boolean, groups: Map[String, Set[String]])(implicit request: RequestHeader)
 
 @panelType = {
     @task.state match {
@@ -23,10 +23,23 @@
 <div class="panel @panelType">
     <div class="panel-heading clearfix">
         <h3 class="panel-title pull-left">@task.prototype.label</h3>
-        <button type="button" class="btn btn-default btn-sm pull-right" data-toggle="modal" data-target="#myModal" data-requestslug="@task.requestSlug" data-taskid="@task.id">
-            <span class="glyphicon glyphicon-comment"></span>
-            @commentCount Comments
-        </button>
+        <div class="pull-right">
+            <div class="row">
+                <div class="col-md-9">
+                    <button type="button" class="btn btn-default btn-sm pull-right" data-toggle="modal" data-target="#commentsModal" data-requestslug="@task.requestSlug" data-taskid="@task.id">
+                        <span class="glyphicon glyphicon-comment"></span>
+                        @commentCount Comments
+                    </button>
+                </div>
+                @if(isAdmin) {
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-danger btn-sm pull-right" data-toggle="modal" data-target="#confirmModal" data-action="delete" data-url="@helper.CSRF(routes.Application.deleteTask(task.requestSlug, task.id))">
+                            <span class="glyphicon glyphicon-remove"></span>
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
     </div>
 
     @task.state match {

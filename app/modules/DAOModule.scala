@@ -39,6 +39,7 @@ trait DAO {
   def updateRequest(requestSlug: String, state: State.State): Future[Request]
   def createTask(requestSlug: String, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task]
   def updateTask(taskId: Int, state: State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task]
+  def deleteTask(taskId: Int): Future[Unit]
   def taskById(taskId: Int): Future[Task]
   def requestTasks(requestSlug: String, maybeState: Option[State] = None): Future[Seq[(Task, DAO.NumComments)]]
   def commentOnTask(taskId: Int, email: String, contents: String): Future[Comment]
@@ -194,6 +195,14 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
       }
       updateFuture.flatMap(_ => taskById(taskId))
     }
+  }
+
+  override def deleteTask(taskId: Index): Future[Unit] = {
+    run {
+      quote {
+        query[Task].filter(_.id == lift(taskId)).delete
+      }
+    }.map(_ => ())
   }
 
   override def requestTasks(requestSlug: String, maybeState: Option[State] = None): Future[Seq[(Task, DAO.NumComments)]] = {

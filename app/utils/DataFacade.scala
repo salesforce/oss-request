@@ -64,6 +64,13 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notifie
     } yield task
   }
 
+  def deleteTask(email: String, taskId: Int): Future[Unit] = {
+    for {
+      _ <- security.deleteTask(email, taskId)
+      result <- dao.deleteTask(taskId)
+    } yield result
+  }
+
   def taskById(taskId: Int): Future[Task] = {
     for {
       task <- dao.taskById(taskId)

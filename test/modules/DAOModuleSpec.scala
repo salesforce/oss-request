@@ -120,6 +120,17 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
     }
   }
 
+  "deleteTask" must {
+    "work" in Evolutions.withEvolutions(database) {
+      val request = await(dao.createRequest("foo", "foo@bar.com"))
+      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
+      val task1 = await(dao.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
+      val task2 = await(dao.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
+      await(dao.deleteTask(task1.id)) must equal (())
+      await(dao.requestTasks(request.slug)).size must equal (1)
+    }
+  }
+
   "requestTasks" must {
     "work when a task state is specified" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest("foo", "foo@bar.com"))
