@@ -10,7 +10,7 @@ import models.{Comment, Request, Task}
 import play.api.http.{HeaderNames, Status}
 import play.api.inject.{Binding, Module}
 import play.api.libs.json.{JsObject, Json}
-import play.api.libs.ws.{WSClient, WSResponse}
+import play.api.libs.ws.{WSAuthScheme, WSClient, WSResponse}
 import play.api.mvc.{Headers, RequestHeader}
 import play.api.{Configuration, Environment, Logger}
 import utils.MetadataService
@@ -22,6 +22,7 @@ import scala.util.Try
 class NotifyModule extends Module {
   def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = {
     configuration.getOptional[String]("notify.provider") match {
+      case Some("mailgun") => Seq(bind[NotifyProvider].to[NotifyMailgun])
       case Some("sparkpost") => Seq(bind[NotifyProvider].to[NotifySparkPost])
       case _ => Seq(bind[NotifyProvider].to[NotifyLogger])
     }
@@ -161,4 +162,42 @@ class NotifySparkPost @Inject()(configuration: Configuration, wSClient: WSClient
 
     wSClient.url(baseUrl + "/transmissions").withHttpHeaders(HeaderNames.AUTHORIZATION -> apiKey).post(json)
   }
+}
+
+
+@Singleton
+class NotifyMailgun @Inject()(configuration: Configuration, wSClient: WSClient)(implicit ec: ExecutionContext) extends NotifyProvider {
+
+  lazy val apiKey = configuration.get[String]("mailgun.apikey")
+  lazy val domain = configuration.get[String]("mailgun.domain")
+  lazy val user = configuration.get[String]("mailgun.user")
+  lazy val from = user + "@" + domain
+  lazy val baseUrl = s"https://api.mailgun.net/v3/$domain/messages"
+
+  override def sendMessage(emails: Set[String], subject: String, message: String): Future[String] = {
+    val f = sendMessageWithResponse(emails, subject, message).flatMap { response =>
+      response.status match {
+        case Status.OK =>
+          Future.successful(response.body)
+        case _ =>
+          val errorTry = Try((response.json \ "message").as[String])
+          val message = errorTry.getOrElse(response.body)
+          Future.failed(new Exception(message))
+      }
+    }
+    f.failed.foreach(Logger.error("Email sending failure", _))
+    f
+  }
+
+  def sendMessageWithResponse(emails: Set[String], subject: String, message: String): Future[WSResponse] = {
+    val data = Map(
+      "from" -> Seq(from),
+      "to" -> emails.toSeq,
+      "subject" -> Seq(subject),
+      "text" -> Seq(message)
+    )
+
+    wSClient.url(baseUrl).withAuth("api", apiKey, WSAuthScheme.BASIC).post(data)
+  }
+
 }

@@ -25,6 +25,8 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
   def dao = app.injector.instanceOf[DAO]
   def notifyMock = app.injector.instanceOf[NotifyMock]
   def notifySparkPost = app.injector.instanceOf[NotifySparkPost]
+  def notifyMailgun = app.injector.instanceOf[NotifyMailgun]
+  def testRecipient = sys.env("NOTIFY_TEST_RECIPIENT")
 
   implicit val fakeRequest = FakeRequest()
 
@@ -78,11 +80,18 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
   }
 
   "sending an email" must {
-    "work" in {
+    "work with SparkPost" in {
       assume(Try(notifySparkPost.apiKey).isSuccess)
 
       val response = await(notifySparkPost.sendMessageWithResponse(Set(notifySparkPost.from), "test", "test"))
 
+      response.status must equal (OK)
+    }
+    "work with Mailgun" in {
+      assume(Try(notifyMailgun.apiKey).isSuccess)
+      assume(Try(testRecipient).isSuccess)
+
+      val response = await(notifyMailgun.sendMessageWithResponse(Set(testRecipient), "test", "test"))
       response.status must equal (OK)
     }
   }
