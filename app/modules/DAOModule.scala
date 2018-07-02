@@ -16,7 +16,6 @@ import models.State.State
 import models.Task.CompletableByType
 import models.Task.CompletableByType.CompletableByType
 import models.{Comment, Request, State, Task}
-import org.slf4j.LoggerFactory
 import play.api.inject.{ApplicationLifecycle, Binding, Module}
 import play.api.libs.json.{JsObject, Json}
 import play.api.{Configuration, Environment}
@@ -317,8 +316,6 @@ object DB {
 
 @Singleton
 class DatabaseWithCtx @Inject()(lifecycle: ApplicationLifecycle, playConfig: Configuration) (implicit ec: ExecutionContext) {
-
-  private val log = LoggerFactory.getLogger(this.getClass)
 
   private val maybeDbUrl = playConfig.getOptional[String]("db.default.url")
 

@@ -13,7 +13,7 @@ import play.api.libs.json.{JsObject, Json}
 import play.api.libs.ws.{WSAuthScheme, WSClient, WSResponse}
 import play.api.mvc.{Headers, RequestHeader}
 import play.api.{Configuration, Environment, Logger}
-import utils.MetadataService
+import utils.{MetadataService, RuntimeReporter}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
@@ -112,7 +112,7 @@ class NotifyLogger @Inject()(implicit executionContext: ExecutionContext) extend
 }
 
 @Singleton
-class NotifySparkPost @Inject()(configuration: Configuration, wSClient: WSClient)(implicit ec: ExecutionContext) extends NotifyProvider {
+class NotifySparkPost @Inject()(configuration: Configuration, wSClient: WSClient, runtimeReporter: RuntimeReporter)(implicit ec: ExecutionContext) extends NotifyProvider {
 
   val baseUrl = "https://api.sparkpost.com/api/v1"
 
@@ -132,7 +132,7 @@ class NotifySparkPost @Inject()(configuration: Configuration, wSClient: WSClient
           Future.failed(new Exception(message))
       }
     }
-    f.failed.foreach(Logger.error("Email sending failure", _))
+    f.failed.foreach(runtimeReporter.error("Email sending failure", _))
     f
   }
 
@@ -166,7 +166,7 @@ class NotifySparkPost @Inject()(configuration: Configuration, wSClient: WSClient
 
 
 @Singleton
-class NotifyMailgun @Inject()(configuration: Configuration, wSClient: WSClient)(implicit ec: ExecutionContext) extends NotifyProvider {
+class NotifyMailgun @Inject()(configuration: Configuration, wSClient: WSClient, runtimeReporter: RuntimeReporter)(implicit ec: ExecutionContext) extends NotifyProvider {
 
   lazy val apiKey = configuration.get[String]("mailgun.apikey")
   lazy val domain = configuration.get[String]("mailgun.domain")
@@ -185,7 +185,7 @@ class NotifyMailgun @Inject()(configuration: Configuration, wSClient: WSClient)(
           Future.failed(new Exception(message))
       }
     }
-    f.failed.foreach(Logger.error("Email sending failure", _))
+    f.failed.foreach(runtimeReporter.error("Email sending failure", _))
     f
   }
 
