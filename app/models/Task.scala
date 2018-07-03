@@ -10,11 +10,10 @@ import io.getquill.MappedEncoding
 import laika.api.Transform
 import laika.parse.markdown.Markdown
 import laika.render.HTML
-import models.Task.CompletableByType.CompletableByType
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-case class Task(id: Int, completableByType: CompletableByType, completableByValue: String, completedByEmail: Option[String], completedDate: Option[ZonedDateTime], state: State.State, prototype: Task.Prototype, data: Option[JsObject], requestSlug: String)
+case class Task(id: Int, completableBy: Seq[String], completedByEmail: Option[String], completedDate: Option[ZonedDateTime], state: State.State, prototype: Task.Prototype, data: Option[JsObject], requestSlug: String)
 
 object Task {
 

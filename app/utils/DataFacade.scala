@@ -5,7 +5,6 @@
 package utils
 
 import javax.inject.Inject
-import models.Task.CompletableByType.CompletableByType
 import models.{Comment, Request, State, Task, TaskEvent}
 import modules.{DAO, Notifier}
 import play.api.libs.json.JsObject
@@ -20,9 +19,9 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notifie
     } yield request
   }
 
-  def createTask(requestSlug: String, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress)(implicit requestHeader: RequestHeader): Future[Task] = {
+  def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress)(implicit requestHeader: RequestHeader): Future[Task] = {
     for {
-      task <- dao.createTask(requestSlug, prototype, completableByType, completableByValue, maybeCompletedBy, maybeData, state)
+      task <- dao.createTask(requestSlug, prototype, completableBy, maybeCompletedBy, maybeData, state)
       _ <- taskEventHandler.process(requestSlug, TaskEvent.EventType.StateChange, task)
       _ <- if (state == State.InProgress) notifier.taskAssigned(task) else Future.unit
     } yield task
@@ -105,10 +104,6 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notifie
 
   def tasksForUser(email: String, state: State.State): Future[Seq[(Task, DAO.NumComments, Request)]] = {
     dao.tasksForUser(email, state)
-  }
-
-  def tasksForGroups(groups: Set[String], state: State.State): Future[Seq[(Task, DAO.NumComments, Request)]] = {
-    dao.tasksForGroups(groups, state)
   }
 
 }

@@ -62,7 +62,7 @@ class Application @Inject()
       } { name =>
         metadataService.fetchMetadata.map { metadata =>
           metadata.tasks.get("start").fold(InternalServerError("Could not find task named 'start'")) { metaTask =>
-            Ok(newRequestWithNameView(name, metaTask, metadata.groups, userInfo))
+            Ok(newRequestWithNameView(name, metaTask, userInfo))
           }
         }
       }
@@ -74,10 +74,10 @@ class Application @Inject()
       metadataService.fetchMetadata.flatMap { metadata =>
         metadata.tasks.get("start").fold(Future.successful(InternalServerError("Could not find task named 'start'"))) { metaTask =>
           dataFacade.createRequest(name, userInfo.email).flatMap { request =>
-            completableByWithDefaults(metaTask.completableBy, Some(userInfo.email), None).fold {
+            completableByWithDefaults(metaTask.completableBy, Some(userInfo.email), None).flatMap(metadata.completableBy).fold {
               Future.successful(BadRequest("Could not determine who can complete the task"))
-            } { case (completableByType, completableByValue) =>
-              dataFacade.createTask(request.slug, metaTask, completableByType, completableByValue, Some(userInfo.email), Json.toJson(userRequest.body).asOpt[JsObject], State.Completed).map { task =>
+            } { emails =>
+              dataFacade.createTask(request.slug, metaTask, emails.toSeq, Some(userInfo.email), Json.toJson(userRequest.body).asOpt[JsObject], State.Completed).map { task =>
                 Ok(Json.toJson(request))
               }
             }
@@ -118,10 +118,10 @@ class Application @Inject()
         maybeTaskPrototypeKey.fold(Future.successful(BadRequest("No taskPrototypeKey specified"))) { taskPrototypeKey =>
           metadataService.fetchMetadata.flatMap { metadata =>
             metadata.tasks.get(taskPrototypeKey).fold(Future.successful(InternalServerError(s"Could not find task prototype $taskPrototypeKey"))) { taskPrototype =>
-              completableByWithDefaults(taskPrototype.completableBy, Some(request.creatorEmail), maybeCompletableBy).fold {
+              completableByWithDefaults(taskPrototype.completableBy, Some(request.creatorEmail), maybeCompletableBy).flatMap(metadata.completableBy).fold {
                 Future.successful(BadRequest("Could not determine who can complete the task"))
-              } { case (completableByType, completableByValue) =>
-                dataFacade.createTask(requestSlug, taskPrototype, completableByType, completableByValue).map { _ =>
+              } { emails =>
+                dataFacade.createTask(requestSlug, taskPrototype, emails.toSeq).map { _ =>
                   Redirect(routes.Application.request(request.slug))
                 }
               }
@@ -182,16 +182,8 @@ class Application @Inject()
 
   def openUserTasks = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      for {
-        metadata <- metadataService.fetchMetadata
-        userGroups = metadata.groups.collect {
-          case (group, emails) if emails.contains(userInfo.email) => group
-        }
-        tasksForUser <- dataFacade.tasksForUser(userInfo.email, State.InProgress)
-        tasksForGroups <- dataFacade.tasksForGroups(userGroups.toSet, State.InProgress)
-      } yield {
-        val tasks = (tasksForUser ++ tasksForGroups).distinct
-        Ok(openUserTasksView(tasks, metadata.groups, userInfo))
+      dataFacade.tasksForUser(userInfo.email, State.InProgress).map { tasks =>
+        Ok(openUserTasksView(tasks, userInfo))
       }
     }
   }

@@ -8,7 +8,6 @@ import java.time.ZonedDateTime
 import java.util.concurrent.ConcurrentHashMap
 
 import javax.inject.Singleton
-import models.Task.CompletableByType
 import models.{Comment, Request, State, Task}
 import play.api.Mode
 import play.api.db.evolutions.EvolutionsModule
@@ -95,12 +94,23 @@ class DAOMock extends DAO {
     }
   }
 
-  override def createTask(requestSlug: String, prototype: Task.Prototype, completableByType: CompletableByType.CompletableByType, completableByValue: String, maybeCompletedBy: Option[String], maybeData: Option[JsObject], state: State.State): Future[Task] = {
+  override def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String], maybeData: Option[JsObject], state: State.State): Future[Task] = {
     Future.successful {
       val id = Try(tasks.map(_.id).max).getOrElse(0) + 1
-      val task = Task(id, completableByType, completableByValue, maybeCompletedBy, maybeCompletedBy.map(_ => ZonedDateTime.now()), state, prototype, maybeData, requestSlug)
+      val task = Task(id, completableBy, maybeCompletedBy, maybeCompletedBy.map(_ => ZonedDateTime.now()), state, prototype, maybeData, requestSlug)
       tasks += task
       task
+    }
+  }
+
+  override def assignTask(taskId: Int, emails: Seq[String]): Future[Task] = {
+    tasks.find(_.id == taskId).fold(Future.failed[Task](new Exception("Task not found"))) { task =>
+      val updatedTask = task.copy(completableBy = emails)
+
+      tasks -= task
+      tasks += updatedTask
+
+      Future.successful(updatedTask)
     }
   }
 
@@ -130,8 +140,7 @@ class DAOMock extends DAO {
   override def tasksForUser(email: String, state: State.State): Future[Seq[(Task, DAO.NumComments, Request)]] = {
     Future.successful {
       tasks.filter { task =>
-        task.completableByType == CompletableByType.Email &&
-        task.completableByValue == email &&
+        task.completableBy.contains(email) &&
         task.state == state
       } flatMap { task =>
         val numTaskComments = comments.count(_.taskId == task.id).toLong
@@ -142,39 +151,32 @@ class DAOMock extends DAO {
     }
   }
 
-  override def tasksForGroups(groups: Set[String], state: State.State): Future[Seq[(Task, DAO.NumComments, Request)]] = {
-    Future.successful {
-      tasks.filter { task =>
-        task.completableByType == CompletableByType.Group &&
-        groups.contains(task.completableByValue) &&
-        task.state == state
-      } flatMap { task =>
-        val numTaskComments = comments.count(_.taskId == task.id).toLong
-        requests.find(_.slug == task.requestSlug).map { request =>
-          (task, numTaskComments, request)
-        }
-      }
-    }
-  }
 }
 
 object DAOMock {
 
   val daoUrl = sys.env.getOrElse("DATABASE_URL", "postgres://ossrequest:password@localhost:5432/ossrequest-test")
 
-  val testConfig = Map("db.default.url" -> daoUrl)
+  val testConfig = Map(
+    "db.default.url" -> daoUrl
+  )
+
+  // has a daomodule connected to the test db
+  def databaseAppBuilderWithEvolutionsDisabled(mode: Mode = Mode.Test, additionalConfig: Map[String, Any] = Map.empty[String, Any]) = databaseAppBuilder(mode, additionalConfig)
+    .configure(Map("play.evolutions.db.default.enabled" -> false))
+    .in(mode)
 
   // has a daomodule connected to the test db
   def databaseAppBuilder(mode: Mode = Mode.Test, additionalConfig: Map[String, Any] = Map.empty[String, Any]) = new GuiceApplicationBuilder()
     .configure(testConfig)
     .configure(additionalConfig)
-    .disable[EvolutionsModule]
     .in(mode)
 
   // has no real dao
   def noDatabaseAppBuilder(mode: Mode = Mode.Test, additionalConfig: Map[String, Any] = Map.empty[String, Any]) = databaseAppBuilder(mode, additionalConfig)
     .disable[HikariCPModule]
     .disable[DBModule]
+    .disable[EvolutionsModule]
     .overrides(bind[DAO].to[DAOMock])
 
 }

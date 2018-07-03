@@ -22,7 +22,7 @@ libraryDependencies ++= Seq(
 
   "org.postgresql"         %  "postgresql"                         % "42.1.4",
 
-  "io.getquill"            %% "quill-async-postgres"               % "2.4.2",
+  "io.getquill"            %% "quill-async-postgres"               % "2.5.4",
 
   "org.eclipse.jgit"       %  "org.eclipse.jgit"                   % "4.10.0.201712302008-r",
 

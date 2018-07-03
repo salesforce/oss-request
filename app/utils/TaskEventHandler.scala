@@ -54,7 +54,11 @@ class TaskEventHandler @Inject()(dao: DAO, metadataService: MetadataService)(imp
                 taskPrototypes.get(taskEvent.action.value).fold(Future.failed[Task](new Exception(s"Could not find task named '${taskEvent.action.value}'"))) { taskPrototype =>
                   taskPrototype.completableBy.fold(Future.failed[Task](new Exception("Could not create task because it does not have completable_by info"))) { completableBy =>
                     completableBy.value.fold(Future.failed[Task](new Exception("Could not create task because it does not have a completable_by value"))) { completableByValue =>
-                      dao.createTask(requestSlug, taskPrototype, completableBy.`type`, completableByValue)
+                      metadataService.fetchMetadata.flatMap { metadata =>
+                        metadata.completableBy(completableBy.`type`, completableByValue).fold(Future.failed[Task](new Exception("Could not create task because it can't be assigned to anyone"))) { emails =>
+                          dao.createTask(requestSlug, taskPrototype, emails.toSeq)
+                        }
+                      }
                     }
                   }
                 }

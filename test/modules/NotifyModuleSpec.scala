@@ -6,7 +6,6 @@ package modules
 
 import javax.inject.Singleton
 import models.Task
-import org.scalatest.TryValues._
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.db.Database
@@ -35,7 +34,7 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
   "taskComment" must {
     "work" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest("asdf", "asdf@asdf.com"))
-      val task = await(dao.createTask(request.slug, Task.Prototype("foo", Task.TaskType.Action, "foo"), Task.CompletableByType.Email, "foo@foo.com"))
+      val task = await(dao.createTask(request.slug, Task.Prototype("foo", Task.TaskType.Action, "foo"), Seq("foo@foo.com")))
       val comment = await(dao.commentOnTask(task.id, "bar@bar.com", "bar"))
 
 
@@ -48,7 +47,7 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
   "taskAssigned" must {
     "work" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest("asdf", "asdf@asdf.com"))
-      val task = await(dao.createTask(request.slug, Task.Prototype("foo", Task.TaskType.Action, "foo"), Task.CompletableByType.Email, "foo@foo.com"))
+      val task = await(dao.createTask(request.slug, Task.Prototype("foo", Task.TaskType.Action, "foo"), Seq("foo@foo.com")))
 
       await(notifier.taskAssigned(task))
 
@@ -63,19 +62,6 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       await(notifier.requestStatusChange(request))
 
       notifyMock.notifications.map(_._1) must contain (Set("asdf@asdf.com"))
-    }
-  }
-
-  "taskCompletableEmails" must {
-    "work" in Evolutions.withEvolutions(database) {
-      val request = await(dao.createRequest("asdf", "asdf@asdf.com"))
-      val task1 = await(dao.createTask(request.slug, Task.Prototype("foo", Task.TaskType.Action, "foo"), Task.CompletableByType.Email, "foo@foo.com"))
-      val emails1 = await(notifier.taskCompletableEmails(task1))
-      emails1 must equal (Set("foo@foo.com"))
-
-      val task2 = await(dao.createTask(request.slug, Task.Prototype("foo", Task.TaskType.Action, "foo"), Task.CompletableByType.Group, "admin"))
-      val emails2 = await(notifier.taskCompletableEmails(task2))
-      emails2 must equal (Set("foo@bar.com", "zxcv@zxcv.com"))
     }
   }
 

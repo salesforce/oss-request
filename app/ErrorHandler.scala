@@ -3,10 +3,10 @@
  */
 
 import javax.inject.{Inject, Provider, Singleton}
-import play.api.{Configuration, Environment, OptionalSourceMapper, UsefulException}
 import play.api.http.DefaultHttpErrorHandler
 import play.api.mvc.RequestHeader
 import play.api.routing.Router
+import play.api.{Configuration, Environment, OptionalSourceMapper, UsefulException}
 import utils.RuntimeReporter
 
 @Singleton
