@@ -76,7 +76,7 @@ class ApplyEvolutions(app: Application) {
           }
 
           val assignTo = maybeAssignTo.getOrElse {
-            StdIn.readLine("Assign to emails (comma separated): ").replaceAllLiterally(" ", "").split(",").toSeq
+            StdIn.readLine("Assign task '$label' on request '$slug' to emails (comma separated): \n").replaceAllLiterally(" ", "").split(",").toSeq
           }
 
           val updateTask = databaseWithCtx.ctx.run {
