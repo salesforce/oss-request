@@ -9,14 +9,15 @@ import modules.DatabaseWithCtx
 import play.api.db.DBApi
 import play.api.db.evolutions.{EvolutionsApi, EvolutionsReader}
 import play.api.inject.guice.GuiceApplicationBuilder
-import play.api.{Application, Logger}
+import play.api.{Application, Logger, Mode}
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext}
 import scala.io.StdIn
+import scala.util.Try
 
 object ApplyEvolutions extends App {
-  val app = new GuiceApplicationBuilder().build()
+  val app = new GuiceApplicationBuilder().in(Mode.Prod).configure(Map("play.evolutions.db.default.enabled" -> false)).build()
 
   new ApplyEvolutions(app).run
 
@@ -36,7 +37,9 @@ class ApplyEvolutions(app: Application) {
 
     val (before, after) = scripts.partition(_.evolution.revision < 3)
 
-    evolutionsApi.evolve("default", before, true, "")
+    Logger.info(s"Applying evolutions before manual migration: ${before.map(_.evolution.revision).mkString}")
+
+    Try(evolutionsApi.evolve("default", before, true, ""))
 
     // programmatic evolutions
     val metadataService = app.injector.instanceOf[MetadataService]
@@ -88,6 +91,8 @@ class ApplyEvolutions(app: Application) {
       }
     }
 
-    evolutionsApi.evolve("default", after, true, "")
+    Logger.info(s"Applying evolutions after manual migration: ${after.map(_.evolution.revision).mkString}")
+
+    Try(evolutionsApi.evolve("default", after, true, ""))
   }
 }
