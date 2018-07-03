@@ -31,7 +31,7 @@ class DataFacadeSpec extends PlaySpec with GuiceOneAppPerTest {
       val event = TaskEvent(TaskEvent.EventType.StateChange, State.InProgress.toString, TaskEvent.EventAction(TaskEvent.EventActionType.CreateTask, "review_request"), None)
       val request = await(dataFacade.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", Task.TaskType.Approval, "asdf", None, None, Seq(event))
-      val task = await(dataFacade.createTask(request.slug, prototype, Task.CompletableByType.Email, "foo@foo.com"))
+      val task = await(dataFacade.createTask(request.slug, prototype, Seq("foo@foo.com")))
       val allTasks = await(dataFacade.requestTasks("foo@foo.com", request.slug))
       allTasks must have size 2
 

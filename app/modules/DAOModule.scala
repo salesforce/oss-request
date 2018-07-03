@@ -13,8 +13,6 @@ import com.github.mauricio.async.db.postgresql.util.URLParser
 import io.getquill.{PostgresAsyncContext, SnakeCase}
 import javax.inject.{Inject, Singleton}
 import models.State.State
-import models.Task.CompletableByType
-import models.Task.CompletableByType.CompletableByType
 import models.{Comment, Request, State, Task}
 import play.api.inject.{ApplicationLifecycle, Binding, Module}
 import play.api.libs.json.{JsObject, Json}
@@ -36,15 +34,15 @@ trait DAO {
   def requestsForUser(email: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]]
   def request(requestSlug: String): Future[Request]
   def updateRequest(requestSlug: String, state: State.State): Future[Request]
-  def createTask(requestSlug: String, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task]
+  def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task]
   def updateTask(taskId: Int, state: State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task]
   def deleteTask(taskId: Int): Future[Unit]
+  def assignTask(taskId: Int, emails: Seq[String]): Future[Task]
   def taskById(taskId: Int): Future[Task]
   def requestTasks(requestSlug: String, maybeState: Option[State] = None): Future[Seq[(Task, DAO.NumComments)]]
   def commentOnTask(taskId: Int, email: String, contents: String): Future[Comment]
   def commentsOnTask(taskId: Int): Future[Seq[Comment]]
   def tasksForUser(email: String, state: State): Future[Seq[(Task, DAO.NumComments, Request)]]
-  def tasksForGroups(groups: Set[String], state: State): Future[Seq[(Task, DAO.NumComments, Request)]]
 }
 
 object DAO {
@@ -138,7 +136,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def createTask(requestSlug: String, prototype: Task.Prototype, completableByType: CompletableByType, completableByValue: String, maybeCompletedByEmail: Option[String], maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task] = {
+  override def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedByEmail: Option[String], maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task] = {
     // todo: move this to a validation module via the DAO
     if (state == State.Completed && maybeCompletedByEmail.isEmpty) {
       Future.failed(new Exception("maybeCompletedByEmail was not specified"))
@@ -149,8 +147,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
       run {
         quote {
           query[Task].insert(
-            _.completableByType -> lift(completableByType),
-            _.completableByValue -> lift(completableByValue),
+            _.completableBy -> lift(completableBy),
             _.completedByEmail -> lift(maybeCompletedByEmail),
             _.requestSlug -> lift(requestSlug),
             _.state -> lift(state),
@@ -160,7 +157,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
           ).returning(_.id)
         }
       } map { id =>
-        Task(id, completableByType, completableByValue, maybeCompletedByEmail, maybeCompletedDate, state, prototype, maybeData, requestSlug)
+        Task(id, completableBy, maybeCompletedByEmail, maybeCompletedDate, state, prototype, maybeData, requestSlug)
       }
     }
   }
@@ -202,6 +199,14 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
         query[Task].filter(_.id == lift(taskId)).delete
       }
     }.map(_ => ())
+  }
+
+  def assignTask(taskId: Int, emails: Seq[String]): Future[Task] = {
+    run {
+      quote {
+        query[Task].filter(_.id == lift(taskId)).update(_.completableBy -> lift(emails))
+      }
+    }.flatMap(_ => taskById(taskId))
   }
 
   override def requestTasks(requestSlug: String, maybeState: Option[State] = None): Future[Seq[(Task, DAO.NumComments)]] = {
@@ -257,8 +262,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
       quote {
         for {
           task <- query[Task].filter { task =>
-            task.completableByType == lift(CompletableByType.Email) &&
-            task.completableByValue == lift(email) &&
+            task.completableBy.contains(lift(email)) &&
             task.state == lift(state)
           }
 
@@ -273,26 +277,6 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  def tasksForGroups(groups: Set[String], state: State): Future[Seq[(Task, DAO.NumComments, Request)]] = {
-    run {
-      quote {
-        for {
-          task <- query[Task].filter { task =>
-            task.completableByType == lift(CompletableByType.Group) &&
-            liftQuery(groups).contains(task.completableByValue) &&
-            task.state == lift(state)
-          }
-
-          numComments = query[Comment].filter(_.taskId == task.id).size
-
-          request <- query[Request].filter { request =>
-            request.slug == task.requestSlug &&
-            request.state == lift(State.InProgress)
-          }
-        } yield (task, numComments, request)
-      }
-    }
-  }
 }
 
 object DB {

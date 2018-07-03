@@ -4,7 +4,6 @@
 
 package views.html.utils
 
-import models.Task.CompletableByType
 import models.{State, Task}
 import modules.DAOMock
 import org.scalatestplus.play.PlaySpec
@@ -21,18 +20,18 @@ class TaskShowSpec extends PlaySpec with GuiceOneAppPerTest {
     "render plain text" in {
       val info = "hello, world"
       val taskPrototype = Task.Prototype("foo", Task.TaskType.Action, info)
-      val task = Task(1, CompletableByType.Email, "foo@foo.com", None, None, State.InProgress, taskPrototype, None, "foo")
+      val task = Task(1, Seq("foo@foo.com"), None, None, State.InProgress, taskPrototype, None, "foo")
 
-      val body = taskShowView.render(task, Map.empty[String, Set[String]]).body
+      val body = taskShowView.render(task).body
 
       body must include (info)
     }
     "render markdown" in {
       val info = "[hello, world](https://hello.world)"
       val taskPrototype = Task.Prototype("foo", Task.TaskType.Action, info)
-      val task = Task(1, CompletableByType.Email, "foo@foo.com", None, None, State.InProgress, taskPrototype, None, "foo")
+      val task = Task(1, Seq("foo@foo.com"), None, None, State.InProgress, taskPrototype, None, "foo")
 
-      val body = taskShowView.render(task, Map.empty[String, Set[String]]).body
+      val body = taskShowView.render(task).body
 
       body must include (taskPrototype.infoMarkdownToHtml)
     }

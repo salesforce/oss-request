@@ -10,12 +10,13 @@ import java.nio.file.Files
 import com.jcraft.jsch.{JSch, Session}
 import javax.inject.{Inject, Singleton}
 import models.Task
+import models.Task.CompletableByType
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.transport.{JschConfigSessionFactory, OpenSshConfig, SshTransport}
 import org.eclipse.jgit.util.FS
+import play.api.cache.SyncCacheApi
 import play.api.libs.json.Json
 import play.api.{Configuration, Environment, Mode}
-import play.api.cache.SyncCacheApi
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -23,6 +24,18 @@ import scala.util.Try
 
 case class Metadata(groups: Map[String, Set[String]], tasks: Map[String, Task.Prototype]) {
   val admins = groups.getOrElse("admin", Set.empty[String])
+
+  def completableBy(completableBy: (CompletableByType.CompletableByType, String)): Option[Set[String]] = {
+    val (completableByType, completableByValue) = completableBy
+    completableByType match {
+      case models.Task.CompletableByType.Group => {
+        groups.get(completableByValue)
+      }
+      case models.Task.CompletableByType.Email => {
+        Some(Set(completableByValue))
+      }
+    }
+  }
 }
 
 object Metadata {

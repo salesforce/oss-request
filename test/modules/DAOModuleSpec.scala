@@ -6,7 +6,7 @@ package modules
 
 import java.time.ZonedDateTime
 
-import models.Task.{CompletableByType, TaskType}
+import models.Task.TaskType
 import models.{State, Task}
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
@@ -91,7 +91,7 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
 
-      val task = await(dao.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
+      val task = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
       task.state must equal (State.InProgress)
     }
   }
@@ -100,7 +100,7 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
     "work" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task = await(dao.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
+      val task = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
       task.state must equal (State.InProgress)
       val updatedTask = await(dao.updateTask(task.id, State.Completed, Some("foo@foo.com"), None))
       updatedTask.state must equal (State.Completed)
@@ -108,14 +108,14 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
     "add a completedDate when closing a task" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task = await(dao.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
+      val task = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
       val updatedTask = await(dao.updateTask(task.id, State.Completed, Some("foo@foo.com"), None))
       updatedTask.completedDate must be (defined)
     }
     "fail to complete without a completedByEmail" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task = await(dao.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
+      val task = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
       an [Exception] must be thrownBy await(dao.updateTask(task.id, State.Completed, None, None))
     }
   }
@@ -124,8 +124,8 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
     "work" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task1 = await(dao.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
-      val task2 = await(dao.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
+      val task1 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
+      val task2 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
       await(dao.deleteTask(task1.id)) must equal (())
       await(dao.requestTasks(request.slug)).size must equal (1)
     }
@@ -135,8 +135,8 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
     "work when a task state is specified" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task1 = await(dao.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
-      val task2 = await(dao.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
+      val task1 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
+      val task2 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
       await(dao.updateTask(task1.id, State.Completed, Some("foo@foo.com"), None))
       val inProgressTasks = await(dao.requestTasks(request.slug, Some(State.InProgress)))
       inProgressTasks must have size 1
@@ -149,7 +149,7 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
     "work" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task = await(dao.createTask(request.slug, prototype, CompletableByType.Email, "foo@foo.com"))
+      val task = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
       val comment = await(dao.commentOnTask(task.id, "foo@bar.com", "test"))
       comment.id must be >= 0
       comment.contents must equal ("test")

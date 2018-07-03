@@ -2,23 +2,11 @@
  * Copyright (c) Salesforce.com, inc. 2017
  *@
 
-@(groups: Map[String, Set[String]], maybeCompletableBy: Option[(models.Task.CompletableByType.CompletableByType, String)])
+@(completableBy: Set[String])
 
-@for((completableByType, completableByValue) <- maybeCompletableBy) {
-    @completableByType match {
-        case models.Task.CompletableByType.Group => {
-            @defining(groups(completableByValue)) { emails =>
-                @if(emails.size == 1) {
-                    Assigned to: @emails.head
-                } else {
-                    Assigned to any of: @emails.mkString(", ")
-                }
-            }
 
-        }
-        case models.Task.CompletableByType.Email => {
-            Assigned to: @completableByValue
-        }
-    }
-
+@if(completableBy.size == 1) {
+    Assigned to: @completableBy.head
+} else {
+    Assigned to any of: @completableBy.mkString(", ")
 }

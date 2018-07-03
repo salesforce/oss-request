@@ -5,13 +5,12 @@
 package modules
 
 import javax.inject.{Inject, Singleton}
-import models.Task.CompletableByType
 import models.{Comment, Request, Task}
 import play.api.http.{HeaderNames, Status}
 import play.api.inject.{Binding, Module}
 import play.api.libs.json.{JsObject, Json}
 import play.api.libs.ws.{WSAuthScheme, WSClient, WSResponse}
-import play.api.mvc.{Headers, RequestHeader}
+import play.api.mvc.RequestHeader
 import play.api.{Configuration, Environment, Logger}
 import utils.{MetadataService, RuntimeReporter}
 
@@ -46,7 +45,7 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
          |To complete or followup on this task, see: $url
         """.stripMargin
 
-    taskCompletableEmails(task).flatMap(notifyProvider.sendMessage(_, subject, message))
+    notifyProvider.sendMessage(task.completableBy.toSet, subject, message)
   }
 
   def taskComment(requestSlug: String, comment: Comment)(implicit requestHeader: RequestHeader): Future[_] = {
@@ -77,18 +76,6 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
     notifyProvider.sendMessage(Set(request.creatorEmail), subject, message)
   }
 
-  private[modules] def taskCompletableEmails(task: Task): Future[Set[String]] = {
-    task.completableByType match {
-      case CompletableByType.Email =>
-        Future.successful(Set(task.completableByValue))
-
-      case CompletableByType.Group =>
-        metadataService.fetchMetadata.flatMap { metadata =>
-          metadata.groups.get(task.completableByValue).fold(Future.failed[Set[String]](new Exception("Could not find specified group")))(Future.successful)
-        }
-    }
-  }
-
   private def taskCommentInfo(requestSlug: String, comment: Comment): Future[(Request, Task, Set[String])] = {
     val requestFuture = dao.request(requestSlug)
     val taskFuture = dao.taskById(comment.taskId)
@@ -96,10 +83,9 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
     for {
       request <- requestFuture
       task <- taskFuture
-      emailsFromTask <- taskCompletableEmails(task)
     } yield {
       // notify those that can complete the task, the request creator, but not the comment creator
-      (request, task, emailsFromTask + request.creatorEmail - comment.creatorEmail)
+      (request, task, task.completableBy.toSet + request.creatorEmail - comment.creatorEmail)
     }
   }
 }

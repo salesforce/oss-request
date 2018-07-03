@@ -4,33 +4,29 @@
 
 @this()
 
-@(newOrExistingTask: Either[(String, models.Task.Prototype), models.Task], groups: Map[String, Set[String]])(implicit request: RequestHeader)
+@(newOrExistingTask: Either[(String, models.Task.Prototype, Set[String]), models.Task])(implicit request: RequestHeader)
 
 @import helper._
 
 @taskPrototype = @{
     newOrExistingTask match {
-        case Left((_, taskPrototype)) => taskPrototype
+        case Left((_, taskPrototype, _)) => taskPrototype
         case Right(task) => task.prototype
     }
 }
 
-@maybeCompletableBy = @{
+@completableBy = @{
     newOrExistingTask match {
-        case Left((_, taskPrototype)) =>
-            taskPrototype.completableBy.flatMap { completableBy =>
-                completableBy.value.map { completableByValue =>
-                    completableBy.`type` -> completableByValue
-                }
-            }
+        case Left((_, _, completableBy)) =>
+            completableBy
         case Right(task) =>
-            Some(task.completableByType -> task.completableByValue)
+            task.completableBy.toSet
     }
 }
 
 @formUrl(state: models.State.State = State.Completed) = @{
     newOrExistingTask match {
-        case Left((name, _)) => CSRF(routes.Application.createRequest(name)).url
+        case Left((name, _, _)) => CSRF(routes.Application.createRequest(name)).url
         case Right(task) => CSRF(routes.Application.updateTask(task.requestSlug, task.id, state)).url
     }
 }
@@ -87,7 +83,7 @@
         </div>
 
         <div class="panel-footer">
-            @utils.AssignedTo(groups, maybeCompletableBy)
+            @utils.AssignedTo(completableBy)
         </div>
     }
     case models.Task.TaskType.Action => {
@@ -95,7 +91,7 @@
             <p>@Html(taskPrototype.infoMarkdownToHtml)</p>
         </div>
         <div class="panel-footer clearfix">
-            <span>@utils.AssignedTo(groups, maybeCompletableBy)</span>
+            <span>@utils.AssignedTo(completableBy)</span>
 
             <form action="@Html(formUrl())" method="post" class="pull-right">
                 <button type="submit" class="btn btn-success">Mark as Completed</button>
@@ -108,7 +104,7 @@
         </div>
 
         <div class="panel-footer clearfix">
-            <span>@utils.AssignedTo(groups, maybeCompletableBy)</span>
+            <span>@utils.AssignedTo(completableBy)</span>
 
             <div class="pull-right">
                 <div class="row">

@@ -4,7 +4,7 @@
 
 @this(taskEditView: TaskEdit, taskShowView: TaskShow)
 
-@(task: models.Task, commentCount: Long, canEdit: Boolean, isAdmin: Boolean, groups: Map[String, Set[String]])(implicit request: RequestHeader)
+@(task: models.Task, commentCount: Long, canEdit: Boolean, isAdmin: Boolean)(implicit request: RequestHeader)
 
 @panelType = {
     @task.state match {
@@ -44,10 +44,10 @@
 
     @task.state match {
         case models.State.InProgress if canEdit => {
-            @taskEditView(Right(task), groups)
+            @taskEditView(Right(task))
         }
         case _ => {
-            @taskShowView(task, groups)
+            @taskShowView(task)
         }
     }
 </div>

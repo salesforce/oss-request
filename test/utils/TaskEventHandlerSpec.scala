@@ -4,7 +4,7 @@
 
 package utils
 
-import models.{State, Task}
+import models.State
 import modules.DAOMock
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
@@ -25,7 +25,7 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
     "automatically add a new task when the metadata says to do so" in {
       val taskPrototype = await(metadataService.fetchMetadata).tasks("start")
       val request = await(dataFacade.createRequest("asdf", "asdf@asdf.com"))
-      val task = await(dataFacade.createTask(request.slug, taskPrototype, Task.CompletableByType.Email, "foo@foo.com", Some("foo@foo.com"), None, State.Completed))
+      val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
       val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug)).map(_._1)
 
       tasks.exists(_.prototype.label == "Review Request") mustBe true
@@ -36,7 +36,7 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
       val taskPrototype = await(metadataService.fetchMetadata).tasks("start")
       val data = Json.obj("github_org" -> "Bar")
       val request = await(dataFacade.createRequest("asdf", "asdf@asdf.com"))
-      val task = await(dataFacade.createTask(request.slug, taskPrototype, Task.CompletableByType.Email, "foo@foo.com", Some("foo@foo.com"), Some(data), State.Completed))
+      val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), Some(data), State.Completed))
       val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug)).map(_._1)
 
       tasks.exists(_.prototype.label == "Review Request") mustBe true
@@ -47,7 +47,7 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
       val taskPrototype = await(metadataService.fetchMetadata).tasks("start")
       val data = Json.obj("github_org" -> "Foo")
       val request = await(dataFacade.createRequest("asdf", "asdf@asdf.com"))
-      val task = await(dataFacade.createTask(request.slug, taskPrototype, Task.CompletableByType.Email, "foo@foo.com", Some("foo@foo.com"), Some(data), State.Completed))
+      val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), Some(data), State.Completed))
       val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug)).map(_._1)
 
       tasks.exists(_.prototype.label == "Review Request") mustBe true
@@ -58,7 +58,7 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
       val taskPrototype = await(metadataService.fetchMetadata).tasks("start")
       val data = Json.obj("patentable" -> true)
       val request = await(dataFacade.createRequest("asdf", "asdf@asdf.com"))
-      val task = await(dataFacade.createTask(request.slug, taskPrototype, Task.CompletableByType.Email, "foo@foo.com", Some("foo@foo.com"), Some(data), State.Completed))
+      val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), Some(data), State.Completed))
       val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug)).map(_._1)
 
       tasks.exists(_.prototype.label == "Review Request") mustBe true

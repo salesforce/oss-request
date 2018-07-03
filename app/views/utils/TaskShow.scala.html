@@ -4,7 +4,7 @@
 
 @this()
 
-@(task: models.Task, groups: Map[String, Set[String]])
+@(task: models.Task)
 
 @formWithData(form: play.api.libs.json.JsObject) = @{
     val dataBody = task.data.getOrElse(play.api.libs.json.Json.obj())
@@ -40,7 +40,7 @@
                 <div class="panel-footer">Task Cancelled</div>
             }
             case models.State.InProgress => {
-                <div class="panel-footer">@views.html.utils.AssignedTo(groups, Some(task.completableByType -> task.completableByValue))</div>
+                <div class="panel-footer">@views.html.utils.AssignedTo(task.completableBy.toSet)</div>
             }
         }
 
@@ -61,7 +61,7 @@
                 <div class="panel-footer">Task Cancelled</div>
             }
             case models.State.InProgress => {
-                <div class="panel-footer">@views.html.utils.AssignedTo(groups, Some(task.completableByType -> task.completableByValue))</div>
+                <div class="panel-footer">@views.html.utils.AssignedTo(task.completableBy.toSet)</div>
             }
         }
     }
@@ -81,7 +81,7 @@
                 <div class="panel-footer">Denied</div>
             }
             case models.State.InProgress => {
-                <div class="panel-footer">@views.html.utils.AssignedTo(groups, Some(task.completableByType -> task.completableByValue))</div>
+                <div class="panel-footer">@views.html.utils.AssignedTo(task.completableBy.toSet)</div>
             }
         }
     }

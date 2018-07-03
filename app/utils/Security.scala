@@ -60,19 +60,9 @@ class Security @Inject() (dao: DAO, metadataService: MetadataService) (implicit 
       }
       else {
         val taskFuture = taskOrTaskId.fold(Future.successful, dao.taskById)
-        val metadataFuture = metadataService.fetchMetadata
 
-        taskFuture.flatMap { task =>
-          metadataFuture.map { metadata =>
-            task.completableByType match {
-              case Task.CompletableByType.Email if task.completableByValue == email =>
-                true
-              case Task.CompletableByType.Group if metadata.groups(task.completableByValue).contains(email) =>
-                true
-              case _ =>
-                false
-            }
-          }
+        taskFuture.map { task =>
+          task.completableBy.contains(email)
         }
       }
     }

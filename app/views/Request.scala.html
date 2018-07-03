@@ -148,7 +148,7 @@
     </div>
 
     @for(task <- tasks) {
-        @taskView(task._1, task._2, request.state == State.InProgress && task._3, userInfo.isAdmin, metadata.groups)
+        @taskView(task._1, task._2, request.state == State.InProgress && task._3, userInfo.isAdmin)
     }
 
 }

@@ -60,21 +60,24 @@ class SecuritySpec extends PlaySpec with GuiceOneAppPerTest {
       val email = metadata.admins.head
 
       val request = await(dao.createRequest("asdf", "asdf@asdf.com"))
-      val task = await(dao.createTask(request.slug, taskPrototype, Task.CompletableByType.Email, "foo@foo.com"))
+      val task = await(dao.createTask(request.slug, taskPrototype, Seq("foo@foo.com")))
 
       noException must be thrownBy await(security.updateTask(email, task.id))
     }
     "allow changes for task owner(s)" in Evolutions.withEvolutions(database) {
       val email = "foo@foo.com"
+      val task1Emails = Seq(email)
 
       val request = await(dao.createRequest("asdf", "asdf@asdf.com"))
 
-      val task1 = await(dao.createTask(request.slug, taskPrototype, Task.CompletableByType.Email, email))
+      val task1 = await(dao.createTask(request.slug, taskPrototype, task1Emails))
       noException must be thrownBy await(security.updateTask(email, task1.id))
 
       val securityGroup = metadata.groups("security")
 
-      val task2 = await(dao.createTask(request.slug, taskPrototype, Task.CompletableByType.Group, "security"))
+      val task2Emails = metadata.completableBy(Task.CompletableByType.Group, "security").get.toSeq
+
+      val task2 = await(dao.createTask(request.slug, taskPrototype, task2Emails))
       noException must be thrownBy await(security.updateTask(securityGroup.head, task2.id))
     }
     "deny non-admins and non-owner from making changes" in Evolutions.withEvolutions(database) {
@@ -82,10 +85,12 @@ class SecuritySpec extends PlaySpec with GuiceOneAppPerTest {
 
       val request = await(dao.createRequest("asdf", "asdf@asdf.com"))
 
-      val task1 = await(dao.createTask(request.slug, taskPrototype, Task.CompletableByType.Email, "foo@bar.com"))
+      val task1 = await(dao.createTask(request.slug, taskPrototype, Seq("foo@bar.com")))
       a[Security.NotAllowed] must be thrownBy await(security.updateTask(email, task1.id))
 
-      val task2 = await(dao.createTask(request.slug, taskPrototype, Task.CompletableByType.Group, "security"))
+      val task2Emails = metadata.completableBy(Task.CompletableByType.Group, "security").get.toSeq
+
+      val task2 = await(dao.createTask(request.slug, taskPrototype, task2Emails))
       a[Security.NotAllowed] must be thrownBy await(security.updateTask(email, task2.id))
 
     }
