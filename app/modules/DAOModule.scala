@@ -6,6 +6,7 @@ package modules
 
 import java.time.ZonedDateTime
 
+import com.github.mauricio.async.db
 import com.github.mauricio.async.db.SSLConfiguration
 import com.github.mauricio.async.db.pool.{PartitionedConnectionPool, PoolConfiguration}
 import com.github.mauricio.async.db.postgresql.pool.PostgreSQLConnectionFactory
@@ -303,7 +304,7 @@ class DatabaseWithCtx @Inject()(lifecycle: ApplicationLifecycle, playConfig: Con
 
   private val maybeDbUrl = playConfig.getOptional[String]("db.default.url")
 
-  private val config = maybeDbUrl.map(URLParser.parse(_)).getOrElse(URLParser.DEFAULT)
+  val config: db.Configuration = maybeDbUrl.map(URLParser.parse(_)).getOrElse(URLParser.DEFAULT)
 
   private val configWithMaybeSsl = playConfig.getOptional[String]("db.default.sslmode").fold(config) { sslmode =>
     val sslConfig = SSLConfiguration(Map("sslmode" -> sslmode))

@@ -25,7 +25,7 @@ class ApplyEvolutionsSpec extends PlaySpec with GuiceOneAppPerTest {
     "work" in {
       val databaseWithCtx = app.injector.instanceOf[DatabaseWithCtx]
 
-      await(databaseWithCtx.ctx.executeAction("DROP OWNED BY ossrequest CASCADE"))
+      await(databaseWithCtx.ctx.executeAction(s"DROP OWNED BY ${databaseWithCtx.config.username} CASCADE"))
 
       an[GenericDatabaseException] must be thrownBy await(databaseWithCtx.ctx.executeQuerySingle("SELECT * FROM play_evolutions"))
     }
