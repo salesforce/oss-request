@@ -24,8 +24,13 @@ class ApplyEvolutionsSpec extends PlaySpec with GuiceOneAppPerTest {
   "clear out the db" must {
     "work" in {
       val databaseWithCtx = app.injector.instanceOf[DatabaseWithCtx]
+      val evolutionsApi = app.injector.instanceOf[EvolutionsApi]
+      val evolutionsReader = app.injector.instanceOf[EvolutionsReader]
 
-      await(databaseWithCtx.ctx.executeAction(s"DROP OWNED BY ${databaseWithCtx.config.username} CASCADE"))
+      val scripts = evolutionsApi.resetScripts("default", "")
+      evolutionsApi.evolve("default", scripts, true, "")
+
+      await(databaseWithCtx.ctx.executeAction(s"DROP TABLE play_evolutions"))
 
       an[GenericDatabaseException] must be thrownBy await(databaseWithCtx.ctx.executeQuerySingle("SELECT * FROM play_evolutions"))
     }
