@@ -13,9 +13,9 @@ import play.api.mvc.RequestHeader
 import scala.concurrent.{ExecutionContext, Future}
 
 class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notifier: Notifier, security: Security)(implicit ec: ExecutionContext) {
-  def createRequest(name: String, creatorEmail: String): Future[Request] = {
+  def createRequest(program: String, name: String, creatorEmail: String): Future[Request] = {
     for {
-      request <- dao.createRequest(name, creatorEmail)
+      request <- dao.createRequest(program, name, creatorEmail)
     } yield request
   }
 
@@ -27,10 +27,16 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notifie
     } yield task
   }
 
-  def allRequests(): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
+  def programRequests(program: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
     for {
-      allRequests <- dao.allRequests()
-    } yield allRequests
+      programRequests <- dao.programRequests(program)
+    } yield programRequests
+  }
+
+  def userRequests(email: String): Future[Seq[(Request, Long, Long)]] = {
+    for {
+      requests <- dao.userRequests(email)
+    } yield requests
   }
 
   def updateRequest(email: String, requestSlug: String, state: State.State)(implicit requestHeader: RequestHeader): Future[Request] = {
@@ -41,16 +47,11 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notifie
     } yield request
   }
 
-  def requestsForUser(email: String): Future[Seq[(Request, Long, Long)]] = {
-    for {
-      requests <- dao.requestsForUser(email)
-    } yield requests
-  }
 
   def request(email: String, requestSlug: String): Future[(Request, Boolean, Boolean)] = {
     for {
       request <- dao.request(requestSlug)
-      isAdmin <- security.isAdmin(email)
+      isAdmin <- security.isAdmin(request.program, email)
       canCancelRequest <- security.canCancelRequest(email, Left(request))
     } yield (request, isAdmin, canCancelRequest)
   }

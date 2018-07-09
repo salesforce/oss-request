@@ -30,9 +30,11 @@ class DAOModule extends Module {
 }
 
 trait DAO {
-  def createRequest(name: String, creatorEmail: String): Future[Request]
-  def allRequests(): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]]
-  def requestsForUser(email: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]]
+  def createRequest(program: String, name: String, creatorEmail: String): Future[Request]
+  def createRequest(name: String, creatorEmail: String): Future[Request] = createRequest("default", name, creatorEmail)
+  def programRequests(program: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]]
+  def programRequests(): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = programRequests("default")
+  def userRequests(email: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]]
   def request(requestSlug: String): Future[Request]
   def updateRequest(requestSlug: String, state: State.State): Future[Request]
   def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task]
@@ -58,7 +60,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
   implicit val jsObjectDecoder = MappedEncoding[String, JsObject](Json.parse(_).as[JsObject])
   implicit val jsObjectEncoder = MappedEncoding[JsObject, String](_.toString())
 
-  override def createRequest(name: String, creatorEmail: String): Future[Request] = {
+  override def createRequest(program: String, name: String, creatorEmail: String): Future[Request] = {
     // todo: slug choice in transaction with create
 
     // figure out slug
@@ -73,7 +75,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
       val state = State.InProgress
       val createDate = ZonedDateTime.now()
 
-      val request = Request(slug, name, createDate, creatorEmail, state, None)
+      val request = Request(program, slug, name, createDate, creatorEmail, state, None)
 
       run {
         quote {
@@ -87,11 +89,24 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def allRequests(): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
+  override def programRequests(program: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
     run {
       quote {
         for {
-          request <- query[Request]
+          request <- query[Request].filter(_.program == lift(program))
+          tasks = query[Task].filter(_.requestSlug == request.slug)
+          totalTasks = tasks.size
+          completedTasks = tasks.filter(_.state == lift(State.Completed)).size
+        } yield (request, totalTasks, completedTasks)
+      }
+    }
+  }
+
+  override def userRequests(email: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
+    run {
+      quote {
+        for {
+          request <- query[Request].filter(_.creatorEmail == lift(email))
           tasks = query[Task].filter(_.requestSlug == request.slug)
           totalTasks = tasks.size
           completedTasks = tasks.filter(_.state == lift(State.Completed)).size
@@ -114,18 +129,6 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     updateFuture.flatMap(_ => request(requestSlug))
   }
 
-  override def requestsForUser(email: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
-    run {
-      quote {
-        for {
-          request <- query[Request].filter(_.creatorEmail == lift(email))
-          tasks = query[Task].filter(_.requestSlug == request.slug)
-          totalTasks = tasks.size
-          completedTasks = tasks.filter(_.state == lift(State.Completed)).size
-        } yield (request, totalTasks, completedTasks)
-      }
-    }
-  }
 
   override def request(slug: String): Future[Request] = {
     run {

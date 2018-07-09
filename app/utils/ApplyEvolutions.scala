@@ -19,7 +19,7 @@ import scala.util.Try
 object ApplyEvolutions extends App {
   val app = new GuiceApplicationBuilder().in(Mode.Prod).configure(Map("play.evolutions.db.default.enabled" -> false)).build()
 
-  new ApplyEvolutions(app).run
+  Try(new ApplyEvolutions(app).run)
 
   app.stop()
 }
@@ -35,13 +35,24 @@ class ApplyEvolutions(app: Application) {
 
     val scripts = evolutionsApi.scripts("default", evolutionsReader, "")
 
-    val (before, after) = scripts.partition(_.evolution.revision < 3)
+    val migrations = Set(Migration(2, migration2))
 
-    Logger.info(s"Applying evolutions before manual migration: ${before.map(_.evolution.revision).mkString}")
+    scripts.foreach { script =>
+      Logger.info(s"Applying evolution ${script.evolution.revision}")
+      evolutionsApi.evolve("default", Seq(script), true, "")
 
-    Try(evolutionsApi.evolve("default", before, true, ""))
+      migrations.filter(_.after == script.evolution.revision).foreach { migration =>
+        Logger.info(s"Applying manual migration ${migration.after}")
+        migration.migrator()
+      }
+    }
+  }
 
-    // programmatic evolutions
+  case class Migration(after: Int, migrator: () => Unit)
+
+  val migration2 = () => {
+    implicit val ec = app.injector.instanceOf[ExecutionContext]
+
     val metadataService = app.injector.instanceOf[MetadataService]
     val metadata = Await.result(metadataService.fetchMetadata, Duration.Inf)
 
@@ -70,7 +81,7 @@ class ApplyEvolutions(app: Application) {
           Logger.info(s"Migrating task '$label' on request '$slug'")
 
           val maybeAssignTo = completableByType match {
-            case CompletableByType.Group => metadata.groups.get(completableByValue).map(_.toSeq)
+            case CompletableByType.Group => metadata.programs("default").groups.get(completableByValue).map(_.toSeq)
             case CompletableByType.Email => Some(Seq(completableByValue))
             case _ => None
           }
@@ -90,9 +101,6 @@ class ApplyEvolutions(app: Application) {
         }
       }
     }
-
-    Logger.info(s"Applying evolutions after manual migration: ${after.map(_.evolution.revision).mkString}")
-
-    Try(evolutionsApi.evolve("default", after, true, ""))
   }
+
 }

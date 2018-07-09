@@ -4,13 +4,20 @@
 
 @this(main: Main)
 
-@(emails: Map[String, Boolean])(implicit request: RequestHeader)
+@(emails: Set[String], metadata: _root_.utils.Metadata)(implicit request: RequestHeader)
 
 @main(None)("Select Email") {
     <h2>That account has multiple emails, pick one</h2>
     <ul>
-        @for((email, isAdmin) <- emails) {
-            <li><a href="@routes.Application.selectEmail(email)">@email</a> @if(isAdmin) { (admin) }</li>
+        @for(email <- emails) {
+            <li>
+                <a href="@routes.Application.selectEmail(email)">@email</a>
+                @for(program <- metadata.programs) {
+                    @if(program._2.isAdmin(email)) {
+                        (admin in @program._2.name)
+                    }
+                }
+            </li>
         }
     </ul>
 }

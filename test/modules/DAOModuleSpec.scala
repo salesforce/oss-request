@@ -65,12 +65,13 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
     }
   }
 
-  "allRequests" must {
+  "programRequests" must {
     "work" in Evolutions.withEvolutions(database) {
       await(dao.createRequest("foo", "foo@bar.com"))
       await(dao.createRequest("asdf", "asdf@asdf.com"))
+      await(dao.createRequest("asdf", "asdf", "asdf@asdf.com"))
 
-      val requests = await(dao.allRequests())
+      val requests = await(dao.programRequests())
       requests must have size 2
     }
   }
@@ -78,10 +79,11 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
   "requestsForUser" must {
     "work" in Evolutions.withEvolutions(database) {
       await(dao.createRequest("foo", "foo@bar.com"))
+      await(dao.createRequest("foo", "foo", "foo@bar.com"))
       await(dao.createRequest("asdf", "asdf@asdf.com"))
 
-      val requests = await(dao.requestsForUser("foo@bar.com"))
-      requests must have size 1
+      val requests = await(dao.userRequests("foo@bar.com"))
+      requests must have size 2
     }
   }
 
@@ -125,7 +127,7 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       val request = await(dao.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
       val task1 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
-      val task2 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
+      await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
       await(dao.deleteTask(task1.id)) must equal (())
       await(dao.requestTasks(request.slug)).size must equal (1)
     }
@@ -136,7 +138,7 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       val request = await(dao.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
       val task1 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
-      val task2 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
+      await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
       await(dao.updateTask(task1.id, State.Completed, Some("foo@foo.com"), None))
       val inProgressTasks = await(dao.requestTasks(request.slug, Some(State.InProgress)))
       inProgressTasks must have size 1

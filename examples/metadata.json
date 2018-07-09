@@ -1,128 +1,162 @@
 {
-  "groups": {
-    "admin": [
-      "foo@bar.com",
-      "zxcv@zxcv.com"
-    ],
-    "security": [
-      "baz@baz.com"
-    ]
-  },
-  "tasks": {
-    "start": {
-      "label": "OSS Request Info",
-      "type": "INPUT",
-      "info": "Please fill in all the info for your OSS request.",
-      "form": {
-        "schema": {
-          "type": "object",
-          "properties": {
-            "project_name": {
-              "title": "Project Description",
-              "type": "string",
-              "required": true
-            },
-            "github_org": {
-              "title": "GitHub Org",
-              "type": "string",
-              "enum": [
-                "Foo",
-                "Bar",
-                "Personal"
-              ],
-              "required": true
-            },
-            "patentable": {
-              "type": "boolean",
-              "enum": [true, false]
-            }
-          }
-        },
-        "options": {
-          "fields": {
-            "github_org": {
-              "type": "select",
-              "noneLabel": "-- Select --",
-              "removeDefaultNone": false
-            },
-            "patentable": {
-              "type": "radio",
-              "label": "Is this patentable?",
-              "removeDefaultNone": true,
-              "optionLabels": ["Yes", "No"]
-            }
-          }
-        }
-      },
-      "task_events": [
-        {
-          "type": "STATE_CHANGE",
-          "value": "COMPLETED",
-          "action": {
-            "type": "CREATE_TASK",
-            "value": "review_request"
-          }
-        },
-        {
-          "type": "STATE_CHANGE",
-          "value": "COMPLETED",
-          "criteria": {
-            "type": "FIELD_VALUE",
-            "value": "github_org=Foo"
-          },
-          "action": {
-            "type": "CREATE_TASK",
-            "value": "create_github_repo"
-          }
-        },
-        {
-          "type": "STATE_CHANGE",
-          "value": "COMPLETED",
-          "criteria": {
-            "type": "FIELD_VALUE",
-            "value": "patentable=true"
-          },
-          "action": {
-            "type": "CREATE_TASK",
-            "value": "ip_approval"
-          }
-        }
+  "default": {
+    "name": "Default Program",
+    "groups": {
+      "admin": [
+        "foo@bar.com",
+        "zxcv@zxcv.com"
+      ],
+      "security": [
+        "baz@baz.com"
       ]
     },
-    "review_request": {
-      "label": "Review Request",
-      "type": "ACTION",
-      "completable_by": {
-        "type": "GROUP",
-        "value": "admin"
+    "tasks": {
+      "start": {
+        "label": "OSS Request Info",
+        "type": "INPUT",
+        "info": "Please fill in all the info for your OSS request.",
+        "form": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "project_name": {
+                "title": "Project Description",
+                "type": "string",
+                "required": true
+              },
+              "github_org": {
+                "title": "GitHub Org",
+                "type": "string",
+                "enum": [
+                  "Foo",
+                  "Bar",
+                  "Personal"
+                ],
+                "required": true
+              },
+              "patentable": {
+                "type": "boolean",
+                "enum": [true, false]
+              }
+            }
+          },
+          "options": {
+            "fields": {
+              "github_org": {
+                "type": "select",
+                "noneLabel": "-- Select --",
+                "removeDefaultNone": false
+              },
+              "patentable": {
+                "type": "radio",
+                "label": "Is this patentable?",
+                "removeDefaultNone": true,
+                "optionLabels": ["Yes", "No"]
+              }
+            }
+          }
+        },
+        "task_events": [
+          {
+            "type": "STATE_CHANGE",
+            "value": "COMPLETED",
+            "action": {
+              "type": "CREATE_TASK",
+              "value": "review_request"
+            }
+          },
+          {
+            "type": "STATE_CHANGE",
+            "value": "COMPLETED",
+            "criteria": {
+              "type": "FIELD_VALUE",
+              "value": "github_org=Foo"
+            },
+            "action": {
+              "type": "CREATE_TASK",
+              "value": "create_github_repo"
+            }
+          },
+          {
+            "type": "STATE_CHANGE",
+            "value": "COMPLETED",
+            "criteria": {
+              "type": "FIELD_VALUE",
+              "value": "patentable=true"
+            },
+            "action": {
+              "type": "CREATE_TASK",
+              "value": "ip_approval"
+            }
+          }
+        ]
       },
-      "info": "Please review the request and assign tasks"
+      "review_request": {
+        "label": "Review Request",
+        "type": "ACTION",
+        "completable_by": {
+          "type": "GROUP",
+          "value": "admin"
+        },
+        "info": "Please review the request and assign tasks"
+      },
+      "ip_approval": {
+        "label": "IP Approval",
+        "type": "APPROVAL",
+        "completable_by": {
+          "type": "EMAIL",
+          "value": "foo@bar.com"
+        },
+        "info": "Schedule a meeting with Foo Bar to start the IP approval process."
+      },
+      "vp_approval": {
+        "label": "VP Approval",
+        "type": "APPROVAL",
+        "completable_by": {
+          "type": "EMAIL"
+        },
+        "info": "The requester's VP must approve this."
+      },
+      "create_github_repo": {
+        "label": "Create GitHub Repo",
+        "type": "ACTION",
+        "completable_by": {
+          "type": "GROUP",
+          "value": "admin"
+        },
+        "info": "A GitHub repo needs to be created."
+      }
+    }
+  },
+  "two": {
+    "name": "Program Two",
+    "groups": {
+      "admin": [
+        "foo@bar.com",
+        "asfd@asdf.com"
+      ],
+      "security": [
+        "blah@blah.com"
+      ]
     },
-    "ip_approval": {
-      "label": "IP Approval",
-      "type": "APPROVAL",
-      "completable_by": {
-        "type": "EMAIL",
-        "value": "foo@bar.com"
-      },
-      "info": "Schedule a meeting with Foo Bar to start the IP approval process."
-    },
-    "vp_approval": {
-      "label": "VP Approval",
-      "type": "APPROVAL",
-      "completable_by": {
-        "type": "EMAIL"
-      },
-      "info": "The requester's VP must approve this."
-    },
-    "create_github_repo": {
-      "label": "Create GitHub Repo",
-      "type": "ACTION",
-      "completable_by": {
-        "type": "GROUP",
-        "value": "admin"
-      },
-      "info": "A GitHub repo needs to be created."
+    "tasks": {
+      "start": {
+        "label": "OSS Request Info",
+        "type": "INPUT",
+        "info": "Please fill in all the info for your OSS request.",
+        "form": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "project_name": {
+                "title": "Project Description",
+                "type": "string",
+                "required": true
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

@@ -12,7 +12,6 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 class TaskEventHandler @Inject()(dao: DAO, metadataService: MetadataService)(implicit ec: ExecutionContext) {
-  lazy val taskPrototypesFuture = metadataService.fetchMetadata.map(_.tasks)
 
   def process(requestSlug: String, eventType: TaskEvent.EventType.EventType, task: Task): Future[Seq[_]] = {
     Future.sequence {
@@ -50,13 +49,15 @@ class TaskEventHandler @Inject()(dao: DAO, metadataService: MetadataService)(imp
         else {
           taskEvent.action.`type` match {
             case TaskEvent.EventActionType.CreateTask =>
-              taskPrototypesFuture.flatMap { taskPrototypes =>
-                taskPrototypes.get(taskEvent.action.value).fold(Future.failed[Task](new Exception(s"Could not find task named '${taskEvent.action.value}'"))) { taskPrototype =>
-                  taskPrototype.completableBy.fold(Future.failed[Task](new Exception("Could not create task because it does not have completable_by info"))) { completableBy =>
-                    completableBy.value.fold(Future.failed[Task](new Exception("Could not create task because it does not have a completable_by value"))) { completableByValue =>
-                      metadataService.fetchMetadata.flatMap { metadata =>
-                        metadata.completableBy(completableBy.`type`, completableByValue).fold(Future.failed[Task](new Exception("Could not create task because it can't be assigned to anyone"))) { emails =>
-                          dao.createTask(requestSlug, taskPrototype, emails.toSeq)
+              dao.request(requestSlug).flatMap { request =>
+                metadataService.fetchMetadata.flatMap { metadata =>
+                  metadata.programs.get(request.program).fold(Future.failed[Task](new Exception(s"Could not find program for request"))) { program =>
+                    program.tasks.get(taskEvent.action.value).fold(Future.failed[Task](new Exception(s"Could not find task named '${taskEvent.action.value}'"))) { taskPrototype =>
+                      taskPrototype.completableBy.fold(Future.failed[Task](new Exception("Could not create task because it does not have completable_by info"))) { completableBy =>
+                        completableBy.value.fold(Future.failed[Task](new Exception("Could not create task because it does not have a completable_by value"))) { completableByValue =>
+                          program.completableBy(completableBy.`type`, completableByValue).fold(Future.failed[Task](new Exception("Could not create task because it can't be assigned to anyone"))) { emails =>
+                            dao.createTask(requestSlug, taskPrototype, emails.toSeq)
+                          }
                         }
                       }
                     }

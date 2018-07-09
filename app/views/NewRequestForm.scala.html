@@ -4,7 +4,7 @@
 
 @this(mainView: Main, taskEditView: utils.TaskEdit)
 
-@(projectName: String, taskPrototype: models.Task.Prototype, userInfo: _root_.utils.UserInfo)(implicit request: RequestHeader)
+@(programKey: String, projectName: String, taskPrototype: models.Task.Prototype, userInfo: _root_.utils.UserInfo)(implicit request: RequestHeader)
 
 @mainView(Some(userInfo))("New Request") {
 
@@ -13,7 +13,7 @@
             <h3 class="panel-title">New Request - @projectName</h3>
         </div>
 
-        @taskEditView(Left((projectName, taskPrototype, Set(userInfo.email))))
+        @taskEditView(Left((programKey, projectName, taskPrototype, Set(userInfo.email))))
     </div>
 
 }

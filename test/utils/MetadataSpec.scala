@@ -7,15 +7,47 @@ package utils
 import modules.DAOMock
 import org.scalatestplus.play._
 import play.api.Mode
+import play.api.libs.json.Json
 import play.api.test.Helpers._
 
 class MetadataSpec extends MixedPlaySpec {
+
+  "parse" must {
+    "work for a single program" in { () =>
+      val json = Json.obj(
+        "groups" -> Json.obj(),
+        "tasks" -> Json.obj()
+      )
+
+      val metadata = json.as[Metadata]
+      metadata.programs.size must equal (1)
+      metadata.programs.get("default") must be (defined)
+    }
+    "work for multiple programs" in { () =>
+      val json = Json.obj(
+        "one" -> Json.obj(
+          "name" -> "One",
+          "groups" -> Json.obj(),
+          "tasks" -> Json.obj()
+        ),
+        "two" -> Json.obj(
+          "name" -> "Two",
+          "groups" -> Json.obj(),
+          "tasks" -> Json.obj()
+        )
+      )
+
+      val metadata = json.as[Metadata]
+      metadata.programs.size must equal (2)
+      metadata.programs.get("one") must be (defined)
+    }
+  }
 
   "fetchMetadata" must {
     "work with the default value in dev mode" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
       val metadataService = app.injector.instanceOf[MetadataService]
 
-      val metadata = await(metadataService.fetchMetadata)
+      val metadata = await(metadataService.fetchMetadata).programs("default")
       metadata.groups("admin") must contain ("foo@bar.com")
       metadata.tasks.get("start") must be (defined)
     }
