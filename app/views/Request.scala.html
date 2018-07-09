@@ -4,7 +4,7 @@
 
 @this(mainView: Main, taskView: utils.TaskEditOrShow)
 
-@(metadata: _root_.utils.Metadata, request: models.Request, tasks: Seq[(models.Task, Long, Boolean)], userInfo: _root_.utils.UserInfo, canCancelRequest: Boolean)(implicit requestHeader: RequestHeader)
+@(programMetadata: _root_.utils.Program, request: models.Request, tasks: Seq[(models.Task, Long, Boolean)], userInfo: _root_.utils.UserInfo, canCancelRequest: Boolean)(implicit requestHeader: RequestHeader)
 
 @tasksWithState(state: State.State) = @{
     tasks.filter(_._1.state == state)
@@ -35,7 +35,7 @@
                 </div>
 
                 <div class="row">
-                    @if(completedTasks.size == tasks.size && userInfo.isAdmin) {
+                    @if(completedTasks.size == tasks.size && programMetadata.isAdmin(userInfo)) {
                         <div class="col-md-2">
                             <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Completed))" method="post">
                                 <button type="submit" class="btn btn-success">Mark as Completed</button>
@@ -51,14 +51,14 @@
                         </div>
                     }
 
-                    @if(userInfo.isAdmin) {
+                    @if(programMetadata.isAdmin(userInfo)) {
                         <div class="col-md-4">
                             <form action="@helper.CSRF(routes.Application.addTask(request.slug))" method="post" class="form-inline">
                                 <div class="form-group">
                                     <label for="taskPrototypeKey">Add a Task</label>
                                     <select id="taskPrototypeKeySelect" name="taskPrototypeKey" class="form-control">
                                         <option disabled selected value> -- task type -- </option>
-                                        @for((key, taskPrototype) <- metadata.tasks) {
+                                        @for((key, taskPrototype) <- programMetadata.tasks) {
                                             <option value="@key">@taskPrototype.label</option>
                                         }
                                     </select>
@@ -70,7 +70,7 @@
                                 <div id="completableByGroupDiv" class="form-group">
                                     <label for="completableByGroup">Completable By</label>
                                     <select id="completableByGroup" class="form-control">
-                                    @for(group <- metadata.groups.keys) {
+                                    @for(group <- programMetadata.groups.keys) {
                                         <option>@group</option>
                                     }
                                     </select>
@@ -84,7 +84,7 @@
 
             <script>
                 // Only send a completableBy form value if it was needed by the prototype
-                const taskPrototypes = @Html(play.api.libs.json.Json.toJson(metadata.tasks).toString);
+                const taskPrototypes = @Html(play.api.libs.json.Json.toJson(programMetadata.tasks).toString);
 
                 const completableByEmailDiv = document.getElementById("completableByEmailDiv");
                 const completableByGroupDiv = document.getElementById("completableByGroupDiv");
@@ -148,7 +148,7 @@
     </div>
 
     @for(task <- tasks) {
-        @taskView(task._1, task._2, request.state == State.InProgress && task._3, userInfo.isAdmin)
+        @taskView(task._1, task._2, request.state == State.InProgress && task._3, programMetadata.isAdmin(userInfo))
     }
 
 }

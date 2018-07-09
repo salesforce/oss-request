@@ -27,15 +27,15 @@ class DAOMock extends DAO {
   val tasks = ConcurrentHashMap.newKeySet[Task].asScala.toBuffer
   val comments = ConcurrentHashMap.newKeySet[Comment].asScala.toBuffer
 
-  override def createRequest(name: String, creatorEmail: String): Future[Request] = {
+  override def createRequest(program: String, name: String, creatorEmail: String): Future[Request] = {
     Future.successful {
-      val request = Request(DB.slug(name), name, ZonedDateTime.now(), creatorEmail, State.InProgress, None)
+      val request = Request(program, DB.slug(name), name, ZonedDateTime.now(), creatorEmail, State.InProgress, None)
       requests += request
       request
     }
   }
 
-  override def allRequests(): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
+  def allRequests() = {
     Future.sequence {
       requests.map { request =>
         requestTasks(request.slug).map { requestTasks =>
@@ -46,7 +46,11 @@ class DAOMock extends DAO {
     }
   }
 
-  override def requestsForUser(email: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
+  override def programRequests(program: String) = {
+    allRequests().map(_.filter(_._1.program == program))
+  }
+
+  override def userRequests(email: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
     allRequests().map(_.filter(_._1.creatorEmail == email))
   }
 

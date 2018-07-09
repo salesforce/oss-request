@@ -9,7 +9,7 @@ import play.api.mvc.{ActionBuilder, ActionTransformer, AnyContent, BodyParsers, 
 
 import scala.concurrent.{ExecutionContext, Future}
 
-case class UserInfo(email: String, isAdmin: Boolean)
+case class UserInfo(email: String)
 
 class UserRequest[A](val maybeUserInfo: Option[UserInfo], request: Request[A]) extends WrappedRequest[A](request)
 
@@ -17,8 +17,7 @@ class UserAction @Inject()(val parser: BodyParsers.Default)(implicit val executi
   def transform[A](request: Request[A]): Future[UserRequest[A]] = {
 
     val maybeUser = request.session.get("email").map { email =>
-      val isAdmin = request.session.get("isAdmin").exists(_.toBoolean)
-      UserInfo(email, isAdmin)
+      UserInfo(email)
     }
 
     Future.successful(new UserRequest[A](maybeUser, request))

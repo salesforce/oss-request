@@ -14,7 +14,7 @@ import play.api.libs.json.{JsObject, Json}
 import play.api.mvc._
 import play.api.{Configuration, Environment}
 import play.twirl.api.Html
-import utils.{DataFacade, MetadataService, UserAction, UserInfo, UserRequest}
+import utils.{DataFacade, MetadataService, RuntimeReporter, UserAction, UserInfo, UserRequest}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -22,8 +22,8 @@ import scala.xml.{Comment, Node}
 
 
 class Application @Inject()
-  (env: Environment, dataFacade: DataFacade, userAction: UserAction, auth: Auth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, notifyProvider: NotifyProvider)
-  (requestsView: views.html.Requests, newRequestView: views.html.NewRequest, newRequestWithNameView: views.html.NewRequestWithName, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest, notifyTestView: views.html.NotifyTest, loginView: views.html.Login, pickEmailView: views.html.PickEmail, errorView: views.html.Error, openUserTasksView: views.html.OpenUserTasks)
+  (env: Environment, dataFacade: DataFacade, userAction: UserAction, auth: Auth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, notifyProvider: NotifyProvider, runtimeReporter: RuntimeReporter)
+  (requestsView: views.html.Requests, newRequestView: views.html.NewRequest, newRequestFormView: views.html.NewRequestForm, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest, notifyTestView: views.html.NotifyTest, loginView: views.html.Login, pickEmailView: views.html.PickEmail, errorView: views.html.Error, openUserTasksView: views.html.OpenUserTasks)
   (implicit ec: ExecutionContext)
   extends InjectedController {
 
@@ -40,45 +40,92 @@ class Application @Inject()
     userRequest.maybeUserInfo.fold(auth.authUrl.map(Redirect(_)))(f)
   }
 
-  def requests = userAction.async { implicit userRequest =>
+  def openUserTasks = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      val requestsFuture = if (userInfo.isAdmin) {
-        dataFacade.allRequests()
-      }
-      else {
-        dataFacade.requestsForUser(userInfo.email)
-      }
+      metadataService.fetchMetadata.flatMap { metadata =>
+        dataFacade.tasksForUser(userInfo.email, State.InProgress).map { tasks =>
+          val tasksWithProgram = tasks.flatMap { case (task, numComments, request) =>
+            metadata.programs.get(request.program).map { program =>
+              (task, numComments, request, program)
+            }
+          }
 
-      requestsFuture.map { requests =>
-        Ok(requestsView(requests, userInfo))
-      }
-    }
-  }
-
-  def newRequest(maybeName: Option[String]) = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
-      maybeName.fold {
-        Future.successful(Ok(newRequestView(userInfo)))
-      } { name =>
-        metadataService.fetchMetadata.map { metadata =>
-          metadata.tasks.get("start").fold(InternalServerError("Could not find task named 'start'")) { metaTask =>
-            Ok(newRequestWithNameView(name, metaTask, userInfo))
+          // todo: this could be better
+          if (tasks.size == tasksWithProgram.size) {
+            Ok(openUserTasksView(tasksWithProgram, userInfo))
+          }
+          else {
+            InternalServerError("Could not find a specified program")
           }
         }
       }
     }
   }
 
-  def createRequest(name: String) = userAction.async(parse.json) { implicit userRequest =>
+  def requests = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
       metadataService.fetchMetadata.flatMap { metadata =>
-        metadata.tasks.get("start").fold(Future.successful(InternalServerError("Could not find task named 'start'"))) { metaTask =>
-          dataFacade.createRequest(name, userInfo.email).flatMap { request =>
-            completableByWithDefaults(metaTask.completableBy, Some(userInfo.email), None).flatMap(metadata.completableBy).fold {
-              Future.successful(BadRequest("Could not determine who can complete the task"))
-            } { emails =>
-              dataFacade.createTask(request.slug, metaTask, emails.toSeq, Some(userInfo.email), Json.toJson(userRequest.body).asOpt[JsObject], State.Completed).map { task =>
-                Ok(Json.toJson(request))
+
+        val programRequestsFuture = Future.reduceLeft {
+          metadata.programs.map { case (programKey, programMetadata) =>
+            if (programMetadata.isAdmin(userInfo)) {
+              dataFacade.programRequests(programKey)
+            }
+            else {
+              Future.successful(Seq.empty)
+            }
+          }
+        }(_ ++ _)
+
+        val userRequestsFuture = dataFacade.userRequests(userInfo.email)
+
+        for {
+          programRequests <- programRequestsFuture
+          userRequests <- userRequestsFuture
+        } yield {
+          val adminRequests = programRequests.groupBy { case (request, _, _) =>
+            metadata.programs.get(request.program)
+          } collect {
+            case (Some(program), requests) => program -> requests
+          }
+
+          // todo: this just silently drops programs that can't be found
+
+          Ok(requestsView(userRequests, adminRequests, userInfo))
+        }
+      }
+    }
+  }
+
+  def newRequest(maybeName: Option[String], maybeProgramKey: Option[String]) = userAction.async { implicit userRequest =>
+    withUserInfo { userInfo =>
+      metadataService.fetchMetadata.map { metadata =>
+        val maybeTaskView = for {
+          name <- maybeName
+          programKey <- maybeProgramKey
+          programMetadata <- metadata.programs.get(programKey)
+          startTask <- programMetadata.tasks.get("start")
+        } yield Ok(newRequestFormView(programKey, name, startTask, userInfo))
+
+        maybeTaskView.getOrElse(Ok(newRequestView(userInfo, metadata)))
+      }
+    }
+  }
+
+  def createRequest(name: String, programKey: String) = userAction.async(parse.json) { implicit userRequest =>
+    withUserInfo { userInfo =>
+      metadataService.fetchMetadata.flatMap { metadata =>
+        metadata.programs.get(programKey).fold {
+          Future.successful(NotFound(s"Program '$programKey' not found"))
+        } { programMetadata =>
+          programMetadata.tasks.get("start").fold(Future.successful(InternalServerError("Could not find task named 'start'"))) { metaTask =>
+            dataFacade.createRequest(programKey, name, userInfo.email).flatMap { request =>
+              completableByWithDefaults(metaTask.completableBy, Some(userInfo.email), None).flatMap(programMetadata.completableBy).fold {
+                Future.successful(BadRequest("Could not determine who can complete the task"))
+              } { emails =>
+                dataFacade.createTask(request.slug, metaTask, emails.toSeq, Some(userInfo.email), Json.toJson(userRequest.body).asOpt[JsObject], State.Completed).map { task =>
+                  Ok(Json.toJson(request))
+                }
               }
             }
           }
@@ -89,10 +136,14 @@ class Application @Inject()
 
   def request(requestSlug: String) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      dataFacade.request(userInfo.email, requestSlug).flatMap { case (request, isAdmin, canCancelRequest) =>
-        dataFacade.requestTasks(userInfo.email, request.slug).flatMap { tasks =>
-          metadataService.fetchMetadata.map { metadata =>
-            Ok(requestView(metadata, request, tasks, userInfo, canCancelRequest))
+      metadataService.fetchMetadata.flatMap { metadata =>
+        dataFacade.request(userInfo.email, requestSlug).flatMap { case (request, isAdmin, canCancelRequest) =>
+          metadata.programs.get(request.program).fold {
+            Future.successful(InternalServerError(s"Could not find program ${request.program}"))
+          } { program =>
+            dataFacade.requestTasks(userInfo.email, request.slug).map { tasks =>
+              Ok(requestView(program, request, tasks, userInfo, canCancelRequest))
+            }
           }
         }
       } recover {
@@ -111,19 +162,21 @@ class Application @Inject()
 
   def addTask(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
     withUserInfo { userInfo =>
-      val maybeTaskPrototypeKey = userRequest.body.get("taskPrototypeKey").flatMap(_.headOption)
-      val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption).filterNot(_.isEmpty)
+      metadataService.fetchMetadata.flatMap { metadata =>
+        val maybeTaskPrototypeKey = userRequest.body.get("taskPrototypeKey").flatMap(_.headOption)
+        val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption).filterNot(_.isEmpty)
 
-      dataFacade.request(userInfo.email, requestSlug).flatMap { case (request, _, _) =>
-        maybeTaskPrototypeKey.fold(Future.successful(BadRequest("No taskPrototypeKey specified"))) { taskPrototypeKey =>
-          metadataService.fetchMetadata.flatMap { metadata =>
-            metadata.tasks.get(taskPrototypeKey).fold(Future.successful(InternalServerError(s"Could not find task prototype $taskPrototypeKey"))) { taskPrototype =>
-              completableByWithDefaults(taskPrototype.completableBy, Some(request.creatorEmail), maybeCompletableBy).flatMap(metadata.completableBy).fold {
-                Future.successful(BadRequest("Could not determine who can complete the task"))
-              } { emails =>
-                dataFacade.createTask(requestSlug, taskPrototype, emails.toSeq).map { _ =>
-                  Redirect(routes.Application.request(request.slug))
-                }
+        dataFacade.request(userInfo.email, requestSlug).flatMap { case (request, _, _) =>
+          maybeTaskPrototypeKey.fold(Future.successful(BadRequest("No taskPrototypeKey specified"))) { taskPrototypeKey =>
+            val maybeTask = for {
+              programMetadata <- metadata.programs.get(request.program)
+              task <- programMetadata.tasks.get(taskPrototypeKey)
+              completableBy <- completableByWithDefaults(task.completableBy, Some(request.creatorEmail), maybeCompletableBy).flatMap(programMetadata.completableBy)
+            } yield (task, completableBy)
+
+            maybeTask.fold(Future.successful(InternalServerError(s"Could not find task prototype $taskPrototypeKey"))) { case (task, completableBy) =>
+              dataFacade.createTask(requestSlug, task, completableBy.toSeq).map { _ =>
+                Redirect(routes.Application.request(request.slug))
               }
             }
           }
@@ -180,18 +233,10 @@ class Application @Inject()
     }
   }
 
-  def openUserTasks = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
-      dataFacade.tasksForUser(userInfo.email, State.InProgress).map { tasks =>
-        Ok(openUserTasksView(tasks, userInfo))
-      }
-    }
-  }
-
   def formTest = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
       metadataService.fetchMetadata.map { metadata =>
-        Ok(formTestView(userInfo, metadata.tasks))
+        Ok(formTestView(userInfo, metadata))
       }
     }
   }
@@ -235,23 +280,17 @@ class Application @Inject()
   private def login(state: Option[String])(emails: Set[String])(implicit request: RequestHeader): Future[Result] = {
     if (emails.size > 1) {
       metadataService.fetchMetadata.map { metadata =>
-        val emailsWithIsAdmin = emails.map { email =>
-          email -> metadata.admins.contains(email)
-        }.toMap
-
-        Ok(pickEmailView(emailsWithIsAdmin)).withSession("emails" -> emails.mkString(","))
+        Ok(pickEmailView(emails, metadata)).withSession("emails" -> emails.mkString(","))
       }
-
     }
     else if (emails.size == 1) {
       val email = emails.head
 
       metadataService.fetchMetadata.map { metadata =>
-        val isAdmin = metadata.groups("admin").contains(email)
         val url = state.getOrElse(controllers.routes.Application.openUserTasks().url)
 
         // todo: putting this info in the session means we can't easily invalidate it later
-        Redirect(url).withSession("email" -> email, "isAdmin" -> isAdmin.toString)
+        Redirect(url).withSession("email" -> email)
       }
     }
     else {
@@ -271,16 +310,12 @@ class Application @Inject()
     }
   }
 
-  def selectEmail(email: String) = Action.async { request =>
+  def selectEmail(email: String) = Action { request =>
     val maybeValidEmail = request.session.get("emails").map(_.split(",")).getOrElse(Array.empty[String]).find(_ == email)
-    maybeValidEmail.fold(Future.successful(Unauthorized("Email invalid"))) { validEmail =>
-      metadataService.fetchMetadata.map { metadata =>
-        val isAdmin = metadata.groups("admin").contains(validEmail)
-        val url = controllers.routes.Application.openUserTasks().url
-
-        // todo: putting this info in the session means we can't easily invalidate it later
-        Redirect(url).withSession("email" -> validEmail, "isAdmin" -> isAdmin.toString)
-      }
+    maybeValidEmail.fold(Unauthorized("Email invalid")) { validEmail =>
+      val url = controllers.routes.Application.openUserTasks().url
+      // todo: putting this info in the session means we can't easily invalidate it later
+      Redirect(url).withSession("email" -> validEmail)
     }
   }
 

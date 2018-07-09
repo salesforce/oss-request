@@ -15,15 +15,30 @@ import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.transport.{JschConfigSessionFactory, OpenSshConfig, SshTransport}
 import org.eclipse.jgit.util.FS
 import play.api.cache.SyncCacheApi
-import play.api.libs.json.Json
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
 import play.api.{Configuration, Environment, Mode}
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-case class Metadata(groups: Map[String, Set[String]], tasks: Map[String, Task.Prototype]) {
-  val admins = groups.getOrElse("admin", Set.empty[String])
+case class Metadata(programs: Map[String, Program])
+
+object Metadata {
+  val multiprogramReads = Reads.mapReads[Program](Program.jsonReads).map(Metadata(_))
+  val singleprogramReads = Program.jsonReads.map { program =>
+    Metadata(Map("default" -> program))
+  }
+
+  implicit val jsonReads: Reads[Metadata] = multiprogramReads.orElse(singleprogramReads)
+}
+
+case class Program(name: String, groups: Map[String, Set[String]], tasks: Map[String, Task.Prototype]) {
+  val admins: Set[String] = groups.getOrElse("admin", Set.empty[String])
+
+  def isAdmin(userInfo: UserInfo): Boolean = isAdmin(userInfo.email)
+  def isAdmin(email: String): Boolean = admins.contains(email)
 
   def completableBy(completableBy: (CompletableByType.CompletableByType, String)): Option[Set[String]] = {
     val (completableByType, completableByValue) = completableBy
@@ -38,8 +53,12 @@ case class Metadata(groups: Map[String, Set[String]], tasks: Map[String, Task.Pr
   }
 }
 
-object Metadata {
-  implicit val jsonReads = Json.reads[Metadata]
+object Program {
+  implicit val jsonReads: Reads[Program] = (
+    (__ \ "name").read[String].orElse(Reads.pure("Default")) ~
+    (__ \ "groups").read[Map[String, Set[String]]] ~
+    (__ \ "tasks").read[Map[String, Task.Prototype]]
+  )(Program.apply _)
 }
 
 @Singleton
@@ -64,7 +83,7 @@ class MetadataService @Inject() (cache: SyncCacheApi, configuration: Configurati
         val fileInputStream = new FileInputStream(metadataFile)
         val json = Json.parse(fileInputStream)
         fileInputStream.close()
-        json.as[Metadata]
+        json.as[Metadata](Metadata.jsonReads)
       }
       Future.fromTry(metadataTry)
     }

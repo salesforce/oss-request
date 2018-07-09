@@ -4,20 +4,20 @@
 
 @this()
 
-@(newOrExistingTask: Either[(String, models.Task.Prototype, Set[String]), models.Task])(implicit request: RequestHeader)
+@(newOrExistingTask: Either[(String, String, models.Task.Prototype, Set[String]), models.Task])(implicit request: RequestHeader)
 
 @import helper._
 
 @taskPrototype = @{
     newOrExistingTask match {
-        case Left((_, taskPrototype, _)) => taskPrototype
+        case Left((_, _, taskPrototype, _)) => taskPrototype
         case Right(task) => task.prototype
     }
 }
 
 @completableBy = @{
     newOrExistingTask match {
-        case Left((_, _, completableBy)) =>
+        case Left((_, _, _, completableBy)) =>
             completableBy
         case Right(task) =>
             task.completableBy.toSet
@@ -26,7 +26,7 @@
 
 @formUrl(state: models.State.State = State.Completed) = @{
     newOrExistingTask match {
-        case Left((name, _, _)) => CSRF(routes.Application.createRequest(name)).url
+        case Left((programKey, name, _, _)) => CSRF(routes.Application.createRequest(name, programKey)).url
         case Right(task) => CSRF(routes.Application.updateTask(task.requestSlug, task.id, state)).url
     }
 }
@@ -42,6 +42,10 @@
                     <script>
                         (function() {
                             const form = @Html(form.toString());
+
+                            if (form.options === undefined) {
+                              form.options = {};
+                            }
 
                             form.options.form = {
                                 attributes: {

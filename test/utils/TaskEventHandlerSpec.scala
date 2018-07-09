@@ -17,14 +17,15 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
   def taskEventHandler = app.injector.instanceOf[TaskEventHandler]
   def dataFacade = app.injector.instanceOf[DataFacade]
   def metadataService = app.injector.instanceOf[MetadataService]
+  def metadata = await(metadataService.fetchMetadata).programs("default")
   implicit val fakeRequest = FakeRequest()
 
   implicit override def fakeApplication() = DAOMock.noDatabaseAppBuilder().build()
 
   "TaskEventHandler" must {
     "automatically add a new task when the metadata says to do so" in {
-      val taskPrototype = await(metadataService.fetchMetadata).tasks("start")
-      val request = await(dataFacade.createRequest("asdf", "asdf@asdf.com"))
+      val taskPrototype = metadata.tasks("start")
+      val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
       val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
       val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug)).map(_._1)
 
@@ -33,9 +34,9 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
       tasks.exists(_.prototype.label == "IP Approval") mustBe false
     }
     "work with criteria and non-matching data" in {
-      val taskPrototype = await(metadataService.fetchMetadata).tasks("start")
+      val taskPrototype = metadata.tasks("start")
       val data = Json.obj("github_org" -> "Bar")
-      val request = await(dataFacade.createRequest("asdf", "asdf@asdf.com"))
+      val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
       val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), Some(data), State.Completed))
       val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug)).map(_._1)
 
@@ -44,9 +45,9 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
       tasks.exists(_.prototype.label == "IP Approval") mustBe false
     }
     "work with criteria and matching data" in {
-      val taskPrototype = await(metadataService.fetchMetadata).tasks("start")
+      val taskPrototype = metadata.tasks("start")
       val data = Json.obj("github_org" -> "Foo")
-      val request = await(dataFacade.createRequest("asdf", "asdf@asdf.com"))
+      val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
       val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), Some(data), State.Completed))
       val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug)).map(_._1)
 
@@ -55,9 +56,9 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
       tasks.exists(_.prototype.label == "IP Approval") mustBe false
     }
     "work with criteria and matching data that is a boolean" in {
-      val taskPrototype = await(metadataService.fetchMetadata).tasks("start")
+      val taskPrototype = metadata.tasks("start")
       val data = Json.obj("patentable" -> true)
-      val request = await(dataFacade.createRequest("asdf", "asdf@asdf.com"))
+      val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
       val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), Some(data), State.Completed))
       val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug)).map(_._1)
 

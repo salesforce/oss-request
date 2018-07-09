@@ -70,7 +70,7 @@ class ApplyEvolutions(app: Application) {
           Logger.info(s"Migrating task '$label' on request '$slug'")
 
           val maybeAssignTo = completableByType match {
-            case CompletableByType.Group => metadata.groups.get(completableByValue).map(_.toSeq)
+            case CompletableByType.Group => metadata.programs("default").groups.get(completableByValue).map(_.toSeq)
             case CompletableByType.Email => Some(Seq(completableByValue))
             case _ => None
           }

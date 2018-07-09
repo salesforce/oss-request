@@ -15,7 +15,7 @@ import play.api.test.Helpers._
 class SecuritySpec extends PlaySpec with GuiceOneAppPerTest {
 
   def security = app.injector.instanceOf[Security]
-  def metadata = await(app.injector.instanceOf[MetadataService].fetchMetadata)
+  def metadata = await(app.injector.instanceOf[MetadataService].fetchMetadata).programs("default")
   def database = app.injector.instanceOf[Database]
   def dao = app.injector.instanceOf[DAO]
 

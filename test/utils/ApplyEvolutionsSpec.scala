@@ -66,7 +66,7 @@ class ApplyEvolutionsSpec extends PlaySpec with GuiceOneAppPerTest {
       new ApplyEvolutions(app).run
 
       val queryEvolutions = databaseWithCtx.ctx.executeQuerySingle[RowData]("SELECT COUNT(*) FROM play_evolutions")
-      await(queryEvolutions).apply(0) must equal (3)
+      await(queryEvolutions).head.asInstanceOf[Long] must be >= 3L
 
       val dao = app.injector.instanceOf[DAO]
 

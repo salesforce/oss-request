@@ -4,7 +4,7 @@
 
 @this(mainView: Main, webJarsUtil: org.webjars.play.WebJarsUtil)
 
-@(userInfo: _root_.utils.UserInfo, tasks: Map[String, Task.Prototype])(implicit request: RequestHeader)
+@(userInfo: _root_.utils.UserInfo, metadata: _root_.utils.Metadata)(implicit request: RequestHeader)
 
 @extraHead() =  {
     @webJarsUtil.locate("jsoneditor.min.css").css()
@@ -15,12 +15,23 @@
 
     <form class="form-inline">
         <div class="form-group">
+            <label for="programSelect">Program</label>
+            <select id="programSelect" class="form-control input-small">
+                <option disabled selected>Select a Program</option>
+                @for(program <- metadata.programs) {
+                    <option value="@program._1">@program._2.name</option>
+                }
+            </select>
+        </div>
+        <div class="form-group">
             <label for="formSelect">Form to Test</label>
-            <select id="formSelect" class="form-control input-small">
+            <select id="formSelect" class="form-control input-small" disabled>
                 <option disabled selected>Select a Form</option>
-                @for(task <- tasks) {
-                    @for(form <- task._2.form) {
-                        <option value="@task._1" data-json="@JavaScript(form.toString())">@task._2.label</option>
+                @for(program <- metadata.programs) {
+                    @for(task <- program._2.tasks) {
+                        @for(form <- task._2.form) {
+                            <option value="@task._1" data-program="@program._1" data-json="@JavaScript(form.toString())" hidden>@task._2.label</option>
+                        }
                     }
                 }
             </select>
@@ -38,6 +49,7 @@
         var container = document.getElementById("jsoneditor");
         var editor = new JSONEditor(container, {"mode": "code"});
         var form = $("#form");
+        var formSelect = $("#formSelect");
 
         function render(event) {
             event.preventDefault();
@@ -51,6 +63,13 @@
         }
 
         $("#tryit").click(render);
+
+        $("#programSelect").change(function(e) {
+          const program = e.target.value;
+          formSelect.children("option").attr("hidden", "hidden");
+          formSelect.children("[data-program=\"" + program + "\"]").removeAttr("hidden");
+          formSelect.removeAttr('disabled');
+        });
 
         $("#formSelect").change(function() {
           var json = $(this).find(':selected').data('json');

@@ -4,7 +4,7 @@
 
 @this(main: Main)
 
-@(requests: Seq[(models.Request, Long, Long)], userInfo: _root_.utils.UserInfo)(implicit request: RequestHeader)
+@(userRequests: Seq[(models.Request, Long, Long)], adminRequests: Map[_root_.utils.Program, Seq[(models.Request, Long, Long)]], userInfo: _root_.utils.UserInfo)(implicit request: RequestHeader)
 
 @stateClass(state: models.State.State) = {
     @state match {
@@ -20,24 +20,30 @@
     }
 }
 
-@main(Some(userInfo))("OSS Requests") {
-    @if(requests.nonEmpty) {
-        @if(userInfo.isAdmin) {
-            All Requests:
-        } else {
-            Your Requests:
-        }
+@requestList(requests: Seq[(models.Request, Long, Long)], title: String) = {
+    @title
 
+    @if(requests.nonEmpty) {
         <div class="list-group">
-            @for((request, totalTasks, completedTasks) <- requests) {
-                <a href="@routes.Application.request(request.slug)" class="list-group-item @stateClass(request.state)">
-                    <span class="badge" style="margin-top: 25px;">@completedTasks of @totalTasks tasks completed</span>
-                    <h4>@request.name</h4>
-                    <p>Created @views.utils.DateTime.date(request.createDate) </p>
-                </a>
-            }
+        @for((request, totalTasks, completedTasks) <- requests) {
+            <a href="@routes.Application.request(request.slug)" class="list-group-item @stateClass(request.state)">
+                <span class="badge" style="margin-top: 25px;">@completedTasks of @totalTasks tasks completed</span>
+                <h4>@request.name</h4>
+                <p>Created @views.utils.DateTime.date(request.createDate) </p>
+            </a>
+        }
         </div>
     } else {
-        You have no requests!
+        No requests!
     }
+}
+
+@main(Some(userInfo))("OSS Requests") {
+
+    @requestList(userRequests, "Your Requests")
+
+    @for(program <- adminRequests) {
+        @requestList(program._2, s"${program._1.name} Requests")
+    }
+
 }
