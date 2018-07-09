@@ -34,7 +34,7 @@
                     </div>
                 </div>
 
-                <div class="row">
+                <div class="row" style="margin-bottom: 20px;">
                     @if(completedTasks.size == tasks.size && programMetadata.isAdmin(userInfo)) {
                         <div class="col-md-2">
                             <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Completed))" method="post">
@@ -50,12 +50,14 @@
                             </form>
                         </div>
                     }
+                </div>
 
+                <div class="row">
                     @if(programMetadata.isAdmin(userInfo)) {
-                        <div class="col-md-4">
+                        <div class="col-md-12">
                             <form action="@helper.CSRF(routes.Application.addTask(request.slug))" method="post" class="form-inline">
                                 <div class="form-group">
-                                    <label for="taskPrototypeKey">Add a Task</label>
+                                    <label for="taskPrototypeKeySelect">Add a Task</label>
                                     <select id="taskPrototypeKeySelect" name="taskPrototypeKey" class="form-control">
                                         <option disabled selected value> -- task type -- </option>
                                         @for((key, taskPrototype) <- programMetadata.tasks) {
@@ -63,11 +65,11 @@
                                         }
                                     </select>
                                 </div>
-                                <div id="completableByEmailDiv" class="form-group">
+                                <div id="completableByEmailDiv" class="form-group" style="display: none;">
                                     <label for="completableByEmail">Completable By (Email)</label>
                                     <input id="completableByEmail" type="email" class="form-control">
                                 </div>
-                                <div id="completableByGroupDiv" class="form-group">
+                                <div id="completableByGroupDiv" class="form-group" style="display: none;">
                                     <label for="completableByGroup">Completable By</label>
                                     <select id="completableByGroup" class="form-control">
                                     @for(group <- programMetadata.groups.keys) {
@@ -95,7 +97,7 @@
                 completableByEmailDiv.style.display = "none";
                 completableByGroupDiv.style.display = "none";
 
-                taskPrototypeKeySelect.onchange = function(event) {
+                taskPrototypeKeySelect.onchange = function() {
                     const taskPrototype = taskPrototypes[this.value];
 
                     completableByEmailDiv.style.display = "none";
@@ -133,7 +135,7 @@
         }
 
         case _ => {
-            ???
+            Request @request.state.toHuman
         }
     }
 }
