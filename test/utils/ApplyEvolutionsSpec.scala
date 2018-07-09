@@ -80,6 +80,9 @@ class ApplyEvolutionsSpec extends PlaySpec with GuiceOneAppPerTest {
 
       tasks must contain allOf (Seq("asdf@asdf.com"), Seq("foo@bar.com", "zxcv@zxcv.com"))
     }
+    "work when run again" in {
+      new ApplyEvolutions(app).run
+    }
   }
 
 }
