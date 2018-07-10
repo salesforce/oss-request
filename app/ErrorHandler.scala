@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Salesforce.com, inc. 2017
+ * Copyright (c) Salesforce.com, inc. 2018
  */
 
 import javax.inject.{Inject, Provider, Singleton}
