@@ -13,7 +13,7 @@
     } else {
         @for(task <- tasks) {
             <h1>Request: <a href="@routes.Application.request(task._1.requestSlug)">@task._3.name</a></h1>
-            @taskView(task._1, task._2, true, task._4.isAdmin(userInfo))
+            @taskView(task._1, Left(task._2), userInfo, task._4.isAdmin(userInfo))
         }
     }
 

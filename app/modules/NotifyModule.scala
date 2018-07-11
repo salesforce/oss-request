@@ -37,7 +37,7 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
   // todo: move content to templates
 
   def taskAssigned(task: Task)(implicit requestHeader: RequestHeader): Future[_] = {
-    val url = controllers.routes.Application.request(task.requestSlug).absoluteURL()
+    val url = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL()
 
     val subject = s"OSS Request - Task Assigned - ${task.prototype.label}"
     val message =
@@ -50,10 +50,10 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
   }
 
   def taskComment(requestSlug: String, comment: Comment)(implicit requestHeader: RequestHeader): Future[_] = {
-    val url = controllers.routes.Application.request(requestSlug).absoluteURL()
-
     taskCommentInfo(requestSlug, comment).flatMap { case (request, task, emails) =>
       if (emails.nonEmpty) {
+        val url = controllers.routes.Application.task(request.slug, task.id).absoluteURL()
+
         val subject = s"Comment on OSS Request Task - ${request.name} - ${task.prototype.label}"
         val message = s"""
              |${comment.creatorEmail} said:

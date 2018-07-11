@@ -7,6 +7,7 @@ GET         /                                                  controllers.Appli
 GET         /requests                                          controllers.Application.requests
 GET         /request                                           controllers.Application.newRequest(name: Option[String], program: Option[String])
 GET         /request/:requestSlug                              controllers.Application.request(requestSlug: String)
+GET         /request/:requestSlug/task/:taskId                 controllers.Application.task(requestSlug: String, taskId: Int)
 
 # API and Form Post URLs
 POST        /request                                           controllers.Application.createRequest(name: String, program: String)

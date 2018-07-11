@@ -29,7 +29,7 @@
             <a href="@routes.Application.request(request.slug)" class="list-group-item @stateClass(request.state)">
                 <span class="badge" style="margin-top: 25px;">@completedTasks of @totalTasks tasks completed</span>
                 <h4>@request.name</h4>
-                <p>Created @views.utils.DateTime.date(request.createDate) </p>
+                <p>Created @views.utils.DateTime.date(request.createDate) by @request.creatorEmail</p>
             </a>
         }
         </div>

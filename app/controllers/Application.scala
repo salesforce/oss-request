@@ -23,7 +23,7 @@ import scala.xml.{Comment, Node}
 
 class Application @Inject()
   (env: Environment, dataFacade: DataFacade, userAction: UserAction, auth: Auth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, notifyProvider: NotifyProvider, runtimeReporter: RuntimeReporter)
-  (requestsView: views.html.Requests, newRequestView: views.html.NewRequest, newRequestFormView: views.html.NewRequestForm, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest, notifyTestView: views.html.NotifyTest, loginView: views.html.Login, pickEmailView: views.html.PickEmail, errorView: views.html.Error, openUserTasksView: views.html.OpenUserTasks)
+  (requestsView: views.html.Requests, newRequestView: views.html.NewRequest, newRequestFormView: views.html.NewRequestForm, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest, notifyTestView: views.html.NotifyTest, loginView: views.html.Login, pickEmailView: views.html.PickEmail, errorView: views.html.Error, openUserTasksView: views.html.OpenUserTasks, taskView: views.html.Task)
   (implicit ec: ExecutionContext)
   extends InjectedController {
 
@@ -160,6 +160,16 @@ class Application @Inject()
     }
   }
 
+  def task(requestSlug: String, taskId: Int) = userAction.async { implicit userRequest =>
+    withUserInfo { userInfo =>
+      for {
+        (request, isAdmin, _) <- dataFacade.request(userInfo.email, requestSlug)
+        task <- dataFacade.taskById(taskId)
+        comments <- dataFacade.commentsOnTask(taskId)
+      } yield Ok(taskView(request, task, comments, userInfo, isAdmin))
+    }
+  }
+
   def addTask(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
     withUserInfo { userInfo =>
       metadataService.fetchMetadata.flatMap { metadata =>
@@ -216,10 +226,13 @@ class Application @Inject()
   def commentOnTask(requestSlug: String, taskId: Int) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
     withUserInfo { userInfo =>
       val maybeContents = userRequest.body.get("contents").flatMap(_.headOption).filterNot(_.isEmpty)
+      val maybeRedirect = userRequest.body.get("redirect").flatMap(_.headOption)
 
       maybeContents.fold(Future.successful(BadRequest("The contents were empty"))) { contents =>
         dataFacade.commentOnTask(requestSlug, taskId, userInfo.email, contents).map { comment =>
-          Redirect(routes.Application.request(requestSlug))
+          Redirect {
+            maybeRedirect.getOrElse(routes.Application.request(requestSlug).url)
+          }
         }
       }
     }

@@ -58,9 +58,7 @@ class Security @Inject() (dao: DAO, metadataService: MetadataService) (implicit 
     val taskFuture = taskOrTaskId.fold(Future.successful, dao.taskById)
     taskFuture.flatMap { task =>
       dao.request(task.requestSlug).flatMap { request =>
-        isAdmin(request.program, email).map { isAdmin =>
-          isAdmin || task.completableBy.contains(email)
-        }
+        isAdmin(request.program, email).map(Security.canEditTask(email, task))
       }
     }
   }
@@ -89,4 +87,8 @@ class Security @Inject() (dao: DAO, metadataService: MetadataService) (implicit 
 
 object Security {
   case class NotAllowed() extends Exception
+
+  def canEditTask(email: String, task: Task)(isAdmin: Boolean): Boolean = {
+    isAdmin || task.completableBy.contains(email)
+  }
 }

@@ -1,0 +1,15 @@
+@*
+ * Copyright (c) Salesforce.com, inc. 2018
+ *@
+
+@this(mainView: Main, taskView: utils.TaskEditOrShow, commentsView: partials.Comments)
+
+@(request: models.Request, task: models.Task, comments: Seq[Comment], userInfo: _root_.utils.UserInfo, isAdmin: Boolean)(implicit requestHeader: RequestHeader)
+
+@mainView(Some(userInfo))("Task") {
+
+    <h1>Request: <a href="@routes.Application.request(request.slug)">@request.name</a></h1>
+
+    @taskView(task, Right(comments), userInfo, isAdmin)
+
+}

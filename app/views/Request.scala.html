@@ -4,7 +4,7 @@
 
 @this(mainView: Main, taskView: utils.TaskEditOrShow)
 
-@(programMetadata: _root_.utils.Program, request: models.Request, tasks: Seq[(models.Task, Long, Boolean)], userInfo: _root_.utils.UserInfo, canCancelRequest: Boolean)(implicit requestHeader: RequestHeader)
+@(programMetadata: _root_.utils.Program, request: models.Request, tasks: Seq[(models.Task, Long, Boolean)], userInfo: _root_.utils.UserInfo, isAdmin: Boolean)(implicit requestHeader: RequestHeader)
 
 @tasksWithState(state: State.State) = @{
     tasks.filter(_._1.state == state)
@@ -43,7 +43,7 @@
                         </div>
                     }
 
-                    @if(canCancelRequest) {
+                    @if(isAdmin) {
                         <div class="col-md-2">
                             <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Cancelled))" method="post">
                                 <button type="submit" class="btn btn-success">Cancel Request</button>
@@ -150,7 +150,7 @@
     </div>
 
     @for(task <- tasks) {
-        @taskView(task._1, task._2, request.state == State.InProgress && task._3, programMetadata.isAdmin(userInfo))
+        @taskView(task._1, Left(task._2), userInfo, programMetadata.isAdmin(userInfo))
     }
 
 }

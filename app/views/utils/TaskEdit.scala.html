@@ -15,15 +15,6 @@
     }
 }
 
-@completableBy = @{
-    newOrExistingTask match {
-        case Left((_, _, _, completableBy)) =>
-            completableBy
-        case Right(task) =>
-            task.completableBy.toSet
-    }
-}
-
 @formUrl(state: models.State.State = State.Completed) = @{
     newOrExistingTask match {
         case Left((programKey, name, _, _)) => CSRF(routes.Application.createRequest(name, programKey)).url
@@ -85,45 +76,15 @@
                 }
             }
         </div>
-
-        <div class="panel-footer">
-            @utils.AssignedTo(completableBy)
-        </div>
     }
     case models.Task.TaskType.Action => {
         <div class="panel-body">
             <p>@Html(taskPrototype.infoMarkdownToHtml)</p>
         </div>
-        <div class="panel-footer clearfix">
-            <span>@utils.AssignedTo(completableBy)</span>
-
-            <form action="@Html(formUrl())" method="post" class="pull-right">
-                <button type="submit" class="btn btn-success">Mark as Completed</button>
-            </form>
-        </div>
     }
     case models.Task.TaskType.Approval => {
         <div class="panel-body">
             <p>@Html(taskPrototype.infoMarkdownToHtml)</p>
-        </div>
-
-        <div class="panel-footer clearfix">
-            <span>@utils.AssignedTo(completableBy)</span>
-
-            <div class="pull-right">
-                <div class="row">
-                    <div class="col-md-6">
-                        <form action="@Html(formUrl())" method="post">
-                            <button type="submit" class="btn btn-success">Approve</button>
-                        </form>
-                    </div>
-                    <div class="col-md-6">
-                        <form action="@Html(formUrl(models.State.Cancelled))" method="post">
-                            <button type="submit" class="btn btn-warning">Deny</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
         </div>
     }
 }

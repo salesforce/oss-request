@@ -8,13 +8,13 @@
 
 @if(comments.isEmpty) {
     No comments yet
+} else {
+    <div class="list-group">
+        @for(comment <- comments) {
+            <div class="list-group-item">
+                <h4 class="list-group-item-heading">@comment.creatorEmail - @views.utils.DateTime.date(comment.createDate)</h4>
+                <p class="list-group-item-text">@comment.contents</p>
+            </div>
+        }
+    </div>
 }
-
-<div class="list-group">
-    @for(comment <- comments) {
-        <div class="list-group-item">
-            <h4 class="list-group-item-heading">@comment.creatorEmail - @views.utils.DateTime.date(comment.createDate)</h4>
-            <p class="list-group-item-text">@comment.contents</p>
-        </div>
-    }
-</div>

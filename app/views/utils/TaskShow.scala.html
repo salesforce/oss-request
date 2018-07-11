@@ -28,62 +28,16 @@
                 }
             }
         </div>
-        @task.state match {
-            case models.State.Completed => {
-                @for(completedDate <- task.completedDate) {
-                    @for(completedByEmail <-  task.completedByEmail) {
-                        <div class="panel-footer">Completed on @views.utils.DateTime.date(completedDate) by @completedByEmail</div>
-                    }
-                }
-            }
-            case models.State.Cancelled => {
-                <div class="panel-footer">Task Cancelled</div>
-            }
-            case models.State.InProgress => {
-                <div class="panel-footer">@views.html.utils.AssignedTo(task.completableBy.toSet)</div>
-            }
-        }
-
     }
     case models.Task.TaskType.Action => {
         <div class="panel-body">
             <p>@Html(task.prototype.infoMarkdownToHtml)</p>
         </div>
-        @task.state match {
-            case models.State.Completed => {
-                @for(completedDate <- task.completedDate) {
-                    @for(completedByEmail <- task.completedByEmail) {
-                        <div class="panel-footer">Completed on @views.utils.DateTime.date(completedDate) by @completedByEmail</div>
-                    }
-                }
-            }
-            case models.State.Cancelled => {
-                <div class="panel-footer">Task Cancelled</div>
-            }
-            case models.State.InProgress => {
-                <div class="panel-footer">@views.html.utils.AssignedTo(task.completableBy.toSet)</div>
-            }
-        }
     }
     case models.Task.TaskType.Approval => {
         <div class="panel-body">
             <p>@Html(task.prototype.infoMarkdownToHtml)</p>
         </div>
-        @task.state match {
-            case models.State.Completed => {
-                @for(completedDate <- task.completedDate) {
-                    @for(completedByEmail <- task.completedByEmail) {
-                        <div class="panel-footer">Approved on @views.utils.DateTime.date(completedDate) by @completedByEmail</div>
-                    }
-                }
-            }
-            case models.State.Cancelled => {
-                <div class="panel-footer">Denied</div>
-            }
-            case models.State.InProgress => {
-                <div class="panel-footer">@views.html.utils.AssignedTo(task.completableBy.toSet)</div>
-            }
-        }
     }
 }
 
