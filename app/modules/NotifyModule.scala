@@ -29,6 +29,7 @@ class NotifyModule extends Module {
 }
 
 trait NotifyProvider {
+  // todo: constrain Set to be non-empty
   def sendMessage(emails: Set[String], subject: String, message: String): Future[_]
 }
 
@@ -52,16 +53,19 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
     val url = controllers.routes.Application.request(requestSlug).absoluteURL()
 
     taskCommentInfo(requestSlug, comment).flatMap { case (request, task, emails) =>
-      val subject = s"Comment on OSS Request Task - ${request.name} - ${task.prototype.label}"
-      val message =
-        s"""
-           |${comment.creatorEmail} said:
-           |${comment.contents}
-           |
-         |Respond: $url
-      """.stripMargin
+      if (emails.nonEmpty) {
+        val subject = s"Comment on OSS Request Task - ${request.name} - ${task.prototype.label}"
+        val message = s"""
+             |${comment.creatorEmail} said:
+             |${comment.contents}
+             |
+             |Respond: $url""".stripMargin
 
-      notifyProvider.sendMessage(emails, subject, message)
+        notifyProvider.sendMessage(emails, subject, message)
+      }
+      else {
+        Future.unit
+      }
     }
   }
 
