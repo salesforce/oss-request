@@ -1,3 +1,4 @@
+import com.typesafe.sbt.license.{DepModuleInfo, LicenseInfo}
 import de.heikoseeberger.sbtheader.FileType
 import play.twirl.sbt.Import.TwirlKeys
 
@@ -55,3 +56,12 @@ javaOptions in Test := Seq("-Dlogger.resource=logback-test.xml")
 // license report stuff
 
 licenseConfigurations := Set("runtime")
+
+licenseOverrides := {
+  case DepModuleInfo("ch.qos.logback", _, _) =>
+    LicenseInfo(LicenseCategory.EPL, "Eclipse Public License - v 1.0", "http://www.eclipse.org/legal/epl-v10.html")
+  case DepModuleInfo("javax.transaction", "jta", _) =>
+    LicenseInfo(LicenseCategory.CDDL, "CDDL + GPLv2 with classpath exception", "https://opensource.org/licenses/CDDL-1.0")
+  case DepModuleInfo("tyrex", _, _) =>
+    LicenseInfo(LicenseCategory.BSD, "BSD-like", "http://tyrex.sourceforge.net/license.html")
+}
