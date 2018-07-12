@@ -36,6 +36,26 @@ trait NotifyProvider {
 class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvider: NotifyProvider)(implicit ec: ExecutionContext) {
   // todo: move content to templates
 
+  def taskStateChanged(task: Task)(implicit requestHeader: RequestHeader): Future[_] = {
+    dao.request(task.requestSlug).flatMap { request =>
+      if (!task.completedByEmail.contains(request.creatorEmail)) {
+        val url = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL()
+
+        val subject = s"OSS Request ${request.name} - Task ${task.prototype.label} is now ${task.state.toHuman}"
+        val message =
+          s"""
+             |On your OSS Request ${request.name}, the ${task.prototype.label} task is now ${task.state.toHuman}.
+             |For details, see: $url
+        """.stripMargin
+
+        notifyProvider.sendMessage(Set(request.creatorEmail), subject, message)
+      }
+      else {
+        Future.unit
+      }
+    }
+  }
+
   def taskAssigned(task: Task)(implicit requestHeader: RequestHeader): Future[_] = {
     val url = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL()
 

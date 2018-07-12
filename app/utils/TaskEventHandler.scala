@@ -13,7 +13,7 @@ import scala.util.Try
 
 class TaskEventHandler @Inject()(dao: DAO, metadataService: MetadataService)(implicit ec: ExecutionContext) {
 
-  def process(requestSlug: String, eventType: TaskEvent.EventType.EventType, task: Task): Future[Seq[_]] = {
+  def process(requestSlug: String, eventType: TaskEvent.EventType.EventType, task: Task, createTask: (String, Task.Prototype, Seq[String]) => Future[Task]): Future[Seq[_]] = {
     Future.sequence {
       task.prototype.taskEvents.filter { taskEvent =>
         taskEvent.`type` == eventType && taskEvent.value == task.state.toString
@@ -56,7 +56,7 @@ class TaskEventHandler @Inject()(dao: DAO, metadataService: MetadataService)(imp
                       taskPrototype.completableBy.fold(Future.failed[Task](new Exception("Could not create task because it does not have completable_by info"))) { completableBy =>
                         completableBy.value.fold(Future.failed[Task](new Exception("Could not create task because it does not have a completable_by value"))) { completableByValue =>
                           program.completableBy(completableBy.`type`, completableByValue).fold(Future.failed[Task](new Exception("Could not create task because it can't be assigned to anyone"))) { emails =>
-                            dao.createTask(requestSlug, taskPrototype, emails.toSeq)
+                            createTask(requestSlug, taskPrototype, emails.toSeq)
                           }
                         }
                       }

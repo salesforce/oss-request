@@ -5,7 +5,6 @@
 package utils
 
 import javax.inject.Inject
-import models.Task.CompletableByType.CompletableByType
 import models.{Comment, Request, State, Task, TaskEvent}
 import modules.{DAO, Notifier}
 import play.api.libs.json.JsObject
@@ -23,7 +22,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notifie
   def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress)(implicit requestHeader: RequestHeader): Future[Task] = {
     for {
       task <- dao.createTask(requestSlug, prototype, completableBy, maybeCompletedBy, maybeData, state)
-      _ <- taskEventHandler.process(requestSlug, TaskEvent.EventType.StateChange, task)
+      _ <- taskEventHandler.process(requestSlug, TaskEvent.EventType.StateChange, task, createTask(_, _, _))
       _ <- if (state == State.InProgress) notifier.taskAssigned(task) else Future.unit
     } yield task
   }
@@ -56,11 +55,12 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notifie
     } yield (request, isAdmin, canCancelRequest)
   }
 
-  def updateTaskState(email: String, taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task] = {
+  def updateTaskState(email: String, taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject])(implicit requestHeader: RequestHeader): Future[Task] = {
     for {
       _ <- security.updateTask(email, taskId)
       task <- dao.updateTaskState(taskId, state, maybeCompletedBy, maybeData)
-      _ <- taskEventHandler.process(task.requestSlug, TaskEvent.EventType.StateChange, task)
+      _ <- notifier.taskStateChanged(task)
+      _ <- taskEventHandler.process(task.requestSlug, TaskEvent.EventType.StateChange, task, createTask(_, _, _))
     } yield task
   }
 
