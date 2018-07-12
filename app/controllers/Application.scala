@@ -14,7 +14,7 @@ import play.api.libs.json.{JsObject, Json}
 import play.api.mvc._
 import play.api.{Configuration, Environment}
 import play.twirl.api.Html
-import utils.{DataFacade, MetadataService, RuntimeReporter, UserAction, UserInfo, UserRequest}
+import utils.{DataFacade, MetadataService, Program, RuntimeReporter, UserAction, UserInfo, UserRequest}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -166,7 +166,9 @@ class Application @Inject()
         (request, isAdmin, _) <- dataFacade.request(userInfo.email, requestSlug)
         task <- dataFacade.taskById(taskId)
         comments <- dataFacade.commentsOnTask(taskId)
-      } yield Ok(taskView(request, task, comments, userInfo, isAdmin))
+        metadata <- metadataService.fetchMetadata
+        program <- metadata.programs.get(request.program).fold(Future.failed[Program](new Exception("Program not found")))(Future.successful)
+      } yield Ok(taskView(request, task, comments, userInfo, isAdmin, program.groups.keySet))
     }
   }
 
@@ -201,12 +203,38 @@ class Application @Inject()
     }
   }
 
-  def updateTask(requestSlug: String, taskId: Int, state: State.State) = userAction.async(maybeJsObject) { implicit userRequest =>
+  def updateTaskState(requestSlug: String, taskId: Int, state: State.State) = userAction.async(maybeJsObject) { implicit userRequest =>
     withUserInfo { userInfo =>
-      dataFacade.updateTask(userInfo.email, taskId, state, Some(userInfo.email), userRequest.body).map { task =>
+      dataFacade.updateTaskState(userInfo.email, taskId, state, Some(userInfo.email), userRequest.body).map { task =>
         render {
           case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
           case Accepts.Json() => Ok(Json.toJson(task))
+        }
+      }
+    }
+  }
+
+  def updateTaskAssignment(requestSlug: String, taskId: Int) = userAction.async(parse.json) { implicit userRequest =>
+    withUserInfo { userInfo =>
+      metadataService.fetchMetadata.flatMap { metadata =>
+        dataFacade.request(userInfo.email, requestSlug).flatMap { case (request, _, _) =>
+          val maybeCompletableBy = (userRequest.body \ "email").asOpt[String].map { email =>
+            CompletableByType.Email -> email
+          } orElse {
+            (userRequest.body \ "group").asOpt[String].map { group =>
+              CompletableByType.Group -> group
+            }
+          } flatMap { case (completableByType, completableByValue) =>
+            metadata.programs.get(request.program).flatMap { program =>
+              program.completableBy(completableByType, completableByValue)
+            }
+          }
+
+          maybeCompletableBy.fold(Future.successful(BadRequest("Must specify an email or group"))) { emails =>
+            dataFacade.assignTask(userInfo.email, taskId, emails.toSeq).map { _ =>
+              Ok
+            }
+          }
         }
       }
     }

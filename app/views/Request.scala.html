@@ -150,7 +150,7 @@
     </div>
 
     @for(task <- tasks) {
-        @taskView(task._1, Left(task._2), userInfo, programMetadata.isAdmin(userInfo))
+        @taskView(task._1, Left(task._2), userInfo, programMetadata.isAdmin(userInfo), programMetadata.groups.keySet)
     }
 
 }

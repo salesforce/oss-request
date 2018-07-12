@@ -5,6 +5,7 @@
 package utils
 
 import javax.inject.Inject
+import models.Task.CompletableByType.CompletableByType
 import models.{Comment, Request, State, Task, TaskEvent}
 import modules.{DAO, Notifier}
 import play.api.libs.json.JsObject
@@ -47,7 +48,6 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notifie
     } yield request
   }
 
-
   def request(email: String, requestSlug: String): Future[(Request, Boolean, Boolean)] = {
     for {
       request <- dao.request(requestSlug)
@@ -56,11 +56,19 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notifie
     } yield (request, isAdmin, canCancelRequest)
   }
 
-  def updateTask(email: String, taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task] = {
+  def updateTaskState(email: String, taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task] = {
     for {
       _ <- security.updateTask(email, taskId)
-      task <- dao.updateTask(taskId, state, maybeCompletedBy, maybeData)
+      task <- dao.updateTaskState(taskId, state, maybeCompletedBy, maybeData)
       _ <- taskEventHandler.process(task.requestSlug, TaskEvent.EventType.StateChange, task)
+    } yield task
+  }
+
+  def assignTask(email: String, taskId: Int, emails: Seq[String])(implicit requestHeader: RequestHeader): Future[Task] = {
+    for {
+      _ <- security.updateTask(email, taskId)
+      task <- dao.assignTask(taskId, emails)
+      _ <- notifier.taskAssigned(task)
     } yield task
   }
 

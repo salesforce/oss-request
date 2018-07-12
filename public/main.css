@@ -11,7 +11,7 @@ body {
     padding-top: 7px;
 }
 
-.panel-footer span {
+.panel-footer span .assignment-list {
     line-height: 32px;
 }
 

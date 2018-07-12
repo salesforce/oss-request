@@ -72,7 +72,7 @@
             </div>
 
             <div class="modal fade" id="confirmModal" tabindex="-1">
-                <div class="modal-dialog modal-lg">
+                <div class="modal-dialog modal-sm">
                     <div class="modal-content">
                         <div class="modal-header">
                             <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
@@ -80,6 +80,41 @@
                         </div>
                         <div class="modal-footer">
                             <button id="confirmButton" type="submit" class="btn btn-danger">Do It!</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="reassignModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                            <h4 class="modal-title">Reassign Task</h4>
+                        </div>
+                        <div class="modal-body">
+                            <form class="form-horizontal">
+                                <div class="form-group">
+                                    <label for="reassignEmail" class="col-sm-2 control-label">Email</label>
+                                    <div class="col-sm-4">
+                                        <input type="email" class="form-control" id="reassignEmail">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="col-sm-2 control-label">Or</label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="reassignGroup" class="col-sm-2 control-label">Group</label>
+                                    <div class="col-sm-4">
+                                        <select class="form-control" id="reassignGroup">
+                                        </select>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <span id="reassignError"></span>
+                            <button id="reassignButton" type="submit" class="btn btn-warning">Reassign</button>
                         </div>
                     </div>
                 </div>

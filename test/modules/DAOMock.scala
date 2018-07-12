@@ -54,7 +54,7 @@ class DAOMock extends DAO {
     allRequests().map(_.filter(_._1.creatorEmail == email))
   }
 
-  override def updateTask(taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task] = {
+  override def updateTaskState(taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task] = {
     tasks.find(_.id == taskId).fold(Future.failed[Task](new Exception("Task not found"))) { task =>
       val updatedTask = task.copy(
         state = state,

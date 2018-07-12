@@ -38,7 +38,7 @@ trait DAO {
   def request(requestSlug: String): Future[Request]
   def updateRequest(requestSlug: String, state: State.State): Future[Request]
   def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task]
-  def updateTask(taskId: Int, state: State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task]
+  def updateTaskState(taskId: Int, state: State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task]
   def deleteTask(taskId: Int): Future[Unit]
   def assignTask(taskId: Int, emails: Seq[String]): Future[Task]
   def taskById(taskId: Int): Future[Task]
@@ -176,7 +176,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def updateTask(taskId: Int, state: State, maybeCompletedByEmail: Option[String], maybeData: Option[JsObject]): Future[Task] = {
+  override def updateTaskState(taskId: Int, state: State, maybeCompletedByEmail: Option[String], maybeData: Option[JsObject]): Future[Task] = {
     // todo: move this to a validation module via the DAO
     if (state == State.Completed && maybeCompletedByEmail.isEmpty) {
       Future.failed(new Exception("maybeCompletedByEmail was not specified"))
