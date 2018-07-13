@@ -45,13 +45,33 @@ pipelineStages := Seq(digest, gzip)
 
 WebKeys.webJars in Assets := Seq.empty[File]
 
-headerLicense := Some(HeaderLicense.Custom("Copyright (c) Salesforce.com, inc. 2018"))
+// license header stuff
+
+organizationName := "Salesforce.com, Inc."
+
+startYear := Some(2018)
+
+licenses += "BSD-3-Clause" -> url("https://opensource.org/licenses/BSD-3-Clause")
 
 headerMappings += FileType("html") -> HeaderCommentStyle.twirlStyleBlockComment
 
-unmanagedSources.in(Compile, headerCreate) ++= sources.in(Compile, TwirlKeys.compileTemplates).value
+headerLicense := Some(
+  HeaderLicense.Custom(
+    """|Copyright (c) 2018, Salesforce.com, Inc.
+       |All rights reserved.
+       |SPDX-License-Identifier: BSD-3-Clause
+       |For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+       |""".stripMargin
+  )
+)
+
+headerSources.in(Compile) ++= sources.in(Compile, TwirlKeys.compileTemplates).value
+
+
+// Override logging in test
 
 javaOptions in Test := Seq("-Dlogger.resource=logback-test.xml")
+
 
 // license report stuff
 
