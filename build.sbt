@@ -36,6 +36,7 @@ libraryDependencies ++= Seq(
   "org.webjars"            %  "handlebars"                         % "4.0.11-1",
   "org.webjars"            %  "alpaca"                             % "1.5.23",
   "org.webjars.npm"        %  "jsoneditor"                         % "5.17.1",
+  "org.webjars.npm"        %  "github-com-alexcorvi-anchorme-js"   % "1.1.2",
   "org.planet42"           %% "laika-core"                         % "0.7.5",
 
   "org.scalatestplus.play" %% "scalatestplus-play"                 % "3.1.2" % "test"

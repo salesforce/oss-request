@@ -98,7 +98,7 @@
           "type": "GROUP",
           "value": "admin"
         },
-        "info": "Please review the request and assign tasks"
+        "info": "Please review the request and assign tasks [more info](http://asdf.com)"
       },
       "ip_approval": {
         "label": "IP Approval",

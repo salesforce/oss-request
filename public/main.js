@@ -20,7 +20,7 @@ $(function () {
       newCommentForm.show();
 
       $.get(commentsUrl, function (data) {
-        modal.find('.modal-body').html(data);
+        modal.find('.modal-body').html(anchorme(data));
       });
     }
   });

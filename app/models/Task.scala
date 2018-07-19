@@ -10,11 +10,9 @@ package models
 import java.time.ZonedDateTime
 
 import io.getquill.MappedEncoding
-import laika.api.Transform
-import laika.parse.markdown.Markdown
-import laika.render.HTML
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
+import utils.MarkdownTransformer
 
 case class Task(id: Int, completableBy: Seq[String], completedByEmail: Option[String], completedDate: Option[ZonedDateTime], state: State.State, prototype: Task.Prototype, data: Option[JsObject], requestSlug: String)
 
@@ -22,7 +20,7 @@ object Task {
 
   case class Prototype(label: String, `type`: TaskType.TaskType, info: String, completableBy: Option[CompletableBy] = None, form: Option[JsObject] = None, taskEvents: Seq[TaskEvent] = Seq.empty[TaskEvent]) {
     lazy val infoMarkdownToHtml = {
-      Transform.from(Markdown).to(HTML).fromString(info).toString()
+      MarkdownTransformer.transform(info)
     }
   }
 
