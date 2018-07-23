@@ -13,6 +13,7 @@ import models.{State, Task}
 import modules.{Auth, DB, NotifyProvider}
 import org.webjars.WebJarAssetLocator
 import org.webjars.play.WebJarsUtil
+import play.api.data.Form
 import play.api.libs.json.{JsObject, Json}
 import play.api.mvc._
 import play.api.{Configuration, Environment}
@@ -275,6 +276,10 @@ class Application @Inject()
         Ok(commentsView(comments))
       }
     }
+  }
+
+  def emailReply = Action.async(parse.form(notifyProvider.form)) { request =>
+    Future.successful(NotImplemented)
   }
 
   def formTest = userAction.async { implicit userRequest =>

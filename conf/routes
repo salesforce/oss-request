@@ -19,6 +19,9 @@ DELETE      /request/:requestSlug/task/:taskId                 controllers.Appli
 GET         /request/:requestSlug/task/:taskId/comments        controllers.Application.commentsOnTask(requestSlug: String, taskId: Int)
 POST        /request/:requestSlug/task/:taskId/comments        controllers.Application.commentOnTask(requestSlug: String, taskId: Int)
 
++ nocsrf
+POST        /email_reply                                       controllers.Application.emailReply
+
 GET         /form-test                                         controllers.Application.formTest()
 GET         /notify-test                                       controllers.Application.notifyTest()
 POST        /notify-test                                       controllers.Application.notifyTestSend()

@@ -7,8 +7,13 @@
 
 package modules
 
+import com.roundeights.hasher.Algo
 import javax.inject.{Inject, Singleton}
 import models.{Comment, Request, Task}
+import play.api.data.Forms._
+import play.api.data.{Form, _}
+import play.api.data.format.Formats._
+import play.api.data.format.Formatter
 import play.api.http.{HeaderNames, Status}
 import play.api.inject.{Binding, Module}
 import play.api.libs.json.{JsObject, Json}
@@ -33,7 +38,14 @@ class NotifyModule extends Module {
 
 trait NotifyProvider {
   // todo: constrain Set to be non-empty
-  def sendMessage(emails: Set[String], subject: String, message: String): Future[_]
+  def sendMessage(emails: Set[String], subject: String, message: String, data: JsObject = JsObject.empty): Future[_]
+
+  implicit object EmailReplyFormatter extends Formatter[EmailReply] {
+    override def bind(key: String, data: Map[String, String]): Either[Seq[FormError], EmailReply] = Left(Seq.empty)
+    override def unbind(key: String, value: EmailReply): Map[String, Nothing] = Map.empty
+  }
+
+  val form: Form[EmailReply] = Form[EmailReply](of[EmailReply])
 }
 
 class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvider: NotifyProvider)(implicit ec: ExecutionContext) {
@@ -84,7 +96,12 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
              |
              |Respond: $url""".stripMargin
 
-        notifyProvider.sendMessage(emails, subject, message)
+        val data = Json.obj(
+          "request-slug" -> requestSlug,
+          "comment-id" -> comment.id
+        )
+
+        notifyProvider.sendMessage(emails, subject, message, data)
       }
       else {
         Future.unit
@@ -118,7 +135,7 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
 }
 
 class NotifyLogger @Inject()(implicit executionContext: ExecutionContext) extends NotifyProvider {
-  override def sendMessage(emails: Set[String], subject: String, message: String): Future[Unit] = {
+  override def sendMessage(emails: Set[String], subject: String, message: String, data: JsObject = JsObject.empty): Future[Unit] = {
     Logger.info(s"Notification '$subject' for $emails - $message")
     Future.unit
   }
@@ -134,7 +151,7 @@ class NotifySparkPost @Inject()(configuration: Configuration, wSClient: WSClient
   lazy val user = configuration.get[String]("sparkpost.user")
   lazy val from = user + "@" + maybeDomain.getOrElse("sparkpostbox.com")
 
-  override def sendMessage(emails: Set[String], subject: String, message: String): Future[String] = {
+  override def sendMessage(emails: Set[String], subject: String, message: String, data: JsObject = JsObject.empty): Future[String] = {
     val f = sendMessageWithResponse(emails, subject, message).flatMap { response =>
       response.status match {
         case Status.OK =>
@@ -175,8 +192,11 @@ class NotifySparkPost @Inject()(configuration: Configuration, wSClient: WSClient
 
     wSClient.url(baseUrl + "/transmissions").withHttpHeaders(HeaderNames.AUTHORIZATION -> apiKey).post(json)
   }
+
 }
 
+// todo: type class
+case class EmailReply(sender: String, body: String, messageHeaders: JsObject)
 
 @Singleton
 class NotifyMailgun @Inject()(configuration: Configuration, wSClient: WSClient, runtimeReporter: RuntimeReporter)(implicit ec: ExecutionContext) extends NotifyProvider {
@@ -187,8 +207,8 @@ class NotifyMailgun @Inject()(configuration: Configuration, wSClient: WSClient, 
   lazy val from = user + "@" + domain
   lazy val baseUrl = s"https://api.mailgun.net/v3/$domain/messages"
 
-  override def sendMessage(emails: Set[String], subject: String, message: String): Future[String] = {
-    val f = sendMessageWithResponse(emails, subject, message).flatMap { response =>
+  override def sendMessage(emails: Set[String], subject: String, message: String, data: JsObject = JsObject.empty): Future[String] = {
+    val f = sendMessageWithResponse(emails, subject, message, data).flatMap { response =>
       response.status match {
         case Status.OK =>
           Future.successful(response.body)
@@ -202,15 +222,44 @@ class NotifyMailgun @Inject()(configuration: Configuration, wSClient: WSClient, 
     f
   }
 
-  def sendMessageWithResponse(emails: Set[String], subject: String, message: String): Future[WSResponse] = {
-    val data = Map(
+  def sendMessageWithResponse(emails: Set[String], subject: String, message: String, data: JsObject = JsObject.empty): Future[WSResponse] = {
+    val form = Map(
       "from" -> Seq(from),
       "to" -> emails.toSeq,
       "subject" -> Seq(subject),
-      "text" -> Seq(message)
+      "text" -> Seq(message),
+      "v:my-custom-data" -> Seq(data.toString)
     )
 
-    wSClient.url(baseUrl).withAuth("api", apiKey, WSAuthScheme.BASIC).post(data)
+    wSClient.url(baseUrl).withAuth("api", apiKey, WSAuthScheme.BASIC).post(form)
   }
 
+  implicit object JsObjectFormatter extends Formatter[JsObject] {
+    override val format = Some(("format.jsobject", Nil))
+    override def bind(key: String, data: Map[String, String]) = parsing(Json.parse(_).as[JsObject], "error.jsobject", Nil)(key, data)
+    override def unbind(key: String, value: JsObject) = Map(key -> value.toString)
+  }
+
+  case class Webhook(sender: String, text: String, timestamp: Int, token: String, signature: String, headers: JsObject) {
+    def toEmailReply: EmailReply = EmailReply(sender, text, headers)
+  }
+
+  val webhookMapping: Mapping[Webhook] = mapping(
+    "sender" -> email,
+    "stripped-text" -> text,
+    "timestamp" -> number,
+    "token" -> text,
+    "signature" -> text,
+    "message-headers" -> of[JsObject]
+  )(Webhook.apply)(Webhook.unapply)
+
+  def validate(webhook: Webhook): Boolean = {
+    val data = webhook.timestamp + webhook.token
+    Algo.hmac(apiKey).sha256(data).hex == webhook.signature
+  }
+
+  val emailReplyMapping: Mapping[EmailReply] = webhookMapping.verifying(webhook => validate(webhook)).transform(_.toEmailReply, { throw new Exception("Can't convert to a Webhook") })
+
+  // todo: type class?
+  override val form: Form[EmailReply] = Form(emailReplyMapping)
 }

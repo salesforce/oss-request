@@ -31,6 +31,8 @@ libraryDependencies ++= Seq(
 
   "javax.cache"            %  "cache-api"                          % "1.1.0",
 
+  "com.roundeights"        %% "hasher"                             % "1.2.0",
+
   "org.webjars"            %% "webjars-play"                       % "2.6.3",
   "org.webjars"            %  "salesforce-lightning-design-system" % "2.4.1",
   "org.webjars"            %  "handlebars"                         % "4.0.11-1",

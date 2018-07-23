@@ -14,6 +14,7 @@ import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.db.Database
 import play.api.db.evolutions.Evolutions
 import play.api.inject.bind
+import play.api.libs.json.JsObject
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
 
@@ -99,7 +100,7 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 class NotifyMock extends NotifyProvider {
   val notifications = collection.mutable.Set.empty[(Set[String], String, String)]
 
-  override def sendMessage(emails: Set[String], subject: String, message: String): Future[Unit] = {
+  override def sendMessage(emails: Set[String], subject: String, message: String, data: JsObject): Future[Unit] = {
     val notification = (emails, subject, message)
     notifications += notification
     Future.unit
