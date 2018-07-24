@@ -290,7 +290,12 @@ class Application @Inject()
       taskId <- (request.body.data \ "task-id").asOpt[Int]
     } yield (requestSlug, taskId)
 
-    maybeRequestSlugAndCommentId.fold(Future.successful(NotAcceptable)) { case (requestSlug, taskId) =>
+    maybeRequestSlugAndCommentId.fold {
+      val emailBody = "Sorry, but we couldn't figure out what to do with your email:\n\n" + request.body.body
+      notifyProvider.sendMessage(Set(request.body.sender), "OSS Request Email Not Handled", emailBody).map { _ =>
+        NotAcceptable
+      }
+    } { case (requestSlug, taskId) =>
       dataFacade.commentOnTask(requestSlug, taskId, request.body.sender, request.body.body).map { _ =>
         Ok
       }
