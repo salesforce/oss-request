@@ -70,6 +70,34 @@
                     }
                 </div>
             }
+
+            <script>
+                function programKey() {
+                    const radioVal = $('input[name=program]:checked').val();
+                    const inputVal = $('input[name=program]').val();
+                    if (radioVal !== undefined) {
+                        return radioVal;
+                    }
+                    else {
+                        return inputVal;
+                    }
+                }
+
+                function refreshStartTask() {
+                    $('.start-task').hide();
+                    $('.start-task[data-program=' + programKey() + ']').show();
+
+                    const startTask = $('.input[data-program=' + programKey() + ']').val();
+                    $('input[name=startTask]').val(startTask);
+                }
+
+                $(function () {
+                    refreshStartTask();
+                    $('input[name=program]').change(refreshStartTask);
+                    $('select.input').change(refreshStartTask);
+                });
+            </script>
+
         } { startTask =>
             <input type="hidden" name="startTask" value="@startTask">
         }
@@ -80,31 +108,5 @@
             </div>
         </div>
     </form>
-
-    <script>
-        function programKey() {
-          const radioVal = $('input[name=program]:checked').val();
-          const inputVal = $('input[name=program]').val();
-          if (radioVal !== undefined) {
-            return radioVal;
-          }
-          else {
-            return inputVal;
-          }
-        }
-
-        function refreshStartTask() {
-          $('.start-task').hide();
-          $('.start-task[data-program=' + programKey() + ']').show();
-
-          const startTask = $('.input[data-program=' + programKey() + ']').val();
-          $('input[name=startTask]').val(startTask);
-        }
-
-        $(function () {
-           refreshStartTask();
-           $('input[name=program]').change(refreshStartTask);
-        });
-    </script>
 
 }
