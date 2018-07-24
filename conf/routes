@@ -5,12 +5,12 @@
 # User Visible URLs
 GET         /                                                  controllers.Application.openUserTasks
 GET         /requests                                          controllers.Application.requests
-GET         /request                                           controllers.Application.newRequest(name: Option[String], program: Option[String])
+GET         /request                                           controllers.Application.newRequest(name: Option[String], program: Option[String], startTask: Option[String])
 GET         /request/:requestSlug                              controllers.Application.request(requestSlug: String)
 GET         /request/:requestSlug/task/:taskId                 controllers.Application.task(requestSlug: String, taskId: Int)
 
 # API and Form Post URLs
-POST        /request                                           controllers.Application.createRequest(name: String, program: String)
+POST        /request                                           controllers.Application.createRequest(name: String, program: String, startTask: String)
 POST        /request/:requestSlug                              controllers.Application.updateRequest(requestSlug: String, state: models.State.State)
 POST        /request/:requestSlug/task                         controllers.Application.addTask(requestSlug: String)
 POST        /request/:requestSlug/task/:taskId/state           controllers.Application.updateTaskState(requestSlug: String, taskId: Int, state: models.State.State)

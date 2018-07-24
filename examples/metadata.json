@@ -131,6 +131,7 @@
   },
   "two": {
     "name": "Program Two",
+    "start_tasks": ["oss_request_info", "another_task"],
     "groups": {
       "admin": [
         "foo@bar.com",
@@ -141,7 +142,7 @@
       ]
     },
     "tasks": {
-      "start": {
+      "oss_request_info": {
         "label": "OSS Request Info",
         "type": "INPUT",
         "info": "Please fill in all the info for your OSS request.",
@@ -149,8 +150,25 @@
           "schema": {
             "type": "object",
             "properties": {
-              "project_name": {
+              "project_description": {
                 "title": "Project Description",
+                "type": "string",
+                "required": true
+              }
+            }
+          }
+        }
+      },
+      "another_task": {
+        "label": "Another Task",
+        "type": "INPUT",
+        "info": "Fill out the form",
+        "form": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "favorite_color": {
+                "title": "What is your favorite color?",
                 "type": "string",
                 "required": true
               }

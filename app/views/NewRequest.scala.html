@@ -7,25 +7,26 @@
 
 @this(mainView: Main)
 
-@(userInfo: _root_.utils.UserInfo, metadata: _root_.utils.Metadata)(implicit request: RequestHeader)
+@(userInfo: _root_.utils.UserInfo, metadata: _root_.utils.Metadata, maybeName: Option[String], maybeProgramKey: Option[String], maybeStartTask: Option[String])(implicit request: RequestHeader)
 
 @mainView(Some(userInfo))("New Request") {
 
-    <form action="@routes.Application.newRequest(None, None)" method="get" class="form-horizontal">
+    <form id="new-request-form" action="@routes.Application.newRequest(None, None, None)" method="get" class="form-horizontal">
         <div class="form-group">
             <label for="name" class="col-sm-2 control-label">Request Name</label>
             <div class="col-sm-3">
-                <input id="name" name="name" required class="form-control">
+                <input id="name" name="name" required class="form-control" @for(name <- maybeName) { value="@name" }>
             </div>
         </div>
 
-        @if(metadata.programs.size == 1) {
-            <input name="program" value="@metadata.programs.head._1" type="hidden">
-        } else {
-            <div class="form-group">
-                <label for="program" class="col-sm-2 control-label">Program</label>
+        @maybeProgramKey.fold {
+            @if(metadata.programs.size == 1) {
+                <input name="program" value="@metadata.programs.head._1" type="hidden">
+            } else {
+                <div class="form-group">
+                    <label for="program" class="col-sm-2 control-label">Program</label>
 
-                <div class="col-sm-6">
+                    <div class="col-sm-6">
                     @for(program <- metadata.programs) {
                         <div class="radio">
                             <label>
@@ -37,8 +38,40 @@
                             </label>
                         </div>
                     }
+                    </div>
                 </div>
-            </div>
+            }
+        } { programKey =>
+            <input type="hidden" name="program" value="@programKey">
+        }
+
+        @maybeStartTask.fold {
+            <input type="hidden" name="startTask">
+            @for(program <- metadata.programs) {
+                <div class="start-task" data-program="@program._1" style="display: none">
+                    @if(program._2.startTasks.isEmpty) {
+                        <input type="hidden" class="input" data-program="@program._1" value="start">
+                    } else if(program._2.startTasks.size == 1) {
+                        <input type="hidden" class="input" data-program="@program._1" value="@program._2.startTasks.head">
+                    } else {
+                        <div class="form-group">
+                            <label for="startTask-@program._1" class="col-sm-2 control-label">Start With</label>
+
+                            <div class="col-sm-3">
+                                <select id="startTask-@program._1" data-program="@program._1" class="form-control input" required>
+                                    @for(taskKey <- program._2.startTasks) {
+                                        @for(task <- program._2.tasks.get(taskKey)) {
+                                            <option value="@taskKey">@task.label</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        } { startTask =>
+            <input type="hidden" name="startTask" value="@startTask">
         }
 
         <div class="form-group">
@@ -47,5 +80,27 @@
             </div>
         </div>
     </form>
+
+    <script>
+        function programKey() {
+          return $('input[name=program]:checked').val();
+        }
+
+        function refreshStartTask() {
+          $('.start-task').hide();
+          $('.start-task[data-program=' + programKey() + ']').show();
+        }
+
+        $(function () {
+           refreshStartTask();
+
+           $('input[name=program]').change(refreshStartTask);
+
+           $('#new-request-form').submit(function(event) {
+             const startTask = $('.input[data-program=' + programKey() + ']').val();
+             $('input[name=startTask]').val(startTask);
+           });
+        });
+    </script>
 
 }

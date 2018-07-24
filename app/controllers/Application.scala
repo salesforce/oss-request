@@ -101,28 +101,29 @@ class Application @Inject()
     }
   }
 
-  def newRequest(maybeName: Option[String], maybeProgramKey: Option[String]) = userAction.async { implicit userRequest =>
+  def newRequest(maybeName: Option[String], maybeProgramKey: Option[String], maybeStartTask: Option[String]) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
       metadataService.fetchMetadata.map { metadata =>
         val maybeTaskView = for {
           name <- maybeName
           programKey <- maybeProgramKey
           programMetadata <- metadata.programs.get(programKey)
-          startTask <- programMetadata.tasks.get("start")
-        } yield Ok(newRequestFormView(programKey, name, startTask, userInfo))
+          startTask <- maybeStartTask
+          task <- programMetadata.tasks.get(startTask)
+        } yield Ok(newRequestFormView(programKey, name, startTask, task, userInfo))
 
-        maybeTaskView.getOrElse(Ok(newRequestView(userInfo, metadata)))
+        maybeTaskView.getOrElse(Ok(newRequestView(userInfo, metadata, maybeName, maybeProgramKey, maybeStartTask)))
       }
     }
   }
 
-  def createRequest(name: String, programKey: String) = userAction.async(parse.json) { implicit userRequest =>
+  def createRequest(name: String, programKey: String, startTask: String) = userAction.async(parse.json) { implicit userRequest =>
     withUserInfo { userInfo =>
       metadataService.fetchMetadata.flatMap { metadata =>
         metadata.programs.get(programKey).fold {
           Future.successful(NotFound(s"Program '$programKey' not found"))
         } { programMetadata =>
-          programMetadata.tasks.get("start").fold(Future.successful(InternalServerError("Could not find task named 'start'"))) { metaTask =>
+          programMetadata.tasks.get(startTask).fold(Future.successful(InternalServerError(s"Could not find task named '$startTask'"))) { metaTask =>
             dataFacade.createRequest(programKey, name, userInfo.email).flatMap { request =>
               completableByWithDefaults(metaTask.completableBy, Some(userInfo.email), None).flatMap(programMetadata.completableBy).fold {
                 Future.successful(BadRequest("Could not determine who can complete the task"))
