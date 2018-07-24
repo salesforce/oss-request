@@ -104,15 +104,19 @@ class Application @Inject()
   def newRequest(maybeName: Option[String], maybeProgramKey: Option[String], maybeStartTask: Option[String]) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
       metadataService.fetchMetadata.map { metadata =>
+        val nonEmptyMaybeName = maybeName.filter(_.nonEmpty)
+        val nonEmptyMaybeProgramKey = maybeProgramKey.filter(_.nonEmpty)
+        val nonEmptyMaybeStartTask = maybeStartTask.filter(_.nonEmpty)
+
         val maybeTaskView = for {
-          name <- maybeName
-          programKey <- maybeProgramKey
+          name <- nonEmptyMaybeName
+          programKey <- nonEmptyMaybeProgramKey
           programMetadata <- metadata.programs.get(programKey)
-          startTask <- maybeStartTask
+          startTask <- nonEmptyMaybeStartTask
           task <- programMetadata.tasks.get(startTask)
         } yield Ok(newRequestFormView(programKey, name, startTask, task, userInfo))
 
-        maybeTaskView.getOrElse(Ok(newRequestView(userInfo, metadata, maybeName, maybeProgramKey, maybeStartTask)))
+        maybeTaskView.getOrElse(Ok(newRequestView(userInfo, metadata, nonEmptyMaybeName, nonEmptyMaybeProgramKey, nonEmptyMaybeStartTask)))
       }
     }
   }
