@@ -278,8 +278,18 @@ class Application @Inject()
     }
   }
 
-  def emailReply = Action.async(parse.form(notifyProvider.form)) { request =>
-    Future.successful(NotImplemented)
+  def emailReply = Action.async(parse.form(notifyProvider.form)) { implicit request =>
+
+    val maybeRequestSlugAndCommentId = for {
+      requestSlug <- (request.body.data \ "request-slug").asOpt[String]
+      taskId <- (request.body.data \ "task-id").asOpt[Int]
+    } yield (requestSlug, taskId)
+
+    maybeRequestSlugAndCommentId.fold(Future.successful(NotAcceptable)) { case (requestSlug, taskId) =>
+      dataFacade.commentOnTask(requestSlug, taskId, request.body.sender, request.body.body).map { _ =>
+        Ok
+      }
+    }
   }
 
   def formTest = userAction.async { implicit userRequest =>

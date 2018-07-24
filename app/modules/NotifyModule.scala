@@ -98,7 +98,7 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
 
         val data = Json.obj(
           "request-slug" -> requestSlug,
-          "comment-id" -> comment.id
+          "task-id" -> task.id
         )
 
         notifyProvider.sendMessage(emails, subject, message, data)
@@ -196,7 +196,7 @@ class NotifySparkPost @Inject()(configuration: Configuration, wSClient: WSClient
 }
 
 // todo: type class
-case class EmailReply(sender: String, body: String, messageHeaders: JsObject)
+case class EmailReply(sender: String, body: String, data: JsObject)
 
 @Singleton
 class NotifyMailgun @Inject()(configuration: Configuration, wSClient: WSClient, runtimeReporter: RuntimeReporter)(implicit ec: ExecutionContext) extends NotifyProvider {
@@ -235,22 +235,28 @@ class NotifyMailgun @Inject()(configuration: Configuration, wSClient: WSClient, 
   }
 
   implicit object JsObjectFormatter extends Formatter[JsObject] {
+    def parse(s: String): JsObject = {
+      Json.parse((Json.parse(s).as[JsObject] \ "my-custom-data").as[String]).as[JsObject]
+    }
+
     override val format = Some(("format.jsobject", Nil))
-    override def bind(key: String, data: Map[String, String]) = parsing(Json.parse(_).as[JsObject], "error.jsobject", Nil)(key, data)
+    override def bind(key: String, data: Map[String, String]) = parsing(parse, "error.jsobject", Nil)(key, data).left.flatMap { _ =>
+      Right(Json.obj())
+    }
     override def unbind(key: String, value: JsObject) = Map(key -> value.toString)
   }
 
-  case class Webhook(sender: String, text: String, timestamp: Int, token: String, signature: String, headers: JsObject) {
-    def toEmailReply: EmailReply = EmailReply(sender, text, headers)
+  case class Webhook(sender: String, text: String, timestamp: Long, token: String, signature: String, data: JsObject) {
+    def toEmailReply: EmailReply = EmailReply(sender, text, data)
   }
 
   val webhookMapping: Mapping[Webhook] = mapping(
     "sender" -> email,
     "stripped-text" -> text,
-    "timestamp" -> number,
+    "timestamp" -> longNumber,
     "token" -> text,
     "signature" -> text,
-    "message-headers" -> of[JsObject]
+    "X-Mailgun-Variables" -> of[JsObject]
   )(Webhook.apply)(Webhook.unapply)
 
   def validate(webhook: Webhook): Boolean = {
@@ -258,7 +264,7 @@ class NotifyMailgun @Inject()(configuration: Configuration, wSClient: WSClient, 
     Algo.hmac(apiKey).sha256(data).hex == webhook.signature
   }
 
-  val emailReplyMapping: Mapping[EmailReply] = webhookMapping.verifying(webhook => validate(webhook)).transform(_.toEmailReply, { throw new Exception("Can't convert to a Webhook") })
+  val emailReplyMapping: Mapping[EmailReply] = webhookMapping.verifying(webhook => validate(webhook)).transform(_.toEmailReply, { _ => throw new Exception("Can't convert to a Webhook") })
 
   // todo: type class?
   override val form: Form[EmailReply] = Form(emailReplyMapping)

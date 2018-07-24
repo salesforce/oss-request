@@ -7,6 +7,9 @@
 
 package modules
 
+import java.time.{LocalDateTime, ZoneOffset}
+
+import com.roundeights.hasher.Algo
 import javax.inject.Singleton
 import models.Task
 import org.scalatestplus.play.PlaySpec
@@ -14,12 +17,12 @@ import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.db.Database
 import play.api.db.evolutions.Evolutions
 import play.api.inject.bind
-import play.api.libs.json.JsObject
+import play.api.libs.json.{JsObject, Json}
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
 
 import scala.concurrent.Future
-import scala.util.Try
+import scala.util.{Random, Try}
 
 class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 
@@ -89,8 +92,69 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       assume(Try(notifyMailgun.apiKey).isSuccess)
       assume(Try(testRecipient).isSuccess)
 
-      val response = await(notifyMailgun.sendMessageWithResponse(Set(testRecipient), "test", "test"))
+      val response = await(notifyMailgun.sendMessageWithResponse(Set(testRecipient), "test", "test", Json.obj("test" -> "asdf")))
       response.status must equal (OK)
+    }
+  }
+
+  "Mailgun form" must {
+    "work" in {
+      assume(Try(notifyMailgun.apiKey).isSuccess)
+
+      val sender = "asdf@asdf.com"
+      val text = "test"
+      val timestamp = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
+      val token = Random.alphanumeric.take(32).mkString
+      val signature = Algo.hmac(notifyMailgun.apiKey).sha256(timestamp + token).hex
+
+      val data = Map(
+        "sender" -> sender,
+        "stripped-text" -> text,
+        "timestamp" -> timestamp.toString,
+        "token" -> token,
+        "signature" -> signature
+      )
+
+      val form = notifyMailgun.form.bind(data)
+
+      form.value must be (defined)
+      form.value.get.sender must equal (sender)
+      form.value.get.body must equal (text)
+      form.value.get.data must equal (Json.obj())
+    }
+    "work with json message headers" in {
+      assume(Try(notifyMailgun.apiKey).isSuccess)
+
+      val timestamp = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
+      val token = Random.alphanumeric.take(32).mkString
+      val signature = Algo.hmac(notifyMailgun.apiKey).sha256(timestamp + token).hex
+      val json = Json.obj("foo" -> "bar")
+
+      val data = Map(
+        "sender" -> "asdf@asdf.com",
+        "stripped-text" -> "text",
+        "timestamp" -> timestamp.toString,
+        "token" -> token,
+        "signature" -> signature,
+        "X-Mailgun-Variables" -> Json.obj(
+          "my-custom-data" -> json.toString()
+        ).toString()
+      )
+
+      notifyMailgun.form.bind(data).get.data must equal (json)
+    }
+    "not work with invalid signature" in {
+      assume(Try(notifyMailgun.apiKey).isSuccess)
+
+      val data = Map(
+        "sender" -> "asdf@asdf.com",
+        "stripped-text" -> "text",
+        "timestamp" -> LocalDateTime.now().toEpochSecond(ZoneOffset.UTC).toString,
+        "token" -> "asdf",
+        "signature" -> "asdf"
+      )
+
+      notifyMailgun.form.bind(data).hasErrors must be (true)
     }
   }
 
