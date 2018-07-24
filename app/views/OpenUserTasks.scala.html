@@ -11,7 +11,7 @@
 @main(Some(userInfo))("Your Open Tasks") {
 
     @if(tasks.isEmpty) {
-        You have no open tasks. Woot!
+        You have no open tasks. w00t!
     } else {
         @for(task <- tasks) {
             <h1>Request: <a href="@routes.Application.request(task._1.requestSlug)">@task._3.name</a></h1>
