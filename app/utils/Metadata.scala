@@ -37,7 +37,7 @@ object Metadata {
   implicit val jsonReads: Reads[Metadata] = multiprogramReads.orElse(singleprogramReads)
 }
 
-case class Program(name: String, groups: Map[String, Set[String]], tasks: Map[String, Task.Prototype]) {
+case class Program(name: String, description: Option[String], groups: Map[String, Set[String]], tasks: Map[String, Task.Prototype]) {
   val admins: Set[String] = groups.getOrElse("admin", Set.empty[String])
 
   def isAdmin(userInfo: UserInfo): Boolean = isAdmin(userInfo.email)
@@ -54,11 +54,14 @@ case class Program(name: String, groups: Map[String, Set[String]], tasks: Map[St
       }
     }
   }
+
+  def descriptionMarkdown = description.map(MarkdownTransformer.transform)
 }
 
 object Program {
   implicit val jsonReads: Reads[Program] = (
     (__ \ "name").read[String].orElse(Reads.pure("Default")) ~
+    (__ \ "description").readNullable[String] ~
     (__ \ "groups").read[Map[String, Set[String]]] ~
     (__ \ "tasks").read[Map[String, Task.Prototype]]
   )(Program.apply _)

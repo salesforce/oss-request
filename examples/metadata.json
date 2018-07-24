@@ -1,6 +1,7 @@
 {
   "default": {
     "name": "Default Program",
+    "description": "This is the normal open source program - [more info](http://asdf.com)",
     "groups": {
       "admin": [
         "foo@bar.com",
