@@ -134,6 +134,13 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       await(dao.deleteTask(task1.id)) must equal (())
       await(dao.requestTasks(request.slug)).size must equal (1)
     }
+    "work when there are comments on the task" in Evolutions.withEvolutions(database) {
+      val request = await(dao.createRequest("foo", "foo@bar.com"))
+      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
+      val task = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
+      await(dao.commentOnTask(task.id, "foo@foo.com", "asdf"))
+      await(dao.deleteTask(task.id)) must equal (())
+    }
   }
 
   "requestTasks" must {

@@ -201,11 +201,12 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
   }
 
   override def deleteTask(taskId: Index): Future[Unit] = {
-    run {
-      quote {
-        query[Task].filter(_.id == lift(taskId)).delete
-      }
-    }.map(_ => ())
+    val deletes = for {
+      _ <- runIO(query[Comment].filter(_.taskId == lift(taskId)).delete)
+      _ <- runIO(query[Task].filter(_.id == lift(taskId)).delete)
+    } yield ()
+
+    performIO(deletes.transactional)
   }
 
   def assignTask(taskId: Int, emails: Seq[String]): Future[Task] = {
