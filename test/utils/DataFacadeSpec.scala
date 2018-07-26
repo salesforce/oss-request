@@ -48,7 +48,7 @@ class DataFacadeSpec extends MixedPlaySpec {
         val request = await(dataFacade.createRequest("default", "foo", "foo@bar.com"))
         val prototype = Task.Prototype("asdf", Task.TaskType.Approval, "asdf")
         await(dataFacade.createTask(request.slug, prototype, Seq("foo@foo.com")))
-        an[Exception] must be thrownBy await(dataFacade.createTask(request.slug, prototype, Seq("foo@foo.com")))
+        a[DataFacade.DuplicateTaskException] must be thrownBy await(dataFacade.createTask(request.slug, prototype, Seq("foo@foo.com")))
       }
     }
     "work when task dependencies are met" in new App(withDb) {
@@ -67,7 +67,7 @@ class DataFacadeSpec extends MixedPlaySpec {
       Evolutions.withEvolutions(database) {
         val request = await(dataFacade.createRequest("default", "foo", "foo@bar.com"))
         val prototype = Task.Prototype("asdf", Task.TaskType.Approval, "asdf", None, None, Seq.empty[TaskEvent], Set("start"))
-        an[Exception] must be thrownBy await(dataFacade.createTask(request.slug, prototype, Seq("foo@foo.com")))
+        a[DataFacade.MissingTaskDependencyException] must be thrownBy await(dataFacade.createTask(request.slug, prototype, Seq("foo@foo.com")))
       }
     }
     "fail when task dependencies are not met because dep isn't completed" in new App(withDb) {
@@ -77,7 +77,7 @@ class DataFacadeSpec extends MixedPlaySpec {
         val prototype = Task.Prototype("asdf", Task.TaskType.Approval, "asdf", None, None, Seq.empty[TaskEvent], Set("start"))
         val startPrototype = await(metadataService.fetchProgram("default")).tasks("start")
         await(dataFacade.createTask(request.slug, startPrototype, Seq("foo@foo.com")))
-        an[Exception] must be thrownBy await(dataFacade.createTask(request.slug, prototype, Seq("foo@foo.com")))
+        a[DataFacade.MissingTaskDependencyException] must be thrownBy await(dataFacade.createTask(request.slug, prototype, Seq("foo@foo.com")))
       }
     }
     "work with services" in new Server(withDb) {

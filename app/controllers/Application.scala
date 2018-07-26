@@ -200,6 +200,9 @@ class Application @Inject()
             maybeTask.fold(Future.successful(InternalServerError(s"Could not find task prototype $taskPrototypeKey"))) { case (task, completableBy) =>
               dataFacade.createTask(requestSlug, task, completableBy.toSeq).map { _ =>
                 Redirect(routes.Application.request(request.slug))
+              } recover {
+                case e @ (_: DataFacade.DuplicateTaskException | _: DataFacade.MissingTaskDependencyException) =>
+                  BadRequest(errorView(e.getMessage, userInfo))
               }
             }
           }

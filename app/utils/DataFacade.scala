@@ -32,13 +32,13 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
 
       existingTasks = existingTasksWithComments.map(_._1)
 
-      if !existingTasks.exists(_.prototype == prototype)
+      _ <- if (!existingTasks.exists(_.prototype == prototype)) Future.unit else Future.failed(DataFacade.DuplicateTaskException())
 
       program <- metadataService.fetchProgram(request.program)
 
       dependencyTaskPrototypes = prototype.dependencies.flatMap(program.tasks.get)
 
-      if dependencyTaskPrototypes.subsetOf(existingTasks.filter(_.state == State.Completed).map(_.prototype).toSet)
+      _ <- if (dependencyTaskPrototypes.subsetOf(existingTasks.filter(_.state == State.Completed).map(_.prototype).toSet)) Future.unit else Future.failed(DataFacade.MissingTaskDependencyException())
 
       task <- dao.createTask(requestSlug, prototype, completableBy, maybeCompletedBy, maybeData, state)
 
@@ -156,4 +156,9 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     dao.tasksForUser(email, state)
   }
 
+}
+
+object DataFacade {
+  case class DuplicateTaskException() extends Exception("The task already exists on the request")
+  case class MissingTaskDependencyException() extends Exception("This task depends on a task that either does not exist or isn't completed")
 }
