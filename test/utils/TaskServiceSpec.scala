@@ -28,6 +28,12 @@ class TaskServiceSpec extends MixedPlaySpec {
 
   def updateTaskStateFail(state: State.State, maybeUrl: Option[String], maybeData: Option[JsObject]): Future[Task] = Future.failed(new Exception())
 
+  def updateTaskState(task: Task)(state: State.State, maybeUrl: Option[String], maybeData: Option[JsObject]): Future[Task] = {
+    Future.successful {
+      task.copy(state = state, completedBy = maybeUrl, data = maybeData)
+    }
+  }
+
   "taskCreated" must {
     "not do anything if the task isn't assign to a service" in new App(DAOMock.noDatabaseAppBuilder().build()) {
       val request = Request("two", "asdf", "asdf", ZonedDateTime.now(), "asdf@asdf.com", State.InProgress, None)
@@ -54,13 +60,7 @@ class TaskServiceSpec extends MixedPlaySpec {
       val taskPrototype = program.tasks("create_repo")
       val url = controllers.routes.Application.createDemoRepo().absoluteURL(false, s"localhost:$port")
       val task = Task(1, ZonedDateTime.now(), Seq(url), None, None, State.InProgress, taskPrototype, None, request.slug)
-      def updateTaskState(state: State.State, maybeUrl: Option[String], maybeData: Option[JsObject]): Future[Task] = {
-        Future.successful {
-          task.copy(state = state, completedBy = maybeUrl, data = maybeData)
-        }
-      }
-
-      val updatedTask = await(taskService.taskCreated(program, request, task, Seq.empty[Task], "http://asdf.com", updateTaskState))
+      val updatedTask = await(taskService.taskCreated(program, request, task, Seq.empty[Task], "http://asdf.com", updateTaskState(task)))
       updatedTask.completedBy must equal (Some("http://asdf.com"))
     }
   }
@@ -69,15 +69,15 @@ class TaskServiceSpec extends MixedPlaySpec {
     "fail when the service is unreachable" in new App(DAOMock.noDatabaseAppBuilder().build()) {
       val taskPrototype = program.tasks("create_repo")
       val task = Task(1, ZonedDateTime.now(), Seq("http://localhost:12345/"), None, None, State.InProgress, taskPrototype, None, "asdf")
-      an[Exception] must be thrownBy await(taskService.taskStatus(task))
+      an[Exception] must be thrownBy await(taskService.taskStatus(task, updateTaskStateFail))
     }
     "work when the task exists" in new Server(DAOMock.noDatabaseAppBuilder().build()) {
       val taskPrototype = program.tasks("create_repo")
       val dao = app.injector.instanceOf[DAO]
       val url = controllers.routes.Application.createDemoRepo().absoluteURL(false, s"localhost:$port")
       val task = await(dao.createTask("asdf", taskPrototype, Seq(url)))
-      val response = await(taskService.taskStatus(task))
-      response.maybeData must be (defined)
+      val updatedTask = await(taskService.taskStatus(task, updateTaskState(task)))
+      updatedTask.completedBy must equal (Some("http://asdf.com"))
     }
   }
 

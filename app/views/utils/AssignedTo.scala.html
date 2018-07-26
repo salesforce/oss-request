@@ -5,11 +5,19 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  *@
 
-@(completableBy: Seq[String])
+@(task: models.Task)
 
-
-@if(completableBy.size == 1) {
-    Assigned to: @completableBy.head
-} else {
-    Assigned to any of: @completableBy.mkString(", ")
+@task.completableByEmailsOrUrl match {
+    case Left(emails) => {
+        @if(emails.size == 1) {
+            Assigned to: @emails.head
+        } else {
+            Assigned to any of: @emails.mkString(", ")
+        }
+    }
+    case Right(url) => {
+        @defining(task.completedBy.getOrElse(url)) { serviceUrl =>
+            Assigned to service: <a href="@serviceUrl">@serviceUrl</a>
+        }
+    }
 }

@@ -25,18 +25,36 @@
 @assignedToUser = @{task.completableBy.contains(userInfo.email)}
 
 @assignment = {
-    <span class="assignment-list">@views.html.utils.AssignedTo(task.completableBy)</span>
+    <span class="assignment-list">@views.html.utils.AssignedTo(task)</span>
 
-    @if(assignedToUser || isAdmin) {
+    @if(task.completableByEmailsOrUrl.isLeft && (assignedToUser || isAdmin)) {
         <button type="button" class="btn btn-default btn-xs" title="Reassign" data-toggle="modal" data-target="#reassignModal" data-url="@helper.CSRF(routes.Application.updateTaskAssignment(task.requestSlug, task.id))" data-groups="@groups.mkString(",")">
             <span class="glyphicon glyphicon-pencil" style="padding-top: 5px"></span>
         </button>
     }
 }
 
+@completed = {
+    @for(completedDate <- task.completedDate) {
+        @for(completedBy <- task.completedBy) {
+            <div class="panel-footer">
+                Completed on @views.utils.DateTime.date(completedDate) by
+                @task.completableByEmailsOrUrl match {
+                    case Left(emails) => {
+                        @completedBy
+                    }
+                    case Right(url) => {
+                        <a href="@completedBy">@completedBy</a>
+                    }
+                }
+            </div>
+        }
+    }
+}
+
 <div class="panel @panelType">
     <div class="panel-heading clearfix">
-        <h3 class="panel-title pull-left">@task.prototype.label</h3>
+        <h3 class="panel-title pull-left"><a href="@routes.Application.task(task.requestSlug, task.id)">@task.prototype.label</a></h3>
         <div class="pull-right">
             <div class="row">
                 @commentCountOrComments match {
@@ -98,11 +116,7 @@
         case models.Task.TaskType.Input => {
             @task.state match {
                 case models.State.Completed => {
-                    @for(completedDate <- task.completedDate) {
-                        @for(completedByEmail <- task.completedBy) {
-                            <div class="panel-footer">Completed on @views.utils.DateTime.date(completedDate) by @completedByEmail</div>
-                        }
-                    }
+                    @completed
                 }
                 case models.State.Cancelled => {
                     <div class="panel-footer">Task Cancelled</div>
@@ -117,11 +131,7 @@
         case models.Task.TaskType.Action => {
             @task.state match {
                 case models.State.Completed => {
-                    @for(completedDate <- task.completedDate) {
-                        @for(completedByEmail <- task.completedBy) {
-                            <div class="panel-footer">Completed on @views.utils.DateTime.date(completedDate) by @completedByEmail</div>
-                        }
-                    }
+                    @completed
                 }
                 case models.State.Cancelled => {
                     <div class="panel-footer">Task Cancelled</div>
@@ -145,11 +155,7 @@
         case models.Task.TaskType.Approval => {
             @task.state match {
                 case models.State.Completed => {
-                    @for(completedDate <- task.completedDate) {
-                        @for(completedByEmail <- task.completedBy) {
-                            <div class="panel-footer">Approved on @views.utils.DateTime.date(completedDate) by @completedByEmail</div>
-                        }
-                    }
+                    @completed
                 }
                 case models.State.Cancelled => {
                     <div class="panel-footer">Denied</div>

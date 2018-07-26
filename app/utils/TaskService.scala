@@ -117,16 +117,24 @@ class TaskService @Inject()(configuration: Configuration, wsClient: WSClient)(im
     }
   }
 
-  def taskStatus(task: Task): Future[ServiceResponse] = {
-    wsRequest(task).flatMap { wsRequest =>
-      wsRequest.withQueryStringParameters("requestSlug" -> task.requestSlug, "taskId" -> task.id.toString).get().flatMap { response =>
-        response.status match {
-          case Status.OK =>
-            parseResponse(response.body)
-          case _ =>
-            Future.failed(new Exception(response.body))
+  def taskStatus(task: Task, updateTaskState: (State.State, Option[String], Option[JsObject]) => Future[Task]): Future[Task] = {
+    if (task.prototype.completableBy.exists(_.`type` == CompletableByType.Service)) {
+      wsRequest(task).flatMap { wsRequest =>
+        println(wsRequest.url)
+        wsRequest.withQueryStringParameters("requestSlug" -> task.requestSlug, "taskId" -> task.id.toString).get().flatMap { response =>
+          response.status match {
+            case Status.OK =>
+              parseResponse(response.body).flatMap { serviceResponse =>
+                updateTaskState(serviceResponse.state, Some(serviceResponse.url.toString), serviceResponse.maybeData)
+              }
+            case _ =>
+              Future.failed(new Exception(response.body))
+          }
         }
       }
+    }
+    else {
+      Future.successful(task)
     }
   }
 

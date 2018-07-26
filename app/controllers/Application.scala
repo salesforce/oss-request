@@ -12,7 +12,7 @@ import java.time.ZonedDateTime
 import javax.inject.Inject
 import models.Task.CompletableByType
 import models.{State, Task}
-import modules.{Auth, DB, NotifyProvider}
+import modules.{Auth, DAO, DB, NotifyProvider}
 import org.webjars.WebJarAssetLocator
 import org.webjars.play.WebJarsUtil
 import play.api.data.Form
@@ -28,7 +28,7 @@ import scala.xml.{Comment, Node}
 
 
 class Application @Inject()
-  (env: Environment, dataFacade: DataFacade, userAction: UserAction, auth: Auth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, notifyProvider: NotifyProvider, runtimeReporter: RuntimeReporter)
+  (env: Environment, dataFacade: DataFacade, userAction: UserAction, auth: Auth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, notifyProvider: NotifyProvider, runtimeReporter: RuntimeReporter, dao: DAO)
   (requestsView: views.html.Requests, newRequestView: views.html.NewRequest, newRequestFormView: views.html.NewRequestForm, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest, notifyTestView: views.html.NotifyTest, loginView: views.html.Login, pickEmailView: views.html.PickEmail, errorView: views.html.Error, openUserTasksView: views.html.OpenUserTasks, taskView: views.html.Task)
   (implicit ec: ExecutionContext)
   extends InjectedController {
@@ -422,7 +422,8 @@ class Application @Inject()
     }
   }
 
-  def demoRepo(requestSlug: String, taskId: Int) = Action.async { request =>
+  // one minute after the task is created the status is switched to Completed
+  def demoRepo(requestSlug: String, taskId: Int) = Action.async { implicit request =>
     val allowed = demoRepoAllowed(request)
 
     env.mode match {
@@ -431,7 +432,8 @@ class Application @Inject()
       case _ if !allowed =>
         Future.successful(Unauthorized)
       case _ =>
-        dataFacade.taskById(taskId).map { task =>
+        // we use the dao directly to avoid recursively getting the status
+        dao.taskById(taskId).map { task =>
           val state = if (ZonedDateTime.now().isAfter(task.createDate.plusMinutes(1))) {
             State.Completed
           }

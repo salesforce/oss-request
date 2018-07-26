@@ -106,22 +106,36 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     } yield result
   }
 
-  def taskById(taskId: Int): Future[Task] = {
+  def taskById(taskId: Int)(implicit requestHeader: RequestHeader): Future[Task] = {
     for {
       task <- dao.taskById(taskId)
-    } yield task
+      request <- dao.request(task.requestSlug)
+      updatedTask <- taskService.taskStatus(task, updateTaskState(request.creatorEmail, task.id, _, _, _))
+    } yield updatedTask
   }
 
-  def requestTasks(email: String, requestSlug: String, maybeState: Option[State.State] = None): Future[Seq[(Task, Long, Boolean)]] = {
+  def requestTasks(email: String, requestSlug: String, maybeState: Option[State.State] = None)(implicit requestHeader: RequestHeader): Future[Seq[(Task, Long, Boolean)]] = {
     def canEdit(taskWithNumComments: (Task, Long)): Future[(Task, Long, Boolean)] = {
       security.canEditTask(email, Left(taskWithNumComments._1)).map { canEdit =>
         (taskWithNumComments._1, taskWithNumComments._2, canEdit)
       }
     }
 
+    def updateTasks(request: Request, tasks: Seq[(Task, DAO.NumComments)]): Future[Seq[(Task, DAO.NumComments)]] = {
+      Future.sequence {
+        tasks.map { case (task, numComments) =>
+          taskService.taskStatus(task, updateTaskState(request.creatorEmail, task.id, _, _, _)).map { updatedTask =>
+            updatedTask -> numComments
+          }
+        }
+      }
+    }
+
     for {
       tasks <- dao.requestTasks(requestSlug, maybeState)
-      tasksWithCanEdit <- Future.sequence(tasks.map(canEdit))
+      request <- dao.request(requestSlug)
+      updatedTasks <- updateTasks(request, tasks)
+      tasksWithCanEdit <- Future.sequence(updatedTasks.map(canEdit))
     } yield tasksWithCanEdit
   }
 
