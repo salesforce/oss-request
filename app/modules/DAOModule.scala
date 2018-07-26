@@ -143,10 +143,10 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedByEmail: Option[String], maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task] = {
+  override def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String], maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task] = {
     // todo: move this to a validation module via the DAO
-    if (state == State.Completed && maybeCompletedByEmail.isEmpty) {
-      Future.failed(new Exception("maybeCompletedByEmail was not specified"))
+    if (state == State.Completed && maybeCompletedBy.isEmpty) {
+      Future.failed(new Exception("maybeCompletedBy was not specified"))
     }
     else {
       val maybeCompletedDate = if (state == State.Completed) Some(ZonedDateTime.now()) else None
@@ -155,7 +155,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
         quote {
           query[Task].insert(
             _.completableBy -> lift(completableBy),
-            _.completedByEmail -> lift(maybeCompletedByEmail),
+            _.completedBy -> lift(maybeCompletedBy),
             _.requestSlug -> lift(requestSlug),
             _.state -> lift(state),
             _.prototype -> lift(prototype),
@@ -163,9 +163,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
             _.completedDate -> lift(maybeCompletedDate)
           ).returning(_.id)
         }
-      } map { id =>
-        Task(id, completableBy, maybeCompletedByEmail, maybeCompletedDate, state, prototype, maybeData, requestSlug)
-      }
+      }.flatMap(taskById)
     }
   }
 
@@ -179,17 +177,17 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def updateTaskState(taskId: Int, state: State, maybeCompletedByEmail: Option[String], maybeData: Option[JsObject]): Future[Task] = {
+  override def updateTaskState(taskId: Int, state: State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task] = {
     // todo: move this to a validation module via the DAO
-    if (state == State.Completed && maybeCompletedByEmail.isEmpty) {
-      Future.failed(new Exception("maybeCompletedByEmail was not specified"))
+    if (state == State.Completed && maybeCompletedBy.isEmpty) {
+      Future.failed(new Exception("maybeCompletedBy was not specified"))
     }
     else {
       val maybeCompletedDate = if (state == State.Completed) Some(ZonedDateTime.now()) else None
       val updateFuture = run {
         quote {
           query[Task].filter(_.id == lift(taskId)).update(
-            _.completedByEmail -> lift(maybeCompletedByEmail),
+            _.completedBy -> lift(maybeCompletedBy),
             _.state -> lift(state),
             _.completedDate -> lift(maybeCompletedDate),
             _.data -> lift(maybeData)

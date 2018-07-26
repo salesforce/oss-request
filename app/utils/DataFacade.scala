@@ -15,19 +15,41 @@ import play.api.mvc.RequestHeader
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notifier: Notifier, security: Security)(implicit ec: ExecutionContext) {
+class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskService: TaskService, notifier: Notifier, security: Security, metadataService: MetadataService)(implicit ec: ExecutionContext) {
+
   def createRequest(program: String, name: String, creatorEmail: String): Future[Request] = {
     for {
       request <- dao.createRequest(program, name, creatorEmail)
     } yield request
   }
 
+  // todo: this compares task prototypes on a task (in the db) with those in metadata and thus if a task changes in metadata, it is no longer equal to the one in the db
   def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress)(implicit requestHeader: RequestHeader): Future[Task] = {
     for {
+      request <- dao.request(requestSlug)
+
+      existingTasksWithComments <- dao.requestTasks(requestSlug)
+
+      existingTasks = existingTasksWithComments.map(_._1)
+
+      if !existingTasks.exists(_.prototype == prototype)
+
+      program <- metadataService.fetchProgram(request.program)
+
+      dependencyTaskPrototypes = prototype.dependencies.flatMap(program.tasks.get)
+
+      if dependencyTaskPrototypes.subsetOf(existingTasks.filter(_.state == State.Completed).map(_.prototype).toSet)
+
       task <- dao.createTask(requestSlug, prototype, completableBy, maybeCompletedBy, maybeData, state)
-      _ <- taskEventHandler.process(requestSlug, TaskEvent.EventType.StateChange, task, createTask(_, _, _))
-      _ <- if (state == State.InProgress) notifier.taskAssigned(task) else Future.unit
-    } yield task
+
+      url = controllers.routes.Application.task(requestSlug, task.id).absoluteURL()
+
+      updatedTask <- taskService.taskCreated(program, request, task, existingTasks, url, updateTaskState(request.creatorEmail, task.id, _, _, _))
+
+      _ <- taskEventHandler.process(program, request, TaskEvent.EventType.StateChange, updatedTask, createTask(_, _, _))
+
+      _ <- if (state == State.InProgress) notifier.taskAssigned(updatedTask) else Future.unit
+    } yield updatedTask
   }
 
   def programRequests(program: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
@@ -62,8 +84,10 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, notifie
     for {
       _ <- security.updateTask(email, taskId)
       task <- dao.updateTaskState(taskId, state, maybeCompletedBy, maybeData)
+      request <- dao.request(task.requestSlug)
+      program <- metadataService.fetchProgram(request.program)
       _ <- notifier.taskStateChanged(task)
-      _ <- taskEventHandler.process(task.requestSlug, TaskEvent.EventType.StateChange, task, createTask(_, _, _))
+      _ <- taskEventHandler.process(program, request, TaskEvent.EventType.StateChange, task, createTask(_, _, _))
     } yield task
   }
 

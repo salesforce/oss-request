@@ -26,9 +26,9 @@ import scala.util.Try
 
 @Singleton
 class DAOMock extends DAO {
-  val requests = ConcurrentHashMap.newKeySet[Request].asScala.toBuffer
-  val tasks = ConcurrentHashMap.newKeySet[Task].asScala.toBuffer
-  val comments = ConcurrentHashMap.newKeySet[Comment].asScala.toBuffer
+  val requests = ConcurrentHashMap.newKeySet[Request].asScala
+  val tasks = ConcurrentHashMap.newKeySet[Task].asScala
+  val comments = ConcurrentHashMap.newKeySet[Comment].asScala
 
   override def createRequest(program: String, name: String, creatorEmail: String): Future[Request] = {
     Future.successful {
@@ -50,18 +50,18 @@ class DAOMock extends DAO {
   }
 
   override def programRequests(program: String) = {
-    allRequests().map(_.filter(_._1.program == program))
+    allRequests().map(_.filter(_._1.program == program).toSeq)
   }
 
   override def userRequests(email: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
-    allRequests().map(_.filter(_._1.creatorEmail == email))
+    allRequests().map(_.filter(_._1.creatorEmail == email)).map(_.toSeq)
   }
 
   override def updateTaskState(taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task] = {
     tasks.find(_.id == taskId).fold(Future.failed[Task](new Exception("Task not found"))) { task =>
       val updatedTask = task.copy(
         state = state,
-        completedByEmail = maybeCompletedBy,
+        completedBy = maybeCompletedBy,
         data = maybeData
       )
 
@@ -104,7 +104,7 @@ class DAOMock extends DAO {
   override def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String], maybeData: Option[JsObject], state: State.State): Future[Task] = {
     Future.successful {
       val id = Try(tasks.map(_.id).max).getOrElse(0) + 1
-      val task = Task(id, completableBy, maybeCompletedBy, maybeCompletedBy.map(_ => ZonedDateTime.now()), state, prototype, maybeData, requestSlug)
+      val task = Task(id, ZonedDateTime.now(), completableBy, maybeCompletedBy, maybeCompletedBy.map(_ => ZonedDateTime.now()), state, prototype, maybeData, requestSlug)
       tasks += task
       task
     }
@@ -137,11 +137,11 @@ class DAOMock extends DAO {
         commentsOnTask(task.id).map { comments =>
           task -> comments.size.toLong
         }
-      }
+      }.toSeq
     }
   }
   override def commentsOnTask(taskId: Int): Future[Seq[Comment]] = {
-    Future.successful(comments.filter(_.taskId == taskId))
+    Future.successful(comments.filter(_.taskId == taskId).toSeq)
   }
 
   override def tasksForUser(email: String, state: State.State): Future[Seq[(Task, DAO.NumComments, Request)]] = {
@@ -155,7 +155,7 @@ class DAOMock extends DAO {
           (task, numTaskComments, request)
         }
       }
-    }
+    }.map(_.toSeq)
   }
 
 }

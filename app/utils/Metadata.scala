@@ -37,7 +37,7 @@ object Metadata {
   implicit val jsonReads: Reads[Metadata] = multiprogramReads.orElse(singleprogramReads)
 }
 
-case class Program(name: String, description: Option[String], startTasks: Set[String], groups: Map[String, Set[String]], tasks: Map[String, Task.Prototype]) {
+case class Program(name: String, description: Option[String], startTasks: Set[String], groups: Map[String, Set[String]], services: Map[String, String], tasks: Map[String, Task.Prototype]) {
   val admins: Set[String] = groups.getOrElse("admin", Set.empty[String])
 
   def isAdmin(userInfo: UserInfo): Boolean = isAdmin(userInfo.email)
@@ -46,16 +46,16 @@ case class Program(name: String, description: Option[String], startTasks: Set[St
   def completableBy(completableBy: (CompletableByType.CompletableByType, String)): Option[Set[String]] = {
     val (completableByType, completableByValue) = completableBy
     completableByType match {
-      case models.Task.CompletableByType.Group => {
+      case models.Task.CompletableByType.Group =>
         groups.get(completableByValue)
-      }
-      case models.Task.CompletableByType.Email => {
+      case models.Task.CompletableByType.Email =>
         Some(Set(completableByValue))
-      }
+      case models.Task.CompletableByType.Service =>
+        services.get(completableByValue).map(Set(_))
     }
   }
 
-  def descriptionMarkdown = description.map(MarkdownTransformer.transform)
+  def descriptionMarkdown: Option[String] = description.map(MarkdownTransformer.transform)
 }
 
 object Program {
@@ -64,6 +64,7 @@ object Program {
     (__ \ "description").readNullable[String] ~
     (__ \ "start_tasks").read[Set[String]].orElse(Reads.pure(Set.empty[String])) ~
     (__ \ "groups").read[Map[String, Set[String]]] ~
+    (__ \ "services").read[Map[String, String]].orElse(Reads.pure(Map.empty[String, String])) ~
     (__ \ "tasks").read[Map[String, Task.Prototype]]
   )(Program.apply _)
 }
@@ -172,6 +173,12 @@ class MetadataService @Inject() (cache: SyncCacheApi, configuration: Configurati
         case _ => Future.failed(new Exception("metadata-git-file and metadata-git-ssh-key config must be set"))
       }
 
+    }
+  }
+
+  def fetchProgram(programKey: String): Future[Program] = {
+    fetchMetadata.flatMap { metadata =>
+      metadata.programs.get(programKey).fold(Future.failed[Program](new Exception(s"Program '$programKey' not found")))(Future.successful)
     }
   }
 

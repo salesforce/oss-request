@@ -53,7 +53,7 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
 
   def taskStateChanged(task: Task)(implicit requestHeader: RequestHeader): Future[_] = {
     dao.request(task.requestSlug).flatMap { request =>
-      if (!task.completedByEmail.contains(request.creatorEmail)) {
+      if (!task.completedBy.contains(request.creatorEmail)) {
         val url = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL()
 
         val subject = s"OSS Request ${request.name} - Task ${task.prototype.label} is now ${task.state.toHuman}"
@@ -72,16 +72,20 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
   }
 
   def taskAssigned(task: Task)(implicit requestHeader: RequestHeader): Future[_] = {
-    val url = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL()
+    task.completableByEmailsOrUrl.fold({ emails =>
+      val url = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL()
 
-    val subject = s"OSS Request - Task Assigned - ${task.prototype.label}"
-    val message =
-      s"""
-         |You have been assigned an OSS Request task '${task.prototype.label}'
-         |To complete or followup on this task, see: $url
+      val subject = s"OSS Request - Task Assigned - ${task.prototype.label}"
+      val message =
+        s"""
+           |You have been assigned an OSS Request task '${task.prototype.label}'
+           |To complete or followup on this task, see: $url
         """.stripMargin
 
-    notifyProvider.sendMessage(task.completableBy.toSet, subject, message)
+      notifyProvider.sendMessage(emails, subject, message)
+    }, { _ =>
+      Future.unit
+    })
   }
 
   def taskComment(requestSlug: String, comment: Comment)(implicit requestHeader: RequestHeader): Future[_] = {
@@ -129,7 +133,7 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
       task <- taskFuture
     } yield {
       // notify those that can complete the task, the request creator, but not the comment creator
-      (request, task, task.completableBy.toSet + request.creatorEmail - comment.creatorEmail)
+      (request, task, task.completableByEmailsOrUrl.left.getOrElse(Set.empty[String]) + request.creatorEmail - comment.creatorEmail)
     }
   }
 }

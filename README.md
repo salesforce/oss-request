@@ -35,6 +35,69 @@ The request system is driven by a metadata definition which includes system grou
             - `value` - Matches a field name and value, e.g. foo=bar
 
 
+```
+
+        "username_env": "REPO_SERVICE_USERNAME",
+        "password_env": "REPO_SERVICE_PASSWORD"
+
+```
+
+Tasks Assigned to Services
+--------------------------
+
+Create Payload (POST):
+
+```
+{
+    "request": {
+        "program": "default",
+        "slug": "asdf",
+        "name": "A Request"
+    },
+    "task": {
+        "id": 1,
+        "url": "http://asdf.com/request/asdf",
+        "label": "A Task",
+        "data": {
+            ...
+        },
+        "dependencies": {
+            "task_name": {
+                ...
+            }
+        }
+    }
+}
+
+```
+
+Respond with 201 - Created:
+
+```
+{
+    "state": "IN_PROGRESS|ON_HOLD|CANCELLED|COMPLETED",
+    "url": "http://asdf.com/asdf",
+    "data": {
+        ...
+    }
+}
+```
+
+
+Fetch State (GET): `?requestSlug=asdf&taskId=1`
+
+Respond with 200 - Ok:
+```
+{
+    "state": "IN_PROGRESS|ON_HOLD|CANCELLED|COMPLETED",
+    "url": "http://asdf.com/asdf",
+    "data": {
+        ...
+    }
+}
+```
+
+
 Architecture
 ------------
 

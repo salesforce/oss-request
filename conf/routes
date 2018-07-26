@@ -34,6 +34,10 @@ GET         /select-email                                      controllers.Appli
 
 GET         /logout                                            controllers.Application.logout()
 
++nocsrf
+POST        /_demo_repo                                        controllers.Application.createDemoRepo()
+GET         /_demo_repo                                        controllers.Application.demoRepo(requestSlug: String, taskId: Int)
+
 # Map static resources from the /public folder to the /assets URL path
 GET         /assets/*file                                      controllers.Assets.versioned(path="/public", file: Asset)
 GET         /favicon.ico                                       controllers.Assets.at(path="/public/images", file="favicon.ico")

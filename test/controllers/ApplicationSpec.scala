@@ -9,28 +9,27 @@ package controllers
 
 import models.Task.{CompletableBy, CompletableByType}
 import modules.DAOMock
-import org.scalatestplus.play.PlaySpec
-import org.scalatestplus.play.guice.GuiceOneAppPerTest
+import org.scalatestplus.play.MixedPlaySpec
 import play.api.Mode
+import play.api.http.HeaderNames
+import play.api.test.FakeRequest
 
 import scala.xml.Comment
 
-class ApplicationSpec extends PlaySpec with GuiceOneAppPerTest {
+class ApplicationSpec extends MixedPlaySpec {
 
-  override implicit def fakeApplication() = DAOMock.noDatabaseAppBuilder(Mode.Test).build()
-
-  def applicationController = app.injector.instanceOf[Application]
+  def applicationController(implicit app: play.api.Application) = app.injector.instanceOf[Application]
 
   "svgNode" must {
-    "work" in {
+    "work" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
       val svg = applicationController.svgSymbol("custom-sprite/svg/symbols.svg", "custom16")
       svg.attribute("d") mustBe 'defined
     }
-    "produce a comment when the file can't be found" in {
+    "produce a comment when the file can't be found" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
       val svg = applicationController.svgSymbol("asdfasdf", "custom16")
       svg mustBe a [Comment]
     }
-    "produce a comment when the symbol can't be found" in {
+    "produce a comment when the symbol can't be found" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
       val svg = applicationController.svgSymbol("custom-sprite/svg/symbols.svg", "asdf")
       svg mustBe a [Comment]
     }
@@ -42,7 +41,7 @@ class ApplicationSpec extends PlaySpec with GuiceOneAppPerTest {
     val completableByGroupNoValue = CompletableBy(CompletableByType.Group, None)
     val completableByGroupWithValue = CompletableBy(CompletableByType.Group, Some("group"))
 
-    "not provide a value when no values are provided" in {
+    "not provide a value when no values are provided" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
       val o1 = applicationController.completableByWithDefaults(None, None, None)
       o1 must be (None)
 
@@ -61,21 +60,21 @@ class ApplicationSpec extends PlaySpec with GuiceOneAppPerTest {
       val o6 = applicationController.completableByWithDefaults(Some(completableByGroupNoValue), Some("foo"), None)
       o6 must be (None)
     }
-    "use the provided value" in {
+    "use the provided value" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
       val o1 = applicationController.completableByWithDefaults(Some(completableByEmailWithValue), None, None)
       o1 must contain (completableByEmailWithValue.`type` -> completableByEmailWithValue.value.get)
 
       val o2 = applicationController.completableByWithDefaults(Some(completableByGroupWithValue), None, None)
       o2 must contain (completableByGroupWithValue.`type` -> completableByGroupWithValue.value.get)
     }
-    "default to email type" in {
+    "default to email type" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
       val o1 = applicationController.completableByWithDefaults(None, Some("foo"), None)
       o1 must contain (CompletableByType.Email -> "foo")
 
       val o2 = applicationController.completableByWithDefaults(None, Some("foo"), Some("bar"))
       o2 must contain (CompletableByType.Email -> "foo")
     }
-    "use the default when no value is specified" in {
+    "use the default when no value is specified" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
       val o1 = applicationController.completableByWithDefaults(Some(completableByEmailNoValue), None, Some("foo"))
       o1 must contain (completableByEmailNoValue.`type` -> "foo")
 
@@ -87,6 +86,25 @@ class ApplicationSpec extends PlaySpec with GuiceOneAppPerTest {
 
       val o4 = applicationController.completableByWithDefaults(Some(completableByGroupNoValue), Some("foo"), Some("bar"))
       o4 must contain (completableByGroupNoValue.`type` -> "bar")
+    }
+  }
+
+  "demoRepoAllowed" must {
+    "not require auth with config not set" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
+      val request = FakeRequest()
+      applicationController.demoRepoAllowed(request) must be (true)
+    }
+    "allow access work with the correct psk when set" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev, Map("services.repo_creator" -> "asdf")).build()) {
+      val request = FakeRequest().withHeaders(HeaderNames.AUTHORIZATION -> "psk asdf")
+      applicationController.demoRepoAllowed(request) must be (true)
+    }
+    "not allow access with the wrong psk" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev, Map("services.repo_creator" -> "asdf")).build()) {
+      val request = FakeRequest().withHeaders(HeaderNames.AUTHORIZATION -> "psk zxcv")
+      applicationController.demoRepoAllowed(request) must be (false)
+    }
+    "not allow access with no psk" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev, Map("services.repo_creator" -> "asdf")).build()) {
+      val request = FakeRequest()
+      applicationController.demoRepoAllowed(request) must be (false)
     }
   }
 

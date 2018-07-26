@@ -141,6 +141,9 @@
         "blah@blah.com"
       ]
     },
+    "services": {
+      "repo_creator": "http://localhost:9000/_demo_repo"
+    },
     "tasks": {
       "oss_request_info": {
         "label": "OSS Request Info",
@@ -152,6 +155,11 @@
             "properties": {
               "project_description": {
                 "title": "Project Description",
+                "type": "string",
+                "required": true
+              },
+              "repo_name": {
+                "title": "Repo Name",
                 "type": "string",
                 "required": true
               }
@@ -174,6 +182,16 @@
               }
             }
           }
+        }
+      },
+      "create_repo": {
+        "label": "Create the repo",
+        "type": "ACTION",
+        "info": "This creates the repo",
+        "dependencies": ["oss_request_info"],
+        "completable_by": {
+          "type": "SERVICE",
+          "value": "repo_creator"
         }
       }
     }

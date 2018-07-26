@@ -7,6 +7,8 @@
 
 package controllers
 
+import java.time.ZonedDateTime
+
 import javax.inject.Inject
 import models.Task.CompletableByType
 import models.{State, Task}
@@ -16,7 +18,7 @@ import org.webjars.play.WebJarsUtil
 import play.api.data.Form
 import play.api.libs.json.{JsObject, Json}
 import play.api.mvc._
-import play.api.{Configuration, Environment}
+import play.api.{Configuration, Environment, Logger, Mode}
 import play.twirl.api.Html
 import utils.{DataFacade, MetadataService, Program, RuntimeReporter, UserAction, UserInfo, UserRequest}
 
@@ -391,6 +393,62 @@ class Application @Inject()
   def logout() = Action.async { implicit request =>
     auth.authUrl.map { authUrl =>
       Ok(loginView(authUrl)).withNewSession
+    }
+  }
+
+  private[controllers] def demoRepoAllowed(request: RequestHeader): Boolean = {
+    configuration.getOptional[String]("services.repo_creator").fold(true) { psk =>
+      request.headers.get(AUTHORIZATION).fold(false)(_ == s"psk $psk")
+    }
+  }
+
+  def createDemoRepo() = Action(parse.json) { request =>
+    val allowed = demoRepoAllowed(request)
+
+    env.mode match {
+      case Mode.Prod =>
+        NotFound
+      case _ if !allowed =>
+        Unauthorized
+      case _ =>
+        Logger.info(request.body.toString)
+
+        val json = Json.obj(
+          "state" -> State.InProgress,
+          "url" -> "http://asdf.com"
+        )
+
+        Created(json)
+    }
+  }
+
+  def demoRepo(requestSlug: String, taskId: Int) = Action.async { request =>
+    val allowed = demoRepoAllowed(request)
+
+    env.mode match {
+      case Mode.Prod =>
+        Future.successful(NotFound)
+      case _ if !allowed =>
+        Future.successful(Unauthorized)
+      case _ =>
+        dataFacade.taskById(taskId).map { task =>
+          val state = if (ZonedDateTime.now().isAfter(task.createDate.plusMinutes(1))) {
+            State.Completed
+          }
+          else {
+            State.InProgress
+          }
+
+          val json = Json.obj(
+            "state" -> state,
+            "url" -> "http://asdf.com",
+            "data" -> Json.obj(
+              "message" -> "Repo created!"
+            )
+          )
+
+          Ok(json)
+        }
     }
   }
 

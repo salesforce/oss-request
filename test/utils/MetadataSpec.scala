@@ -69,6 +69,16 @@ class MetadataSpec extends MixedPlaySpec {
     }
   }
 
+  "completableBy" must {
+    "work" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
+      val metadataService = app.injector.instanceOf[MetadataService]
+      val metadata = await(metadataService.fetchMetadata).programs("two")
+      val taskPrototype = metadata.tasks("create_repo")
+      val completableBy = taskPrototype.completableBy.get
+      metadata.completableBy(completableBy.`type` -> completableBy.value.get) must equal (Some(Set("http://localhost:9000/_demo_repo")))
+    }
+  }
+
 }
 
 object MetadataSpec {
