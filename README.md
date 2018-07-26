@@ -9,7 +9,7 @@ Metadata Schema
 The request system is driven by a metadata definition which includes system groups and the prototypes for tasks.  [Check out an example](examples/metadata.json).  For production use set the `METADATA_URL` and `METADATA_TOKEN` env vars so the metadata can be externalized from this source.  Here the properties that need to be defined in the metadata file:
 
 - `groups` (object, required) - Defines the groups where the key is the identifier of the group and the value is an array of string email addresses.  There must be a group with the key `admin` but additional groups can also be defined.
-
+- `services` (object) - Defines the urls for service names in key-values on the the object
 - `tasks` (object, required) - Defines the tasks where the key is the identifier of the task and the value is an object defining the prototype for a task.  There must be a task with the key `start` but additional tasks should also be defined.  A task prototype object has the following properties:
 
     - `label` (string, required) - Displayed in the header of the task view
@@ -18,8 +18,8 @@ The request system is driven by a metadata definition which includes system grou
     - `form` (object, required for INPUT tasks) - Definition of the input form defined by [Alpaca](http://www.alpacajs.org)
     - `completable_by` (object) - Defines who can complete the task.  If not set, the task will be assigned to the request owner. If set, here are the properties:
 
-        - `type` (enum) - Either `GROUP | EMAIL`
-        - `value` (string) - For `GROUP` must be a defined group.  For `EMAIL` the value can be set to an email but if not specified the UI will prompt the user to enter an email.
+        - `type` (enum) - Either `GROUP | EMAIL | SERVICE`
+        - `value` (string) - For `GROUP` must be a defined group.  For `EMAIL` the value can be set to an email but if not specified the UI will prompt the user to enter an email.  For `SERVICE` the value must be a service name defined in the services object.
 
     - `task_events` (object) - Defines event handlers on the task with these properties:
 
@@ -35,17 +35,17 @@ The request system is driven by a metadata definition which includes system grou
             - `value` - Matches a field name and value, e.g. foo=bar
 
 
-```
-
-        "username_env": "REPO_SERVICE_USERNAME",
-        "password_env": "REPO_SERVICE_PASSWORD"
-
-```
-
 Tasks Assigned to Services
 --------------------------
 
-Create Payload (POST):
+The default (and currently only) security mechanism for services is Pre-Shared Keys (PSK).  To configure a service's PSK, sent the config like:
+`-Dservices.repo_creator=MY_SERVICE_PSK`
+
+This sends the the value `psk MY_SERVICE_PSK` in the `AUTHORIZATION` HTTP header when talking to the service.
+
+A service must be accessible at a given URL and implement two HTTP APIs:
+
+Create Task with POST:
 
 ```
 {
@@ -84,7 +84,7 @@ Respond with 201 - Created:
 ```
 
 
-Fetch State (GET): `?requestSlug=asdf&taskId=1`
+Fetch State with GET: `?requestSlug=asdf&taskId=1`
 
 Respond with 200 - Ok:
 ```
@@ -102,7 +102,7 @@ Architecture
 ------------
 
 This application is built with:
-- Play Framework 2.5
+- Play Framework 2.6
 - Scala
 - Postgres
 - Reactive I/O (Non-Blocking)
