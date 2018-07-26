@@ -16,7 +16,6 @@ import play.api.Configuration
 import play.api.http.{HeaderNames, Status}
 import play.api.libs.json.{JsError, JsObject, JsPath, JsResult, JsString, JsSuccess, JsValue, Json, JsonValidationError, Reads}
 import play.api.libs.ws.{WSClient, WSRequest}
-import play.api.mvc.Headers
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
