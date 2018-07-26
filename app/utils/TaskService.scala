@@ -118,9 +118,8 @@ class TaskService @Inject()(configuration: Configuration, wsClient: WSClient)(im
   }
 
   def taskStatus(task: Task, updateTaskState: (State.State, Option[String], Option[JsObject]) => Future[Task]): Future[Task] = {
-    if (task.prototype.completableBy.exists(_.`type` == CompletableByType.Service)) {
+    if (task.prototype.completableBy.exists(_.`type` == CompletableByType.Service) && task.state == State.InProgress) {
       wsRequest(task).flatMap { wsRequest =>
-        println(wsRequest.url)
         wsRequest.withQueryStringParameters("requestSlug" -> task.requestSlug, "taskId" -> task.id.toString).get().flatMap { response =>
           response.status match {
             case Status.OK =>
