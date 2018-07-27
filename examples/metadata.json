@@ -157,11 +157,6 @@
                 "title": "Project Description",
                 "type": "string",
                 "required": true
-              },
-              "repo_name": {
-                "title": "Repo Name",
-                "type": "string",
-                "required": true
               }
             }
           }
@@ -184,11 +179,33 @@
           }
         }
       },
+      "repo_info": {
+        "label": "Repo Info",
+        "type": "INPUT",
+        "info": "Where should we create the repo?",
+        "form": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "org": {
+                "title": "Org Name",
+                "type": "string",
+                "required": true
+              },
+              "name": {
+                "title": "Repo Name",
+                "type": "string",
+                "required": true
+              }
+            }
+          }
+        }
+      },
       "create_repo": {
         "label": "Create the repo",
         "type": "ACTION",
         "info": "This creates the repo",
-        "dependencies": ["oss_request_info"],
+        "dependencies": ["repo_info"],
         "completable_by": {
           "type": "SERVICE",
           "value": "repo_creator"

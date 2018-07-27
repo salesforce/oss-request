@@ -39,7 +39,7 @@ Tasks Assigned to Services
 --------------------------
 
 The default (and currently only) security mechanism for services is Pre-Shared Keys (PSK).  To configure a service's PSK, sent the config like:
-`-Dservices.repo_creator=MY_SERVICE_PSK`
+`-Dprogram.two.services.repo_creator=MY_SERVICE_PSK`
 
 This sends the the value `psk MY_SERVICE_PSK` in the `AUTHORIZATION` HTTP header when talking to the service.
 

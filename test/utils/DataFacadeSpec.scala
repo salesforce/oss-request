@@ -84,10 +84,10 @@ class DataFacadeSpec extends MixedPlaySpec {
           val metadataService = app.injector.instanceOf[MetadataService]
           val program = await(metadataService.fetchProgram("two"))
           val request = await(dataFacade.createRequest("two", "foo", "foo@bar.com"))
-          val ossRequestPrototype = program.tasks("oss_request_info")
+          val ossRequestPrototype = program.tasks("repo_info")
           val ossRequestJson = Json.obj(
-            "project_description" -> "asdf",
-            "repo_name" -> "asdf"
+            "org" -> "asdf",
+            "name" -> "asdf"
           )
           await(dataFacade.createTask(request.slug, ossRequestPrototype, Seq("foo@bar.com"), Some("foo@bar.com"), Some(ossRequestJson), State.Completed))
           val createRepoPrototype = await(metadataService.fetchProgram("two")).tasks("create_repo")

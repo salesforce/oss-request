@@ -26,7 +26,7 @@ case class Task(id: Int, createDate: ZonedDateTime, completableBy: Seq[String], 
       Right(new URL(completableBy.head))
     }
   }
-  val maybeServiceKey: Option[String] = prototype.completableBy.filter(_.`type` != CompletableByType.Service).flatMap(_.value)
+  val maybeServiceKey: Option[String] = prototype.completableBy.filter(_.`type` == CompletableByType.Service).flatMap(_.value)
 }
 
 object Task {

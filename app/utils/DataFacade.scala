@@ -110,7 +110,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     for {
       task <- dao.taskById(taskId)
       request <- dao.request(task.requestSlug)
-      updatedTask <- taskService.taskStatus(task, updateTaskState(request.creatorEmail, task.id, _, _, _))
+      updatedTask <- taskService.taskStatus(request.program, task, updateTaskState(request.creatorEmail, task.id, _, _, _))
     } yield updatedTask
   }
 
@@ -124,7 +124,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     def updateTasks(request: Request, tasks: Seq[(Task, DAO.NumComments)]): Future[Seq[(Task, DAO.NumComments)]] = {
       Future.sequence {
         tasks.map { case (task, numComments) =>
-          taskService.taskStatus(task, updateTaskState(request.creatorEmail, task.id, _, _, _)).map { updatedTask =>
+          taskService.taskStatus(request.program, task, updateTaskState(request.creatorEmail, task.id, _, _, _)).map { updatedTask =>
             updatedTask -> numComments
           }
         }

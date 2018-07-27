@@ -12,7 +12,7 @@ import java.net.URL
 import javax.inject.Inject
 import models.Task.CompletableByType
 import models.{Request, State, Task}
-import play.api.Configuration
+import play.api.{Configuration, Environment, Logger, Mode}
 import play.api.http.{HeaderNames, Status}
 import play.api.libs.json.{JsError, JsObject, JsPath, JsResult, JsString, JsSuccess, JsValue, Json, JsonValidationError, Reads}
 import play.api.libs.ws.{WSClient, WSRequest}
@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 // todo: make auth pluggable
-class TaskService @Inject()(configuration: Configuration, wsClient: WSClient)(implicit ec: ExecutionContext) {
+class TaskService @Inject()(environment: Environment, configuration: Configuration, wsClient: WSClient)(implicit ec: ExecutionContext) {
 
   case class ServiceResponse(state: State.State, url: URL, maybeData: Option[JsObject])
 
@@ -53,13 +53,15 @@ class TaskService @Inject()(configuration: Configuration, wsClient: WSClient)(im
     }
   }
 
-  def wsRequest(task: Task): Future[WSRequest] = {
+  def wsRequest(programKey: String, task: Task): Future[WSRequest] = {
     task.completableByEmailsOrUrl.fold({ _ =>
       Future.failed[WSRequest](new Exception("Task was not assigned a to a valid URL"))
     }, { url =>
       val maybePsk = for {
         serviceKey <- task.maybeServiceKey
-        servicesConfig <- configuration.getOptional[Configuration]("services")
+        baseConfig <- configuration.getOptional[Configuration]("program")
+        programConfig <- baseConfig.getOptional[Configuration](programKey)
+        servicesConfig <- programConfig.getOptional[Configuration]("services")
         psk <- servicesConfig.getOptional[String](serviceKey)
       } yield psk
 
@@ -99,7 +101,7 @@ class TaskService @Inject()(configuration: Configuration, wsClient: WSClient)(im
         )
       )
 
-      wsRequest(task).flatMap { wsRequest =>
+      wsRequest(request.program, task).flatMap { wsRequest =>
         wsRequest.post(json).flatMap { response =>
           response.status match {
             case Status.CREATED =>
@@ -109,6 +111,12 @@ class TaskService @Inject()(configuration: Configuration, wsClient: WSClient)(im
             case _ =>
               Future.failed(new Exception(response.body))
           }
+        } recoverWith {
+          case e: Exception =>
+            if (environment.mode != Mode.Test) {
+              Logger.error("Service threw error on create task", e)
+            }
+            updateTaskState(State.Cancelled, None, None)
         }
       }
     }
@@ -117,10 +125,10 @@ class TaskService @Inject()(configuration: Configuration, wsClient: WSClient)(im
     }
   }
 
-  def taskStatus(task: Task, updateTaskState: (State.State, Option[String], Option[JsObject]) => Future[Task]): Future[Task] = {
+  def taskStatus(programKey: String, task: Task, updateTaskState: (State.State, Option[String], Option[JsObject]) => Future[Task]): Future[Task] = {
     if (task.prototype.completableBy.exists(_.`type` == CompletableByType.Service) && task.state == State.InProgress) {
-      wsRequest(task).flatMap { wsRequest =>
-        task.completedBy.fold(Future.failed[Task](new Exception("Unknown URL to send to servce"))) { url =>
+      wsRequest(programKey, task).flatMap { wsRequest =>
+        task.completedBy.fold(updateTaskState(State.Cancelled, None, None)) { url =>
           wsRequest.withQueryStringParameters("url" -> url).get().flatMap { response =>
             response.status match {
               case Status.OK =>
