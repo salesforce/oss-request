@@ -120,14 +120,16 @@ class TaskService @Inject()(configuration: Configuration, wsClient: WSClient)(im
   def taskStatus(task: Task, updateTaskState: (State.State, Option[String], Option[JsObject]) => Future[Task]): Future[Task] = {
     if (task.prototype.completableBy.exists(_.`type` == CompletableByType.Service) && task.state == State.InProgress) {
       wsRequest(task).flatMap { wsRequest =>
-        wsRequest.withQueryStringParameters("requestSlug" -> task.requestSlug, "taskId" -> task.id.toString).get().flatMap { response =>
-          response.status match {
-            case Status.OK =>
-              parseResponse(response.body).flatMap { serviceResponse =>
-                updateTaskState(serviceResponse.state, Some(serviceResponse.url.toString), serviceResponse.maybeData)
-              }
-            case _ =>
-              Future.failed(new Exception(response.body))
+        task.completedBy.fold(Future.failed[Task](new Exception("Unknown URL to send to servce"))) { url =>
+          wsRequest.withQueryStringParameters("url" -> url).get().flatMap { response =>
+            response.status match {
+              case Status.OK =>
+                parseResponse(response.body).flatMap { serviceResponse =>
+                  updateTaskState(serviceResponse.state, Some(serviceResponse.url.toString), serviceResponse.maybeData)
+                }
+              case _ =>
+                Future.failed(new Exception(response.body))
+            }
           }
         }
       }

@@ -426,34 +426,24 @@ class Application @Inject()
   }
 
   // one minute after the task is created the status is switched to Completed
-  def demoRepo(requestSlug: String, taskId: Int) = Action.async { implicit request =>
+  def demoRepo(url: String) = Action { implicit request =>
     val allowed = demoRepoAllowed(request)
 
     env.mode match {
       case Mode.Prod =>
-        Future.successful(NotFound)
+        NotFound
       case _ if !allowed =>
-        Future.successful(Unauthorized)
+        Unauthorized
       case _ =>
-        // we use the dao directly to avoid recursively getting the status
-        dao.taskById(taskId).map { task =>
-          val state = if (ZonedDateTime.now().isAfter(task.createDate.plusMinutes(1))) {
-            State.Completed
-          }
-          else {
-            State.InProgress
-          }
-
-          val json = Json.obj(
-            "state" -> state,
-            "url" -> "http://asdf.com",
-            "data" -> Json.obj(
-              "message" -> "Repo created!"
-            )
+        val json = Json.obj(
+          "state" -> State.Completed,
+          "url" -> "http://asdf.com",
+          "data" -> Json.obj(
+            "message" -> "Repo created!"
           )
+        )
 
-          Ok(json)
-        }
+        Ok(json)
     }
   }
 

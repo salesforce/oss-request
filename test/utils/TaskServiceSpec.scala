@@ -75,7 +75,7 @@ class TaskServiceSpec extends MixedPlaySpec {
       val taskPrototype = program.tasks("create_repo")
       val dao = app.injector.instanceOf[DAO]
       val url = controllers.routes.Application.createDemoRepo().absoluteURL(false, s"localhost:$port")
-      val task = await(dao.createTask("asdf", taskPrototype, Seq(url)))
+      val task = await(dao.createTask("asdf", taskPrototype, Seq(url), Some("http://asdf.com/asdf")))
       val updatedTask = await(taskService.taskStatus(task, updateTaskState(task)))
       updatedTask.completedBy must equal (Some("http://asdf.com"))
     }

@@ -84,7 +84,7 @@ Respond with 201 - Created:
 ```
 
 
-Fetch State with GET: `?requestSlug=asdf&taskId=1`
+Fetch State with GET: `?url=http://asdf.com/asdf`
 
 Respond with 200 - Ok:
 ```

@@ -9,8 +9,7 @@ package utils
 
 import models.{State, Task, TaskEvent}
 import modules.{DAOMock, NotifyMock, NotifyProvider}
-import org.scalatestplus.play.{MixedPlaySpec, PlaySpec}
-import org.scalatestplus.play.guice.GuiceOneAppPerTest
+import org.scalatestplus.play.MixedPlaySpec
 import play.api.db.Database
 import play.api.db.evolutions.Evolutions
 import play.api.inject.bind

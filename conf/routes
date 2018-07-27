@@ -36,7 +36,7 @@ GET         /logout                                            controllers.Appli
 
 +nocsrf
 POST        /_demo_repo                                        controllers.Application.createDemoRepo()
-GET         /_demo_repo                                        controllers.Application.demoRepo(requestSlug: String, taskId: Int)
+GET         /_demo_repo                                        controllers.Application.demoRepo(url: String)
 
 # Map static resources from the /public folder to the /assets URL path
 GET         /assets/*file                                      controllers.Assets.versioned(path="/public", file: Asset)
