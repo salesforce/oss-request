@@ -70,20 +70,20 @@ class TaskServiceSpec extends MixedPlaySpec {
     "set the task to be cancelled when the external url is not set" in new App(DAOMock.noDatabaseAppBuilder().build()) {
       val taskPrototype = program.tasks("create_repo")
       val task = Task(1, ZonedDateTime.now(), Seq("http://localhost:12345/"), None, None, State.InProgress, taskPrototype, None, "asdf")
-      val updatedTask = await(taskService.taskStatus("two", task, updateTaskState(task)))
+      val updatedTask = await(taskService.taskStatus(task, updateTaskState(task)))
       updatedTask.state must equal (State.Cancelled)
     }
     "fail when the service is unreachable" in new App(DAOMock.noDatabaseAppBuilder().build()) {
       val taskPrototype = program.tasks("create_repo")
       val task = Task(1, ZonedDateTime.now(), Seq("http://localhost:12345/"), Some("http://asdf.com"), None, State.InProgress, taskPrototype, None, "asdf")
-      an[Exception] must be thrownBy await(taskService.taskStatus("two", task, updateTaskState(task)))
+      an[Exception] must be thrownBy await(taskService.taskStatus(task, updateTaskState(task)))
     }
     "work when the task exists" in new Server(DAOMock.noDatabaseAppBuilder().build()) {
       val taskPrototype = program.tasks("create_repo")
       val dao = app.injector.instanceOf[DAO]
       val url = controllers.routes.Application.createDemoRepo().absoluteURL(false, s"localhost:$port")
       val task = await(dao.createTask("asdf", taskPrototype, Seq(url), Some("http://asdf.com/asdf")))
-      val updatedTask = await(taskService.taskStatus("two", task, updateTaskState(task)))
+      val updatedTask = await(taskService.taskStatus(task, updateTaskState(task)))
       updatedTask.completedBy must equal (Some("http://asdf.com"))
     }
   }

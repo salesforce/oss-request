@@ -38,8 +38,7 @@ The request system is driven by a metadata definition which includes system grou
 Tasks Assigned to Services
 --------------------------
 
-The default (and currently only) security mechanism for services is Pre-Shared Keys (PSK).  To configure a service's PSK, sent the config like:
-`-Dprogram.two.services.repo_creator=MY_SERVICE_PSK`
+The default (and currently only) security mechanism for services is Pre-Shared Keys (PSK).  To configure a service's PSK, sent the an env named `PSK_HEXSTRING` where the `HEXSTRING` is an uppercase hex representation of the service's URL.
 
 This sends the the value `psk MY_SERVICE_PSK` in the `AUTHORIZATION` HTTP header when talking to the service.
 

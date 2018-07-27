@@ -53,22 +53,18 @@ class TaskService @Inject()(environment: Environment, configuration: Configurati
     }
   }
 
-  def wsRequest(programKey: String, task: Task): Future[WSRequest] = {
+  def psk(url: URL): Option[String] = {
+    sys.env.get("PSK_" + url.toString.map(_.toHexString).mkString.toUpperCase)
+  }
+
+  def wsRequest(task: Task): Future[WSRequest] = {
     task.completableByEmailsOrUrl.fold({ _ =>
       Future.failed[WSRequest](new Exception("Task was not assigned a to a valid URL"))
     }, { url =>
-      val maybePsk = for {
-        serviceKey <- task.maybeServiceKey
-        baseConfig <- configuration.getOptional[Configuration]("program")
-        programConfig <- baseConfig.getOptional[Configuration](programKey)
-        servicesConfig <- programConfig.getOptional[Configuration]("services")
-        psk <- servicesConfig.getOptional[String](serviceKey)
-      } yield psk
-
       val baseRequest = wsClient.url(url.toString)
 
       Future.successful {
-        maybePsk.fold(baseRequest) { psk =>
+        psk(url).fold(baseRequest) { psk =>
           baseRequest.withHttpHeaders(HeaderNames.AUTHORIZATION -> s"psk $psk")
         }
       }
@@ -101,7 +97,7 @@ class TaskService @Inject()(environment: Environment, configuration: Configurati
         )
       )
 
-      wsRequest(request.program, task).flatMap { wsRequest =>
+      wsRequest(task).flatMap { wsRequest =>
         wsRequest.post(json).flatMap { response =>
           response.status match {
             case Status.CREATED =>
@@ -125,9 +121,9 @@ class TaskService @Inject()(environment: Environment, configuration: Configurati
     }
   }
 
-  def taskStatus(programKey: String, task: Task, updateTaskState: (State.State, Option[String], Option[JsObject]) => Future[Task]): Future[Task] = {
+  def taskStatus(task: Task, updateTaskState: (State.State, Option[String], Option[JsObject]) => Future[Task]): Future[Task] = {
     if (task.prototype.completableBy.exists(_.`type` == CompletableByType.Service) && task.state == State.InProgress) {
-      wsRequest(programKey, task).flatMap { wsRequest =>
+      wsRequest(task).flatMap { wsRequest =>
         task.completedBy.fold(updateTaskState(State.Cancelled, None, None)) { url =>
           wsRequest.withQueryStringParameters("url" -> url).get().flatMap { response =>
             response.status match {
