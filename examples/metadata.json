@@ -71,7 +71,7 @@
             "value": "COMPLETED",
             "criteria": {
               "type": "FIELD_VALUE",
-              "value": "github_org=Foo"
+              "value": "github_org==Foo"
             },
             "action": {
               "type": "CREATE_TASK",
@@ -83,7 +83,7 @@
             "value": "COMPLETED",
             "criteria": {
               "type": "FIELD_VALUE",
-              "value": "patentable=true"
+              "value": "patentable==true"
             },
             "action": {
               "type": "CREATE_TASK",

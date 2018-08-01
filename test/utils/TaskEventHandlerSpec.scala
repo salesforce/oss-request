@@ -71,4 +71,33 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
     }
   }
 
+  "criteriaMatches" must {
+    "work with ==" in {
+      val json = Some(
+          Json.obj(
+          "s" -> "foo",
+          "b" -> true
+        )
+      )
+      TaskEventHandler.criteriaMatches("s==foo", json) must be (true)
+      TaskEventHandler.criteriaMatches("s==bar", json) must be (false)
+      TaskEventHandler.criteriaMatches("b==true", json) must be (true)
+      TaskEventHandler.criteriaMatches("b==false", json) must be (false)
+      TaskEventHandler.criteriaMatches("n==foo", json) must be (false)
+    }
+    "work with !=" in {
+      val json = Some(
+        Json.obj(
+          "s" -> "foo",
+          "b" -> true
+        )
+      )
+      TaskEventHandler.criteriaMatches("s!=foo", json) must be (false)
+      TaskEventHandler.criteriaMatches("s!=bar", json) must be (true)
+      TaskEventHandler.criteriaMatches("b!=true", json) must be (false)
+      TaskEventHandler.criteriaMatches("b!=false", json) must be (true)
+      TaskEventHandler.criteriaMatches("n!=foo", json) must be (true)
+    }
+  }
+
 }
