@@ -1,0 +1,48 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@this(main: Main)
+
+@(requests: Seq[(models.Request, Long, Long)], userInfo: _root_.utils.UserInfo)(implicit request: RequestHeader)
+
+@stateClass(state: models.State.State) = {
+    @state match {
+        case models.State.InProgress => {
+            list-group-item-info
+        }
+        case models.State.Cancelled => {
+            list-group-item-warning
+        }
+        case models.State.Completed => {
+            list-group-item-success
+        }
+    }
+}
+
+@requestList(requests: Seq[(models.Request, Long, Long)], title: String) = {
+    @title
+
+    @if(requests.nonEmpty) {
+        <div class="list-group">
+        @for((request, totalTasks, completedTasks) <- requests) {
+            <a href="@routes.Application.request(request.slug)" class="list-group-item @stateClass(request.state)">
+                <span class="badge" style="margin-top: 25px;">@completedTasks of @totalTasks tasks completed</span>
+                <h4>@request.name</h4>
+                <p>Created @views.utils.DateTime.date(request.createDate) by @request.creatorEmail</p>
+            </a>
+        }
+        </div>
+    } else {
+        No requests!
+    }
+}
+
+@main(Some(userInfo))("OSS Requests") {
+
+    @requestList(requests, "Search Results")
+
+}

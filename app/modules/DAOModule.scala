@@ -49,6 +49,7 @@ trait DAO {
   def commentOnTask(taskId: Int, email: String, contents: String): Future[Comment]
   def commentsOnTask(taskId: Int): Future[Seq[Comment]]
   def tasksForUser(email: String, state: State): Future[Seq[(Task, DAO.NumComments, Request)]]
+  def search(maybeProgram: Option[String], maybeState: Option[State.State], data: Option[JsObject]): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]]
 }
 
 object DAO {
@@ -279,6 +280,51 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
             request.state == lift(State.InProgress)
           }
         } yield (task, numComments, request)
+      }
+    }
+  }
+
+  override def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject]): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
+
+    case class QueryBuilder[T](query: Quoted[Query[T]]) {
+      def ifDefined[U: Encoder](value: Option[U])(f: Quoted[(Query[T], U) => Query[T]]): QueryBuilder[T] =
+        value match {
+          case None => this
+          case Some(v) =>
+            QueryBuilder {
+              quote {
+                f(query, lift(v))
+              }
+            }
+        }
+
+      def build: database.ctx.Quoted[database.ctx.Query[T]] = query
+    }
+
+    val requestQuery = QueryBuilder(query[Request])
+      .ifDefined(maybeProgram) {
+        (q: Query[Request], program: String) => q.filter(_.program == program)
+      }
+      .ifDefined(maybeState) {
+        (q: Query[Request], state: State) => q.filter(_.state == state)
+      }
+      .ifDefined(maybeData) {
+        (q: Query[Request], data: JsObject) => q.filter { request =>
+          query[Task].filter(_.requestSlug == request.slug).filter { task =>
+            infix"""${task.data} @> $data""".as[Boolean]
+          }.nonEmpty
+        }
+      }
+      .build
+
+    run {
+      quote {
+        for {
+          request <- requestQuery
+          tasks = query[Task].filter(_.requestSlug == request.slug)
+          totalTasks = tasks.size
+          completedTasks = tasks.filter(_.state == lift(State.Completed)).size
+        } yield (request, totalTasks, completedTasks)
       }
     }
   }

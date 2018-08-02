@@ -158,6 +158,35 @@ class DAOMock extends DAO {
     }.map(_.toSeq)
   }
 
+  def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject]): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
+    allRequests().flatMap { requests =>
+      val requestsWithTasksFuture = Future.sequence {
+        requests.map { request =>
+          requestTasks(request._1.slug).map { tasks =>
+            (request._1, request._2, request._3, tasks)
+          }
+        }
+      }
+
+      requestsWithTasksFuture.map { requestsWithTasks =>
+        requestsWithTasks.filter { case (request, _, _, requestTasks) =>
+          maybeProgram.forall(_ == request.program) &&
+          maybeState.forall(_ == request.state) &&
+          maybeData.forall { data =>
+            requestTasks.exists { case (task, _) =>
+              task.data.exists { taskData =>
+                // merge them an if they are they same, it is a match!
+                taskData.deepMerge(data) == taskData
+              }
+            }
+          }
+        }.map { case (request, numTotalTasks, numCompletedTasks, _) =>
+          (request, numTotalTasks, numCompletedTasks)
+        }.toSeq
+      }
+    }
+  }
+
 }
 
 object DAOMock {

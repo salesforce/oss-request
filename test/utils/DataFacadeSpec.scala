@@ -117,4 +117,67 @@ class DataFacadeSpec extends MixedPlaySpec {
     }
   }
 
+  "search" must {
+    "work with no params" in new App(withDb) {
+      Evolutions.withEvolutions(database) {
+        await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
+
+        val results = await(dataFacade.search(None, None, None))
+
+        results.size must equal (1)
+      }
+    }
+    "work with a program" in new App(withDb) {
+      Evolutions.withEvolutions(database) {
+        await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
+        await(dataFacade.createRequest("two", "foo", "foo@foo.com"))
+
+        val results = await(dataFacade.search(Some("default"), None, None))
+
+        results.size must equal (1)
+      }
+    }
+    "work with a state" in new App(withDb) {
+      Evolutions.withEvolutions(database) {
+        val request = await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
+        await(dataFacade.updateRequest("foo@foo.com", request.slug, State.Cancelled))
+
+        await(dataFacade.createRequest("two", "foo", "foo@foo.com"))
+
+        val results = await(dataFacade.search(None, Some(State.InProgress), None))
+
+        results.size must equal (1)
+      }
+    }
+    "work with program & state" in new App(withDb) {
+      Evolutions.withEvolutions(database) {
+        val request = await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
+        await(dataFacade.updateRequest("foo@foo.com", request.slug, State.Cancelled))
+
+        await(dataFacade.createRequest("two", "foo", "foo@foo.com"))
+
+        await(dataFacade.search(Some("default"), Some(State.InProgress), None)).size must equal (0)
+        await(dataFacade.search(Some("default"), Some(State.Cancelled), None)).size must equal (1)
+      }
+    }
+    "work with data" in new App(withDb) {
+      Evolutions.withEvolutions(database) {
+        val json = Json.obj(
+          "foo" -> "bar"
+        )
+
+        val prototype = Task.Prototype("test", Task.TaskType.Input, "test")
+
+        val request = await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
+        await(dataFacade.createTask(request.slug, prototype, Seq("foo@foo.com"), Some("foo@foo.com"), Some(json), State.Completed))
+
+        await(dataFacade.createRequest("two", "foo", "foo@foo.com"))
+
+        await(dataFacade.search(None, None, None)).size must equal (2)
+        await(dataFacade.search(None, None, Some(json))).size must equal (1)
+        await(dataFacade.search(None, None, Some(Json.obj("foo" -> "asdf")))).size must equal (0)
+      }
+    }
+  }
+
 }

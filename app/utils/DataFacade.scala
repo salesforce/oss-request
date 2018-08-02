@@ -156,6 +156,10 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     dao.tasksForUser(email, state)
   }
 
+  def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject]): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
+    dao.search(maybeProgram, maybeState, maybeData)
+  }
+
 }
 
 object DataFacade {

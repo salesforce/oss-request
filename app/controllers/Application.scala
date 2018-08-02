@@ -29,7 +29,7 @@ import scala.xml.{Comment, Node}
 
 class Application @Inject()
   (env: Environment, dataFacade: DataFacade, userAction: UserAction, auth: Auth, metadataService: MetadataService, configuration: Configuration, webJarsUtil: WebJarsUtil, notifyProvider: NotifyProvider, runtimeReporter: RuntimeReporter, dao: DAO)
-  (requestsView: views.html.Requests, newRequestView: views.html.NewRequest, newRequestFormView: views.html.NewRequestForm, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest, notifyTestView: views.html.NotifyTest, loginView: views.html.Login, pickEmailView: views.html.PickEmail, errorView: views.html.Error, openUserTasksView: views.html.OpenUserTasks, taskView: views.html.Task)
+  (requestsView: views.html.Requests, newRequestView: views.html.NewRequest, newRequestFormView: views.html.NewRequestForm, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest, notifyTestView: views.html.NotifyTest, loginView: views.html.Login, pickEmailView: views.html.PickEmail, errorView: views.html.Error, openUserTasksView: views.html.OpenUserTasks, taskView: views.html.Task, searchView: views.html.Search)
   (implicit ec: ExecutionContext)
   extends InjectedController {
 
@@ -99,6 +99,18 @@ class Application @Inject()
 
           Ok(requestsView(userRequests, adminRequests, userInfo))
         }
+      }
+    }
+  }
+
+  def search = userAction.async { implicit userRequest =>
+    withUserInfo { userInfo =>
+      val maybeProgram = userRequest.getQueryString("program")
+      val maybeState = userRequest.getQueryString("state").map(State.withName)
+      val maybeData = userRequest.getQueryString("data").flatMap(Json.parse(_).asOpt[JsObject])
+
+      dataFacade.search(maybeProgram, maybeState, maybeData).map { requests =>
+        Ok(searchView(requests, userInfo))
       }
     }
   }
