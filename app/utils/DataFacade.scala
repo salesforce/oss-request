@@ -48,7 +48,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
 
       _ <- taskEventHandler.process(program, request, TaskEvent.EventType.StateChange, updatedTask, createTask(_, _, _))
 
-      _ <- if (state == State.InProgress) notifier.taskAssigned(updatedTask) else Future.unit
+      _ <- if (state == State.InProgress) notifier.taskAssigned(request, updatedTask) else Future.unit
     } yield updatedTask
   }
 
@@ -96,7 +96,8 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     for {
       _ <- security.updateTask(email, taskId)
       task <- dao.assignTask(taskId, emails)
-      _ <- notifier.taskAssigned(task)
+      (request, _, _) <- dao.request(task.requestSlug)
+      _ <- notifier.taskAssigned(request, task)
     } yield task
   }
 

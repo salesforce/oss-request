@@ -79,11 +79,11 @@ class Notifier @Inject()(notifyProvider: NotifyProvider)(implicit ec: ExecutionC
     }
   }
 
-  def taskAssigned(task: Task)(implicit requestHeader: RequestHeader): Future[_] = {
+  def taskAssigned(request: Request, task: Task)(implicit requestHeader: RequestHeader): Future[_] = {
     task.completableByEmailsOrUrl.fold({ emails =>
       val url = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL()
 
-      val subject = s"OSS Request - Task Assigned - ${task.prototype.label}"
+      val subject = s"OSS Request - ${request.name} - Task Assigned - ${task.prototype.label}"
       val message =
         s"""
            |You have been assigned an OSS Request task '${task.prototype.label}'

@@ -64,7 +64,7 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       val request = await(dao.createRequest("asdf", "asdf@asdf.com"))
       val task = await(dao.createTask(request.slug, Task.Prototype("foo", Task.TaskType.Action, "foo"), Seq("foo@foo.com")))
 
-      await(notifier.taskAssigned(task))
+      await(notifier.taskAssigned(request, task))
 
       notifyMock.notifications.map(_._1) must contain (Set("foo@foo.com"))
     }
