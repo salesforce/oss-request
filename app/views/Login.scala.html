@@ -7,8 +7,8 @@
 
 @this(main: Main)
 
-@(authUrl: String)(implicit request: RequestHeader)
+@()(implicit request: RequestHeader)
 
 @main(None)("Login") {
-    You need to <a href="@authUrl">login</a> to do anything.
+    You need to <a href="/">login</a> to do anything.
 }

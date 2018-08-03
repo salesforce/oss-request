@@ -39,6 +39,15 @@ class AuthModule extends Module {
 sealed trait Auth {
   def authUrl(implicit requestHeader: RequestHeader): Future[String]
 
+  def state(implicit requestHeader: RequestHeader): String = {
+    if (requestHeader.rawQueryString.isEmpty) {
+      requestHeader.path
+    }
+    else {
+      requestHeader.path + "?" + requestHeader.rawQueryString
+    }
+  }
+
   def emails(maybeToken: Option[String])(implicit requestHeader: RequestHeader): Future[Set[String]]
 }
 
@@ -46,7 +55,7 @@ class LocalAuth @Inject() (devUsers: DevUsers) extends Auth {
 
   def authUrl(implicit requestHeader: RequestHeader): Future[String] = {
     Future.successful {
-      controllers.routes.Application.callback(None, None).absoluteURL()
+      controllers.routes.Application.callback(None, Some(state)).absoluteURL()
     }
   }
 
@@ -192,7 +201,7 @@ class SamlAuth @Inject() (configuration: Configuration, wsClient: WSClient) (imp
       maybeUrl.fold(Future.failed[String](new Exception("Could not get the redirect url"))) { url =>
         val authnRequest = new AuthnRequest(settings(metadata))
 
-        val query = Query("SAMLRequest" -> authnRequest.getEncodedAuthnRequest, "RelayState" -> "token")
+        val query = Query("SAMLRequest" -> authnRequest.getEncodedAuthnRequest, "RelayState" -> state)
 
         Future.successful(Uri(url).withQuery(query).toString())
       }

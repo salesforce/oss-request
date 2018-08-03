@@ -31,7 +31,7 @@ GET         /callback                                          controllers.Appli
 + nocsrf
 POST        /acs                                               controllers.Application.acs()
 
-GET         /select-email                                      controllers.Application.selectEmail(email: String)
+GET         /select-email                                      controllers.Application.selectEmail(email: String, state: Option[String])
 
 GET         /logout                                            controllers.Application.logout()
 

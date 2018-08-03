@@ -366,7 +366,7 @@ class Application @Inject()
   private def login(state: Option[String])(emails: Set[String])(implicit request: RequestHeader): Future[Result] = {
     if (emails.size > 1) {
       metadataService.fetchMetadata.map { metadata =>
-        Ok(pickEmailView(emails, metadata)).withSession("emails" -> emails.mkString(","))
+        Ok(pickEmailView(emails, metadata, state)).withSession("emails" -> emails.mkString(","))
       }
     }
     else if (emails.size == 1) {
@@ -391,15 +391,16 @@ class Application @Inject()
   }
 
   def acs() = Action.async(parse.formUrlEncoded) { implicit request =>
-    auth.emails(request.body.get("SAMLResponse").flatMap(_.headOption)).flatMap(login(None)).recover {
+    val maybeState = request.body.get("RelayState").flatMap(_.headOption)
+    auth.emails(request.body.get("SAMLResponse").flatMap(_.headOption)).flatMap(login(maybeState)).recover {
       case e: Exception => Unauthorized(e.getMessage)
     }
   }
 
-  def selectEmail(email: String) = Action { request =>
+  def selectEmail(email: String, state: Option[String]) = Action { request =>
     val maybeValidEmail = request.session.get("emails").map(_.split(",")).getOrElse(Array.empty[String]).find(_ == email)
     maybeValidEmail.fold(Unauthorized("Email invalid")) { validEmail =>
-      val url = controllers.routes.Application.openUserTasks().url
+      val url = state.getOrElse(controllers.routes.Application.openUserTasks().url)
       // todo: putting this info in the session means we can't easily invalidate it later
       Redirect(url).withSession("email" -> validEmail)
     }
@@ -407,7 +408,7 @@ class Application @Inject()
 
   def logout() = Action.async { implicit request =>
     auth.authUrl.map { authUrl =>
-      Ok(loginView(authUrl)).withNewSession
+      Ok(loginView()).withNewSession
     }
   }
 
