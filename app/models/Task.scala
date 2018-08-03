@@ -27,6 +27,31 @@ case class Task(id: Int, createDate: ZonedDateTime, completableBy: Seq[String], 
     }
   }
   val maybeServiceKey: Option[String] = prototype.completableBy.filter(_.`type` == CompletableByType.Service).flatMap(_.value)
+
+  def stateToHuman: String = prototype.`type` match {
+    case Task.TaskType.Approval =>
+      state match {
+        case State.InProgress => "in review"
+        case State.OnHold => "put on hold"
+        case State.Cancelled => "denied"
+        case State.Completed => "approved"
+      }
+    case Task.TaskType.Action =>
+      state match {
+        case State.InProgress => "in progress"
+        case State.OnHold => "put on hold"
+        case State.Cancelled => "cancelled"
+        case State.Completed => "completed"
+      }
+    case Task.TaskType.Input =>
+      state match {
+        case State.InProgress => "awaiting input"
+        case State.OnHold => "put on hold"
+        case State.Cancelled => "cancelled"
+        case State.Completed => "completed"
+      }
+  }
+
 }
 
 object Task {

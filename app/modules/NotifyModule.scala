@@ -56,10 +56,10 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
       if (!task.completedBy.contains(request.creatorEmail)) {
         val url = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL()
 
-        val subject = s"OSS Request ${request.name} - Task ${task.prototype.label} is now ${task.state.toHuman}"
+        val subject = s"OSS Request ${request.name} - Task ${task.prototype.label} is now ${task.stateToHuman}"
         val message =
           s"""
-             |On your OSS Request ${request.name}, the ${task.prototype.label} task is now ${task.state.toHuman}.
+             |On your OSS Request ${request.name}, the ${task.prototype.label} task is now ${task.stateToHuman}.
              |For details, see: $url
         """.stripMargin
 
@@ -115,7 +115,7 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
 
   def requestStatusChange(request: Request)(implicit requestHeader: RequestHeader): Future[_] = {
     val url = controllers.routes.Application.request(request.slug).absoluteURL()
-    val subject = s"OSS Request ${request.name} was ${request.state.toHuman}"
+    val subject = s"OSS Request ${request.name} was ${request.stateToHuman}"
     val message =
       s"""
          |Details: $url

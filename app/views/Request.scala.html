@@ -125,20 +125,20 @@
         case models.State.Completed => {
             @request.completedDate match {
                 case Some(completedDate) => {
-                    Completed on @views.utils.DateTime.date(completedDate)
+                    Approved on @views.utils.DateTime.date(completedDate)
                 }
                 case None => {
-                    Completed
+                    Approved
                 }
             }
         }
 
         case models.State.Cancelled => {
-            Request Cancelled
+            Request Denied
         }
 
         case _ => {
-            Request @request.state.toHuman
+            Request @request.stateToHuman
         }
     }
 }
