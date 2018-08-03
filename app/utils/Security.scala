@@ -30,7 +30,7 @@ class Security @Inject() (dao: DAO, metadataService: MetadataService) (implicit 
   }
 
   def canCancelRequest(email: String, requestOrRequestSlug: Either[Request, String]): Future[Boolean] = {
-    val requestFuture = requestOrRequestSlug.fold(Future.successful, dao.request)
+    val requestFuture = requestOrRequestSlug.fold(Future.successful, dao.request(_).map(_._1))
     requestFuture.flatMap { request =>
       isAdmin(request.program, email).map { isAdmin =>
         isAdmin || isRequestOwner(email, request)
@@ -39,7 +39,7 @@ class Security @Inject() (dao: DAO, metadataService: MetadataService) (implicit 
   }
 
   def updateRequest(email: String, requestSlug: String, state: State.State): Future[Unit] = {
-    dao.request(requestSlug).flatMap { request =>
+    dao.request(requestSlug).flatMap { case (request, _, _) =>
       isAdmin(request.program, email).flatMap { isAdmin =>
         if (isAdmin) {
           Future.unit
@@ -60,7 +60,7 @@ class Security @Inject() (dao: DAO, metadataService: MetadataService) (implicit 
   def canEditTask(email: String, taskOrTaskId: Either[Task, Int]): Future[Boolean] = {
     val taskFuture = taskOrTaskId.fold(Future.successful, dao.taskById)
     taskFuture.flatMap { task =>
-      dao.request(task.requestSlug).flatMap { request =>
+      dao.request(task.requestSlug).flatMap { case (request, _, _) =>
         isAdmin(request.program, email).map(Security.canEditTask(email, task))
       }
     }
@@ -76,7 +76,7 @@ class Security @Inject() (dao: DAO, metadataService: MetadataService) (implicit 
   def deleteTask(email: String, taskId: Int): Future[Unit] = {
     val isAdminFuture = for {
       task <- dao.taskById(taskId)
-      request <- dao.request(task.requestSlug)
+      (request, _, _) <- dao.request(task.requestSlug)
       isAdmin <- isAdmin(request.program, email)
     } yield isAdmin
 

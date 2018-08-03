@@ -38,8 +38,8 @@ trait DAO {
   def programRequests(program: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]]
   def programRequests(): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = programRequests("default")
   def userRequests(email: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]]
-  def request(requestSlug: String): Future[Request]
-  def updateRequest(requestSlug: String, state: State.State): Future[Request]
+  def request(requestSlug: String): Future[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]
+  def updateRequest(requestSlug: String, state: State.State): Future[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]
   def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task]
   def updateTaskState(taskId: Int, state: State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task]
   def deleteTask(taskId: Int): Future[Unit]
@@ -119,7 +119,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def updateRequest(requestSlug: String, state: State): Future[Request] = {
+  override def updateRequest(requestSlug: String, state: State): Future[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)] = {
     val maybeCompletedDate = if (state == State.Completed) Some(ZonedDateTime.now()) else None
 
     val updateFuture = run {
@@ -134,13 +134,18 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
   }
 
 
-  override def request(slug: String): Future[Request] = {
+  override def request(slug: String): Future[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)] = {
     run {
       quote {
-        query[Request].filter(_.slug == lift(slug))
+        for {
+          request <- query[Request].filter(_.slug == lift(slug))
+          tasks = query[Task].filter(_.requestSlug == request.slug)
+          totalTasks = tasks.size
+          completedTasks = tasks.filter(_.state == lift(State.Completed)).size
+        } yield (request, totalTasks, completedTasks)
       }
     } flatMap { result =>
-      result.headOption.fold(Future.failed[Request](DB.RequestNotFound(slug)))(Future.successful)
+      result.headOption.fold(Future.failed[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)](DB.RequestNotFound(slug)))(Future.successful)
     }
   }
 

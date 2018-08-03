@@ -11,7 +11,7 @@ import com.roundeights.hasher.Algo
 import javax.inject.{Inject, Singleton}
 import models.{Comment, Request, Task}
 import play.api.data.Forms._
-import play.api.data.{Form, _}
+import play.api.data._
 import play.api.data.format.Formats._
 import play.api.data.format.Formatter
 import play.api.http.{HeaderNames, Status}
@@ -20,7 +20,7 @@ import play.api.libs.json.{JsObject, Json}
 import play.api.libs.ws.{WSAuthScheme, WSClient, WSResponse}
 import play.api.mvc.RequestHeader
 import play.api.{Configuration, Environment, Logger}
-import utils.{MetadataService, RuntimeReporter}
+import utils.RuntimeReporter
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
@@ -37,8 +37,18 @@ class NotifyModule extends Module {
 }
 
 trait NotifyProvider {
+
+  def sendMessage(emails: Set[String], subject: String, message: String, data: JsObject = JsObject.empty): Future[_] = {
+    if (emails.nonEmpty) {
+      sendMessageSafe(emails, subject, message, data)
+    }
+    else {
+      Future.unit
+    }
+  }
+
   // todo: constrain Set to be non-empty
-  def sendMessage(emails: Set[String], subject: String, message: String, data: JsObject = JsObject.empty): Future[_]
+  protected def sendMessageSafe(emails: Set[String], subject: String, message: String, data: JsObject = JsObject.empty): Future[_]
 
   implicit object EmailReplyFormatter extends Formatter[EmailReply] {
     override def bind(key: String, data: Map[String, String]): Either[Seq[FormError], EmailReply] = Left(Seq.empty)
@@ -48,26 +58,24 @@ trait NotifyProvider {
   val form: Form[EmailReply] = Form[EmailReply](of[EmailReply])
 }
 
-class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvider: NotifyProvider)(implicit ec: ExecutionContext) {
+class Notifier @Inject()(notifyProvider: NotifyProvider)(implicit ec: ExecutionContext) {
   // todo: move content to templates
 
-  def taskStateChanged(task: Task)(implicit requestHeader: RequestHeader): Future[_] = {
-    dao.request(task.requestSlug).flatMap { request =>
-      if (!task.completedBy.contains(request.creatorEmail)) {
-        val url = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL()
+  def taskStateChanged(request: Request, task: Task)(implicit requestHeader: RequestHeader): Future[_] = {
+    if (!task.completedBy.contains(request.creatorEmail)) {
+      val url = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL()
 
-        val subject = s"OSS Request ${request.name} - Task ${task.prototype.label} is now ${task.stateToHuman}"
-        val message =
-          s"""
-             |On your OSS Request ${request.name}, the ${task.prototype.label} task is now ${task.stateToHuman}.
-             |For details, see: $url
-        """.stripMargin
+      val subject = s"OSS Request ${request.name} - Task ${task.prototype.label} is now ${task.stateToHuman}"
+      val message =
+        s"""
+           |On your OSS Request ${request.name}, the ${task.prototype.label} task is now ${task.stateToHuman}.
+           |For details, see: $url
+      """.stripMargin
 
-        notifyProvider.sendMessage(Set(request.creatorEmail), subject, message)
-      }
-      else {
-        Future.unit
-      }
+      notifyProvider.sendMessage(Set(request.creatorEmail), subject, message)
+    }
+    else {
+      Future.unit
     }
   }
 
@@ -88,29 +96,23 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
     })
   }
 
-  def taskComment(requestSlug: String, comment: Comment)(implicit requestHeader: RequestHeader): Future[_] = {
-    taskCommentInfo(requestSlug, comment).flatMap { case (request, task, emails) =>
-      if (emails.nonEmpty) {
-        val url = controllers.routes.Application.task(request.slug, task.id).absoluteURL()
+  def taskComment(request: Request, task: Task, comment: Comment)(implicit requestHeader: RequestHeader): Future[_] = {
+    val emails = task.completableByEmailsOrUrl.left.getOrElse(Set.empty[String]) + request.creatorEmail - comment.creatorEmail
+    val url = controllers.routes.Application.task(request.slug, task.id).absoluteURL()
 
-        val subject = s"Comment on OSS Request Task - ${request.name} - ${task.prototype.label}"
-        val message = s"""
-             |${comment.creatorEmail} said:
-             |${comment.contents}
-             |
-             |Respond: $url""".stripMargin
+    val subject = s"Comment on OSS Request Task - ${request.name} - ${task.prototype.label}"
+    val message = s"""
+         |${comment.creatorEmail} said:
+         |${comment.contents}
+         |
+         |Respond: $url""".stripMargin
 
-        val data = Json.obj(
-          "request-slug" -> requestSlug,
-          "task-id" -> task.id
-        )
+    val data = Json.obj(
+      "request-slug" -> request.slug,
+      "task-id" -> task.id
+    )
 
-        notifyProvider.sendMessage(emails, subject, message, data)
-      }
-      else {
-        Future.unit
-      }
-    }
+    notifyProvider.sendMessage(emails, subject, message, data)
   }
 
   def requestStatusChange(request: Request)(implicit requestHeader: RequestHeader): Future[_] = {
@@ -124,22 +126,23 @@ class Notifier @Inject()(dao: DAO, metadataService: MetadataService, notifyProvi
     notifyProvider.sendMessage(Set(request.creatorEmail), subject, message)
   }
 
-  private def taskCommentInfo(requestSlug: String, comment: Comment): Future[(Request, Task, Set[String])] = {
-    val requestFuture = dao.request(requestSlug)
-    val taskFuture = dao.taskById(comment.taskId)
+  def allTasksCompleted(request: Request, admins: Set[String])(implicit requestHeader: RequestHeader): Future[_] = {
+    val url = controllers.routes.Application.request(request.slug).absoluteURL()
+    val subject = s"OSS Request ${request.name} - All Tasks Completed"
+    val message =
+      s"""
+         |All of the tasks on the OSS Request ${request.name} have been completed.
+         |
+         |Details: $url
+        """.stripMargin
 
-    for {
-      request <- requestFuture
-      task <- taskFuture
-    } yield {
-      // notify those that can complete the task, the request creator, but not the comment creator
-      (request, task, task.completableByEmailsOrUrl.left.getOrElse(Set.empty[String]) + request.creatorEmail - comment.creatorEmail)
-    }
+    notifyProvider.sendMessage(admins, subject, message)
   }
+
 }
 
 class NotifyLogger @Inject()(implicit executionContext: ExecutionContext) extends NotifyProvider {
-  override def sendMessage(emails: Set[String], subject: String, message: String, data: JsObject = JsObject.empty): Future[Unit] = {
+  override def sendMessageSafe(emails: Set[String], subject: String, message: String, data: JsObject = JsObject.empty): Future[Unit] = {
     Logger.info(s"Notification '$subject' for $emails - $message")
     Future.unit
   }
@@ -155,7 +158,7 @@ class NotifySparkPost @Inject()(configuration: Configuration, wSClient: WSClient
   lazy val user = configuration.get[String]("sparkpost.user")
   lazy val from = user + "@" + maybeDomain.getOrElse("sparkpostbox.com")
 
-  override def sendMessage(emails: Set[String], subject: String, message: String, data: JsObject = JsObject.empty): Future[String] = {
+  override def sendMessageSafe(emails: Set[String], subject: String, message: String, data: JsObject = JsObject.empty): Future[String] = {
     val f = sendMessageWithResponse(emails, subject, message).flatMap { response =>
       response.status match {
         case Status.OK =>
@@ -211,11 +214,11 @@ class NotifyMailgun @Inject()(configuration: Configuration, wSClient: WSClient, 
   lazy val from = user + "@" + domain
   lazy val baseUrl = s"https://api.mailgun.net/v3/$domain/messages"
 
-  override def sendMessage(emails: Set[String], subject: String, message: String, data: JsObject = JsObject.empty): Future[String] = {
+  override def sendMessageSafe(emails: Set[String], subject: String, message: String, data: JsObject = JsObject.empty): Future[Option[String]] = {
     val f = sendMessageWithResponse(emails, subject, message, data).flatMap { response =>
       response.status match {
         case Status.OK =>
-          Future.successful(response.body)
+          Future.successful(Some(response.body))
         case _ =>
           val errorTry = Try((response.json \ "message").as[String])
           val message = errorTry.getOrElse(response.body)

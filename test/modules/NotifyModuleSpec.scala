@@ -44,7 +44,7 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       val task = await(dao.createTask(request.slug, Task.Prototype("foo", Task.TaskType.Action, "foo"), Seq("foo@foo.com")))
       val comment = await(dao.commentOnTask(task.id, "bar@bar.com", "bar"))
 
-      await(notifier.taskComment(request.slug, comment))
+      await(notifier.taskComment(request, task, comment))
 
       notifyMock.notifications.map(_._1) must contain (Set("asdf@asdf.com", "foo@foo.com"))
     }
@@ -53,7 +53,7 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       val task = await(dao.createTask(request.slug, Task.Prototype("foo", Task.TaskType.Action, "foo"), Seq("foo@foo.com")))
       val comment = await(dao.commentOnTask(task.id, "foo@foo.com", "foo"))
 
-      await(notifier.taskComment(request.slug, comment))
+      await(notifier.taskComment(request, task, comment))
 
       notifyMock.notifications must be (empty)
     }
@@ -164,7 +164,7 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 class NotifyMock extends NotifyProvider {
   val notifications = collection.mutable.Set.empty[(Set[String], String, String)]
 
-  override def sendMessage(emails: Set[String], subject: String, message: String, data: JsObject): Future[Unit] = {
+  override def sendMessageSafe(emails: Set[String], subject: String, message: String, data: JsObject): Future[Unit] = {
     val notification = (emails, subject, message)
     notifications += notification
     Future.unit

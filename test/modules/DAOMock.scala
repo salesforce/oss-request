@@ -88,16 +88,20 @@ class DAOMock extends DAO {
     }
   }
 
-  override def request(requestSlug: String): Future[Request] = {
-    requests.find(_.slug == requestSlug).fold(Future.failed[Request](new Exception("Request not found")))(Future.successful)
+  override def request(requestSlug: String): Future[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)] = {
+    allRequests().flatMap { requests =>
+      requests.find(_._1.slug == requestSlug).fold {
+        Future.failed[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)](new Exception("Request not found"))
+      } (Future.successful)
+    }
   }
 
-  override def updateRequest(requestSlug: String, state: State.State): Future[Request] = {
-    request(requestSlug).map { request =>
+  override def updateRequest(requestSlug: String, state: State.State): Future[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)] = {
+    request(requestSlug).map { case (request, numTotalTasks, numCompletedTasks) =>
       val updatedRequest = request.copy(state = state)
       requests -= request
       requests += request
-      updatedRequest
+      (updatedRequest, numTotalTasks, numCompletedTasks)
     }
   }
 

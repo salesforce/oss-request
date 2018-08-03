@@ -26,7 +26,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
   // todo: this compares task prototypes on a task (in the db) with those in metadata and thus if a task changes in metadata, it is no longer equal to the one in the db
   def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress)(implicit requestHeader: RequestHeader): Future[Task] = {
     for {
-      request <- dao.request(requestSlug)
+      (request, _, _) <- dao.request(requestSlug)
 
       existingTasksWithComments <- dao.requestTasks(requestSlug)
 
@@ -67,14 +67,14 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
   def updateRequest(email: String, requestSlug: String, state: State.State)(implicit requestHeader: RequestHeader): Future[Request] = {
     for {
       _ <- security.updateRequest(email, requestSlug, state)
-      request <- dao.updateRequest(requestSlug, state)
+      (request, _, _) <- dao.updateRequest(requestSlug, state)
       _ <- notifier.requestStatusChange(request)
     } yield request
   }
 
   def request(email: String, requestSlug: String): Future[(Request, Boolean, Boolean)] = {
     for {
-      request <- dao.request(requestSlug)
+      (request, _, _) <- dao.request(requestSlug)
       isAdmin <- security.isAdmin(request.program, email)
       canCancelRequest <- security.canCancelRequest(email, Left(request))
     } yield (request, isAdmin, canCancelRequest)
@@ -84,9 +84,10 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     for {
       _ <- security.updateTask(email, taskId)
       task <- dao.updateTaskState(taskId, state, maybeCompletedBy, maybeData)
-      request <- dao.request(task.requestSlug)
+      (request, numTotalTasks, numCompletedTasks) <- dao.request(task.requestSlug)
       program <- metadataService.fetchProgram(request.program)
-      _ <- notifier.taskStateChanged(task)
+      _ <- notifier.taskStateChanged(request, task)
+      _ <- if (numCompletedTasks == numTotalTasks) notifier.allTasksCompleted(request, program.admins) else Future.unit
       _ <- taskEventHandler.process(program, request, TaskEvent.EventType.StateChange, task, createTask(_, _, _))
     } yield task
   }
@@ -109,7 +110,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
   def taskById(taskId: Int)(implicit requestHeader: RequestHeader): Future[Task] = {
     for {
       task <- dao.taskById(taskId)
-      request <- dao.request(task.requestSlug)
+      (request, _, _) <- dao.request(task.requestSlug)
       updatedTask <- taskService.taskStatus(task, updateTaskState(request.creatorEmail, task.id, _, _, _))
     } yield updatedTask
   }
@@ -133,7 +134,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
 
     for {
       tasks <- dao.requestTasks(requestSlug, maybeState)
-      request <- dao.request(requestSlug)
+      (request, _, _) <- dao.request(requestSlug)
       updatedTasks <- updateTasks(request, tasks)
       tasksWithCanEdit <- Future.sequence(updatedTasks.map(canEdit))
     } yield tasksWithCanEdit
@@ -142,7 +143,9 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
   def commentOnTask(requestSlug: String, taskId: Int, email: String, contents: String)(implicit requestHeader: RequestHeader): Future[Comment] = {
     for {
       comment <- dao.commentOnTask(taskId, email, contents)
-      _ <- notifier.taskComment(requestSlug, comment)
+      task <- dao.taskById(taskId)
+      (request, _, _) <- dao.request(requestSlug)
+      _ <- notifier.taskComment(request, task, comment)
     } yield comment
   }
 
