@@ -12,7 +12,7 @@ import java.nio.file.Files
 
 import com.jcraft.jsch.{JSch, Session}
 import javax.inject.{Inject, Singleton}
-import models.Task
+import models.{State, Task}
 import models.Task.CompletableByType
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.transport.{JschConfigSessionFactory, OpenSshConfig, SshTransport}
@@ -37,7 +37,7 @@ object Metadata {
   implicit val jsonReads: Reads[Metadata] = multiprogramReads.orElse(singleprogramReads)
 }
 
-case class Program(name: String, description: Option[String], startTasks: Set[String], groups: Map[String, Set[String]], services: Map[String, String], tasks: Map[String, Task.Prototype]) {
+case class Program(name: String, description: Option[String], startTasks: Set[String], groups: Map[String, Set[String]], services: Map[String, String], tasks: Map[String, Task.Prototype], reports: Map[String, Report]) {
   val admins: Set[String] = groups.getOrElse("admin", Set.empty[String])
 
   def isAdmin(userInfo: UserInfo): Boolean = isAdmin(userInfo.email)
@@ -65,8 +65,22 @@ object Program {
     (__ \ "start_tasks").read[Set[String]].orElse(Reads.pure(Set.empty[String])) ~
     (__ \ "groups").read[Map[String, Set[String]]] ~
     (__ \ "services").read[Map[String, String]].orElse(Reads.pure(Map.empty[String, String])) ~
-    (__ \ "tasks").read[Map[String, Task.Prototype]]
+    (__ \ "tasks").read[Map[String, Task.Prototype]] ~
+    (__ \ "reports").read[Map[String, Report]].orElse(Reads.pure(Map.empty[String, Report]))
   )(Program.apply _)
+}
+
+case class ReportQuery(state: Option[State.State], program: Option[String], data: JsObject)
+
+object ReportQuery {
+  implicit val jsonReads: Reads[ReportQuery] = Json.reads[ReportQuery]
+}
+
+
+case class Report(title: String, query: ReportQuery)
+
+object Report {
+  implicit val jsonReads: Reads[Report] = Json.reads[Report]
 }
 
 @Singleton

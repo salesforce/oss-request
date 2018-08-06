@@ -7,7 +7,7 @@
 
 @this(mainView: Main, taskView: utils.TaskEditOrShow, commentsView: partials.Comments)
 
-@(request: models.Request, task: models.Task, comments: Seq[Comment], userInfo: _root_.utils.UserInfo, isAdmin: Boolean, groups: Set[String])(implicit requestHeader: RequestHeader)
+@(request: models.Request, task: models.Task, comments: Seq[Comment], userInfo: _root_.utils.UserInfo, isAdmin: Boolean, groups: Set[String])(implicit requestHeader: RequestHeader, metadata: _root_.utils.Metadata)
 
 @mainView(Some(userInfo))("Task") {
 

@@ -7,7 +7,7 @@
 
 @this(mainView: Main)
 
-@(userInfo: _root_.utils.UserInfo, maybeResult: Option[scala.util.Try[String]] = None)(implicit request: RequestHeader)
+@(userInfo: _root_.utils.UserInfo, maybeResult: Option[scala.util.Try[String]] = None)(implicit request: RequestHeader, metadata: _root_.utils.Metadata)
 
 @mainView(Some(userInfo))("Notify Test") {
 

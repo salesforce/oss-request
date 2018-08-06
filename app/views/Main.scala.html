@@ -7,7 +7,7 @@
 
 @this(webJarsUtil: org.webjars.play.WebJarsUtil)
 
-@(maybeUserInfo: Option[_root_.utils.UserInfo])(title: String, extraHead: Html = play.twirl.api.HtmlFormat.empty)(body: Html)(implicit request: RequestHeader)
+@(maybeUserInfo: Option[_root_.utils.UserInfo])(title: String, extraHead: Html = play.twirl.api.HtmlFormat.empty)(body: Html)(implicit request: RequestHeader, metadata: _root_.utils.Metadata)
 
 <!DOCTYPE html>
 <html>
@@ -39,7 +39,12 @@
                 @for(userInfo <- maybeUserInfo) {
                     <ul class="nav navbar-nav">
                         <li @if(title == "Your Open Tasks") { class="active" }><a href="@routes.Application.openUserTasks()">Your Open Tasks</a></li>
-                        <li @if(title == "OSS Requests") { class="active" }><a href="@routes.Application.requests()">Requests</a></li>
+                        <li class="dropdown @if(title == "OSS Requests") { active }">
+                            <a href="@routes.Application.requests(None)" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Requests <span class="caret"></span></a>
+                            <ul class="dropdown-menu">
+                                @partials.QuerySelector(metadata)
+                            </ul>
+                        </li>
                         <li @if(title == "New Request") { class="active" }><a href="@routes.Application.newRequest(None, None, None)">New Request</a></li>
                     </ul>
 

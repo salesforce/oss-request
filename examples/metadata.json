@@ -11,6 +11,18 @@
         "baz@baz.com"
       ]
     },
+    "reports": {
+      "in_foo_org": {
+        "title": "Requests in Foo",
+        "query": {
+          "state": "COMPLETED",
+          "program": "default",
+          "data": {
+            "github_org": "Foo"
+          }
+        }
+      }
+    },
     "tasks": {
       "start": {
         "label": "OSS Request Info",

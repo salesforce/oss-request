@@ -7,7 +7,7 @@
 
 @this(main: Main)
 
-@(userRequests: Seq[(models.Request, Long, Long)], adminRequests: Map[_root_.utils.Program, Seq[(models.Request, Long, Long)]], userInfo: _root_.utils.UserInfo)(implicit request: RequestHeader)
+@(title: String, requests: Seq[(models.Request, Long, Long)], userInfo: _root_.utils.UserInfo)(implicit request: RequestHeader, metadata: _root_.utils.Metadata)
 
 @stateClass(state: models.State.State) = {
     @state match {
@@ -23,7 +23,8 @@
     }
 }
 
-@requestList(requests: Seq[(models.Request, Long, Long)], title: String) = {
+@main(Some(userInfo))("OSS Requests") {
+
     @title
 
     @if(requests.nonEmpty) {
@@ -38,15 +39,6 @@
         </div>
     } else {
         No requests!
-    }
-}
-
-@main(Some(userInfo))("OSS Requests") {
-
-    @requestList(userRequests, "Your Requests")
-
-    @for(program <- adminRequests) {
-        @requestList(program._2, s"${program._1.name} Requests")
     }
 
 }

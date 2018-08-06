@@ -1,0 +1,25 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@(metadata: _root_.utils.Metadata)
+
+<li><a href="@routes.Application.requests(None)">Your Requests</a></li>
+
+<li role="separator" class="divider"></li>
+
+@for((programKey, program) <- metadata.programs) {
+
+    <li><a href="@routes.Application.requests(Some(programKey))">@program.name - All</a></li>
+
+    @for((reportKey, report) <- program.reports) {
+        <li><a href="@routes.Application.search(report.query.program, report.query.state, Some(report.query.data.toString))">@report.title</a></li>
+    }
+
+    @if(programKey != metadata.programs.last._1) {
+        <li role="separator" class="divider"></li>
+    }
+}

@@ -48,7 +48,7 @@ class Application @Inject()
 
   def openUserTasks = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      metadataService.fetchMetadata.flatMap { metadata =>
+      metadataService.fetchMetadata.flatMap { implicit metadata =>
         dataFacade.tasksForUser(userInfo.email, State.InProgress).map { tasks =>
           val tasksWithProgram = tasks.flatMap { case (task, numComments, request) =>
             metadata.programs.get(request.program).map { program =>
@@ -68,56 +68,41 @@ class Application @Inject()
     }
   }
 
-  def requests = userAction.async { implicit userRequest =>
+  def requests(program: Option[String]) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      metadataService.fetchMetadata.flatMap { metadata =>
+      metadataService.fetchMetadata.flatMap { implicit metadata =>
 
-        val programRequestsFuture = Future.reduceLeft {
-          metadata.programs.map { case (programKey, programMetadata) =>
-            if (programMetadata.isAdmin(userInfo)) {
-              dataFacade.programRequests(programKey)
-            }
-            else {
-              Future.successful(Seq.empty)
-            }
+        val (maybeTitle, requestsFuture) = program.map { programKey =>
+          metadata.programs.get(programKey).map(_.name) -> dataFacade.programRequests(programKey)
+        } getOrElse {
+          Some("Your Requests") -> dataFacade.userRequests(userInfo.email)
+        }
+
+        maybeTitle.map { title =>
+          requestsFuture.map { requests =>
+            Ok(requestsView(title, requests, userInfo))
           }
-        }(_ ++ _)
-
-        val userRequestsFuture = dataFacade.userRequests(userInfo.email)
-
-        for {
-          programRequests <- programRequestsFuture
-          userRequests <- userRequestsFuture
-        } yield {
-          val adminRequests = programRequests.groupBy { case (request, _, _) =>
-            metadata.programs.get(request.program)
-          } collect {
-            case (Some(program), requests) => program -> requests
-          }
-
-          // todo: this just silently drops programs that can't be found
-
-          Ok(requestsView(userRequests, adminRequests, userInfo))
+        } getOrElse {
+          Future.successful(InternalServerError(errorView("Could not find program", userInfo)))
         }
       }
     }
   }
 
-  def search = userAction.async { implicit userRequest =>
+  def search(program: Option[String], state: Option[models.State.State], data: Option[String]) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      val maybeProgram = userRequest.getQueryString("program")
-      val maybeState = userRequest.getQueryString("state").map(State.withName)
-      val maybeData = userRequest.getQueryString("data").flatMap(Json.parse(_).asOpt[JsObject])
-
-      dataFacade.search(maybeProgram, maybeState, maybeData).map { requests =>
-        Ok(searchView(requests, userInfo))
+      metadataService.fetchMetadata.flatMap { implicit metadata =>
+        val maybeData = data.flatMap(Json.parse(_).asOpt[JsObject])
+        dataFacade.search(program, state, maybeData).map { requests =>
+          Ok(searchView(requests, userInfo))
+        }
       }
     }
   }
 
   def newRequest(maybeName: Option[String], maybeProgramKey: Option[String], maybeStartTask: Option[String]) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      metadataService.fetchMetadata.map { metadata =>
+      metadataService.fetchMetadata.map { implicit metadata =>
         val nonEmptyMaybeName = maybeName.filter(_.nonEmpty)
         val nonEmptyMaybeProgramKey = maybeProgramKey.filter(_.nonEmpty)
         val nonEmptyMaybeStartTask = maybeStartTask.filter(_.nonEmpty)
@@ -130,14 +115,14 @@ class Application @Inject()
           task <- programMetadata.tasks.get(startTask)
         } yield Ok(newRequestFormView(programKey, name, startTask, task, userInfo))
 
-        maybeTaskView.getOrElse(Ok(newRequestView(userInfo, metadata, nonEmptyMaybeName, nonEmptyMaybeProgramKey, nonEmptyMaybeStartTask)))
+        maybeTaskView.getOrElse(Ok(newRequestView(userInfo, nonEmptyMaybeName, nonEmptyMaybeProgramKey, nonEmptyMaybeStartTask)))
       }
     }
   }
 
   def createRequest(name: String, programKey: String, startTask: String) = userAction.async(parse.json) { implicit userRequest =>
     withUserInfo { userInfo =>
-      metadataService.fetchMetadata.flatMap { metadata =>
+      metadataService.fetchMetadata.flatMap { implicit metadata =>
         metadata.programs.get(programKey).fold {
           Future.successful(NotFound(s"Program '$programKey' not found"))
         } { programMetadata =>
@@ -159,7 +144,7 @@ class Application @Inject()
 
   def request(requestSlug: String) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      metadataService.fetchMetadata.flatMap { metadata =>
+      metadataService.fetchMetadata.flatMap { implicit metadata =>
         dataFacade.request(userInfo.email, requestSlug).flatMap { case (request, isAdmin, canCancelRequest) =>
           metadata.programs.get(request.program).fold {
             Future.successful(InternalServerError(s"Could not find program ${request.program}"))
@@ -168,9 +153,9 @@ class Application @Inject()
               Ok(requestView(program, request, tasks, userInfo, canCancelRequest))
             }
           }
+        } recover {
+          case rnf: DB.RequestNotFound => NotFound(errorView(rnf.getMessage, userInfo))
         }
-      } recover {
-        case rnf: DB.RequestNotFound => NotFound(errorView(rnf.getMessage, userInfo))
       }
     }
   }
@@ -185,19 +170,20 @@ class Application @Inject()
 
   def task(requestSlug: String, taskId: Int) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      for {
-        (request, isAdmin, _) <- dataFacade.request(userInfo.email, requestSlug)
-        task <- dataFacade.taskById(taskId)
-        comments <- dataFacade.commentsOnTask(taskId)
-        metadata <- metadataService.fetchMetadata
-        program <- metadata.programs.get(request.program).fold(Future.failed[Program](new Exception("Program not found")))(Future.successful)
-      } yield Ok(taskView(request, task, comments, userInfo, isAdmin, program.groups.keySet))
+      metadataService.fetchMetadata.flatMap { implicit metadata =>
+        for {
+          (request, isAdmin, _) <- dataFacade.request(userInfo.email, requestSlug)
+          task <- dataFacade.taskById(taskId)
+          comments <- dataFacade.commentsOnTask(taskId)
+          program <- metadata.programs.get(request.program).fold(Future.failed[Program](new Exception("Program not found")))(Future.successful)
+        } yield Ok(taskView(request, task, comments, userInfo, isAdmin, program.groups.keySet))
+      }
     }
   }
 
   def addTask(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
     withUserInfo { userInfo =>
-      metadataService.fetchMetadata.flatMap { metadata =>
+      metadataService.fetchMetadata.flatMap { implicit metadata =>
         val maybeTaskPrototypeKey = userRequest.body.get("taskPrototypeKey").flatMap(_.headOption)
         val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption).filterNot(_.isEmpty)
 
@@ -321,43 +307,47 @@ class Application @Inject()
 
   def formTest = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      metadataService.fetchMetadata.map { metadata =>
-        Ok(formTestView(userInfo, metadata))
+      metadataService.fetchMetadata.map { implicit metadata =>
+        Ok(formTestView(userInfo))
       }
     }
   }
 
   def notifyTest = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      Future.successful(Ok(notifyTestView(userInfo)))
+      metadataService.fetchMetadata.map { implicit metadata =>
+        Ok(notifyTestView(userInfo))
+      }
     }
   }
 
   def notifyTestSend = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      val maybeInfo = for {
-        form <- userRequest.body.asFormUrlEncoded
+      metadataService.fetchMetadata.flatMap { implicit metadata =>
+        val maybeInfo = for {
+          form <- userRequest.body.asFormUrlEncoded
 
-        recipients <- form.get("recipient")
-        recipient <- recipients.headOption
-        if !recipient.isEmpty
+          recipients <- form.get("recipient")
+          recipient <- recipients.headOption
+          if !recipient.isEmpty
 
-        messages <- form.get("message")
-        message <- messages.headOption
-        if !message.isEmpty
-      } yield recipient -> message
+          messages <- form.get("message")
+          message <- messages.headOption
+          if !message.isEmpty
+        } yield recipient -> message
 
-      maybeInfo.fold {
-        Future.successful(BadRequest(notifyTestView(userInfo, Some(Failure(new Exception("Missing form value"))))))
-      } { case (recipient, message) =>
-        notifyProvider.sendMessage(Set(recipient), "Notify Test", message).map { result =>
-          val message = result match {
-            case s: String => s
-            case _ => "Test Successful"
+        maybeInfo.fold {
+          Future.successful(BadRequest(notifyTestView(userInfo, Some(Failure(new Exception("Missing form value"))))))
+        } { case (recipient, message) =>
+          notifyProvider.sendMessage(Set(recipient), "Notify Test", message).map { result =>
+            val message = result match {
+              case s: String => s
+              case _ => "Test Successful"
+            }
+            Ok(notifyTestView(userInfo, Some(Success(message))))
+          } recover {
+            case t: Throwable => Ok(notifyTestView(userInfo, Some(Failure(t))))
           }
-          Ok(notifyTestView(userInfo, Some(Success(message))))
-        } recover {
-          case t: Throwable => Ok(notifyTestView(userInfo, Some(Failure(t))))
         }
       }
     }
@@ -365,8 +355,8 @@ class Application @Inject()
 
   private def login(state: Option[String])(emails: Set[String])(implicit request: RequestHeader): Future[Result] = {
     if (emails.size > 1) {
-      metadataService.fetchMetadata.map { metadata =>
-        Ok(pickEmailView(emails, metadata, state)).withSession("emails" -> emails.mkString(","))
+      metadataService.fetchMetadata.map { implicit  metadata =>
+        Ok(pickEmailView(emails, state)).withSession("emails" -> emails.mkString(","))
       }
     }
     else if (emails.size == 1) {
@@ -407,8 +397,10 @@ class Application @Inject()
   }
 
   def logout() = Action.async { implicit request =>
-    auth.authUrl.map { authUrl =>
-      Ok(loginView()).withNewSession
+    auth.authUrl.flatMap { authUrl =>
+      metadataService.fetchMetadata.map { implicit metadata =>
+        Ok(loginView()).withNewSession
+      }
     }
   }
 

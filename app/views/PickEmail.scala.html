@@ -7,7 +7,7 @@
 
 @this(main: Main)
 
-@(emails: Set[String], metadata: _root_.utils.Metadata, state: Option[String])(implicit request: RequestHeader)
+@(emails: Set[String], state: Option[String])(implicit request: RequestHeader, metadata: _root_.utils.Metadata)
 
 @main(None)("Select Email") {
     <h2>That account has multiple emails, pick one</h2>
