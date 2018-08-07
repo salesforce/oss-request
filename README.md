@@ -8,8 +8,17 @@ Metadata Schema
 
 The request system is driven by a metadata definition which includes system groups and the prototypes for tasks.  [Check out an example](examples/metadata.json).  For production use set the `METADATA_URL` and `METADATA_TOKEN` env vars so the metadata can be externalized from this source.  Here the properties that need to be defined in the metadata file:
 
+- `name` (string) The name of the program
+- `description` (string) Description of the program
 - `groups` (object, required) - Defines the groups where the key is the identifier of the group and the value is an array of string email addresses.  There must be a group with the key `admin` but additional groups can also be defined.
 - `services` (object) - Defines the urls for service names in key-values on the the object
+- `reports` (object) - Named search queries
+    - `a_unique_id` (object)
+        - `title` (string, required) - Title displayed in the site navigation
+        - `query` (object) - Query parameters
+            - `state` (enum) - Request state: `IN_PROGRESS | ON_HOLD | CANCELLED | COMPLETED`
+            - `program` (string) - Program identifier
+            - `data` (object) - Task data to search for
 - `tasks` (object, required) - Defines the tasks where the key is the identifier of the task and the value is an object defining the prototype for a task.  There must be a task with the key `start` but additional tasks should also be defined.  A task prototype object has the following properties:
 
     - `label` (string, required) - Displayed in the header of the task view
@@ -31,8 +40,20 @@ The request system is driven by a metadata definition which includes system grou
             - `value` (string) - The identifier of the task
 
         - `criteria` (object) - Defines critera for when the action should be run
-            - `type` - Currently only `FIELD_VALUE` is supported and allows filtering on a field's value
-            - `value` - Matches a field name and value, e.g. foo=bar
+            - `type` (enum, required) - Currently only `FIELD_VALUE` is supported and allows filtering on a field's value
+            - `value` (string, required) - Matches a field name and value, e.g. foo==bar
+
+    - `approval_conditions` (array) - Strings with the possible approval conditions that can be applied to this task
+
+Your metadata can define multiple programs by nesting the above structure in an object with a program identifier, like:
+```
+{
+    "my_program": {
+        "name": "My Program",
+        ...
+    }
+}
+```
 
 
 Tasks Assigned to Services
