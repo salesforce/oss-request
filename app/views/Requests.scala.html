@@ -7,38 +7,12 @@
 
 @this(main: Main)
 
-@(title: String, requests: Seq[(models.Request, Long, Long)], userInfo: _root_.utils.UserInfo)(implicit request: RequestHeader, metadata: _root_.utils.Metadata)
-
-@stateClass(state: models.State.State) = {
-    @state match {
-        case models.State.InProgress => {
-            list-group-item-info
-        }
-        case models.State.Cancelled => {
-            list-group-item-warning
-        }
-        case models.State.Completed => {
-            list-group-item-success
-        }
-    }
-}
+@(title: String, requests: Seq[RequestWithTasks], userInfo: _root_.utils.UserInfo)(implicit request: RequestHeader, metadata: _root_.utils.Metadata)
 
 @main(Some(userInfo))("OSS Requests") {
 
-    @title
+    <h2>@title</h2>
 
-    @if(requests.nonEmpty) {
-        <div class="list-group">
-        @for((request, totalTasks, completedTasks) <- requests) {
-            <a href="@routes.Application.request(request.slug)" class="list-group-item @stateClass(request.state)">
-                <span class="badge" style="margin-top: 25px;">@completedTasks of @totalTasks tasks completed</span>
-                <h4>@request.name</h4>
-                <p>Created @views.utils.DateTime.date(request.createDate) by @request.creatorEmail</p>
-            </a>
-        }
-        </div>
-    } else {
-        No requests!
-    }
+    @partials.RequestsList(requests)
 
 }

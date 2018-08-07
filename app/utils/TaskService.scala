@@ -12,10 +12,10 @@ import java.net.URL
 import javax.inject.Inject
 import models.Task.CompletableByType
 import models.{Request, State, Task}
-import play.api.{Configuration, Environment, Logger, Mode}
 import play.api.http.{HeaderNames, Status}
 import play.api.libs.json.{JsError, JsObject, JsPath, JsResult, JsString, JsSuccess, JsValue, Json, JsonValidationError, Reads}
 import play.api.libs.ws.{WSClient, WSRequest}
+import play.api.{Configuration, Environment, Logger, Mode}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
@@ -71,7 +71,7 @@ class TaskService @Inject()(environment: Environment, configuration: Configurati
     })
   }
 
-  def taskCreated(program: Program, request: Request, task: Task, existingTasks: Seq[Task], taskUrl: String, updateTaskState: (State.State, Option[String], Option[JsObject]) => Future[Task]): Future[Task] = {
+  def taskCreated(program: Program, request: Request, task: Task, existingTasks: Seq[Task], taskUrl: String, updateTaskState: (State.State, Option[String], Option[JsObject], Option[String]) => Future[Task]): Future[Task] = {
     if (task.prototype.completableBy.exists(_.`type` == CompletableByType.Service)) {
       val dependenciesData = task.prototype.dependencies.map { taskKey =>
 
@@ -102,17 +102,22 @@ class TaskService @Inject()(environment: Environment, configuration: Configurati
           response.status match {
             case Status.CREATED =>
               parseResponse(response.body).flatMap { serviceResponse =>
-                updateTaskState(serviceResponse.state, Some(serviceResponse.url.toString), serviceResponse.maybeData)
+                updateTaskState(serviceResponse.state, Some(serviceResponse.url.toString), serviceResponse.maybeData, None)
               }
             case _ =>
-              Future.failed(new Exception(response.body))
+              Future.failed(UnexpectedResponse(response.statusText, response.body))
           }
         } recoverWith {
+          case e: UnexpectedResponse =>
+            if (environment.mode != Mode.Test) {
+              Logger.error(e.body, e)
+            }
+            updateTaskState(State.Cancelled, Some(wsRequest.url), None, Some(e.getMessage))
           case e: Exception =>
             if (environment.mode != Mode.Test) {
-              Logger.error("Service threw error on create task", e)
+              Logger.error("Error communicating with Service", e)
             }
-            updateTaskState(State.Cancelled, None, None)
+            updateTaskState(State.Cancelled, Some(wsRequest.url), None, Some(e.getMessage))
         }
       }
     }
@@ -121,20 +126,31 @@ class TaskService @Inject()(environment: Environment, configuration: Configurati
     }
   }
 
-  def taskStatus(task: Task, updateTaskState: (State.State, Option[String], Option[JsObject]) => Future[Task]): Future[Task] = {
+  def taskStatus(task: Task, updateTaskState: (State.State, Option[String], Option[JsObject], Option[String]) => Future[Task]): Future[Task] = {
     if (task.prototype.completableBy.exists(_.`type` == CompletableByType.Service) && task.state == State.InProgress) {
       wsRequest(task).flatMap { wsRequest =>
-        task.completedBy.fold(updateTaskState(State.Cancelled, None, None)) { url =>
+        task.completedBy.fold(updateTaskState(State.Cancelled, None, None, Some("Could not determine URL to call"))) { url =>
           wsRequest.withQueryStringParameters("url" -> url).get().flatMap { response =>
             response.status match {
               case Status.OK =>
                 parseResponse(response.body).flatMap { serviceResponse =>
-                  updateTaskState(serviceResponse.state, Some(serviceResponse.url.toString), serviceResponse.maybeData)
+                  updateTaskState(serviceResponse.state, Some(serviceResponse.url.toString), serviceResponse.maybeData, None)
                 }
               case _ =>
-                Future.failed(new Exception(response.body))
+                Future.failed(UnexpectedResponse(response.statusText, response.body))
             }
           }
+        } recoverWith {
+          case e: UnexpectedResponse =>
+            if (environment.mode != Mode.Test) {
+              Logger.error(e.body, e)
+            }
+            updateTaskState(State.Cancelled, Some(wsRequest.url), None, Some(e.getMessage))
+          case e: Exception =>
+            if (environment.mode != Mode.Test) {
+              Logger.error("Error communicating with Service", e)
+            }
+            updateTaskState(State.Cancelled, Some(wsRequest.url), None, Some(e.getMessage))
         }
       }
     }
@@ -144,3 +160,5 @@ class TaskService @Inject()(environment: Environment, configuration: Configurati
   }
 
 }
+
+case class UnexpectedResponse(statusText: String, body: String) extends Exception(s"Unexpected status '$statusText' from service")

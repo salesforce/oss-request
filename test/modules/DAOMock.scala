@@ -11,7 +11,7 @@ import java.time.ZonedDateTime
 import java.util.concurrent.ConcurrentHashMap
 
 import javax.inject.Singleton
-import models.{Comment, Request, State, Task}
+import models.{Comment, Request, RequestWithTasks, State, Task}
 import play.api.Mode
 import play.api.db.evolutions.EvolutionsModule
 import play.api.db.{DBModule, HikariCPModule}
@@ -42,22 +42,21 @@ class DAOMock extends DAO {
     Future.sequence {
       requests.map { request =>
         requestTasks(request.slug).map { requestTasks =>
-          val numCompletedTasks = requestTasks.map(_._1).count(_.state == State.Completed).toLong
-          (request, requestTasks.size.toLong, numCompletedTasks)
+          RequestWithTasks(request, requestTasks.map(_._1))
         }
       }
     }
   }
 
   override def programRequests(program: String) = {
-    allRequests().map(_.filter(_._1.program == program).toSeq)
+    allRequests().map(_.filter(_.request.program == program).toSeq)
   }
 
-  override def userRequests(email: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
-    allRequests().map(_.filter(_._1.creatorEmail == email)).map(_.toSeq)
+  override def userRequests(email: String): Future[Seq[RequestWithTasks]] = {
+    allRequests().map(_.filter(_.request.creatorEmail == email)).map(_.toSeq)
   }
 
-  override def updateTaskState(taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject]): Future[Task] = {
+  override def updateTaskState(taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], completionMessage: Option[String]): Future[Task] = {
     tasks.find(_.id == taskId).fold(Future.failed[Task](new Exception("Task not found"))) { task =>
       val updatedTask = task.copy(
         state = state,
@@ -88,27 +87,35 @@ class DAOMock extends DAO {
     }
   }
 
-  override def request(requestSlug: String): Future[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)] = {
+  override def request(requestSlug: String): Future[Request] = {
     allRequests().flatMap { requests =>
-      requests.find(_._1.slug == requestSlug).fold {
-        Future.failed[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)](new Exception("Request not found"))
+      requests.find(_.request.slug == requestSlug).fold {
+        Future.failed[Request](new Exception("Request not found"))
+      } (r => Future.successful(r.request))
+    }
+  }
+
+  override def requestWithTasks(requestSlug: String) = {
+    allRequests().flatMap { requests =>
+      requests.find(_.request.slug == requestSlug).fold {
+        Future.failed[RequestWithTasks](new Exception("Request not found"))
       } (Future.successful)
     }
   }
 
-  override def updateRequest(requestSlug: String, state: State.State): Future[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)] = {
-    request(requestSlug).map { case (request, numTotalTasks, numCompletedTasks) =>
+  override def updateRequest(requestSlug: String, state: State.State): Future[Request] = {
+    request(requestSlug).map { request =>
       val updatedRequest = request.copy(state = state)
       requests -= request
       requests += request
-      (updatedRequest, numTotalTasks, numCompletedTasks)
+      updatedRequest
     }
   }
 
   override def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String], maybeData: Option[JsObject], state: State.State): Future[Task] = {
     Future.successful {
       val id = Try(tasks.map(_.id).max).getOrElse(0) + 1
-      val task = Task(id, ZonedDateTime.now(), completableBy, maybeCompletedBy, maybeCompletedBy.map(_ => ZonedDateTime.now()), state, prototype, maybeData, requestSlug)
+      val task = Task(id, ZonedDateTime.now(), completableBy, maybeCompletedBy, maybeCompletedBy.map(_ => ZonedDateTime.now()), None, state, prototype, maybeData, requestSlug)
       tasks += task
       task
     }
@@ -162,35 +169,22 @@ class DAOMock extends DAO {
     }.map(_.toSeq)
   }
 
-  def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject]): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
-    allRequests().flatMap { requests =>
-      val requestsWithTasksFuture = Future.sequence {
-        requests.map { request =>
-          requestTasks(request._1.slug).map { tasks =>
-            (request._1, request._2, request._3, tasks)
-          }
-        }
-      }
-
-      requestsWithTasksFuture.map { requestsWithTasks =>
-        requestsWithTasks.filter { case (request, _, _, requestTasks) =>
-          maybeProgram.forall(_ == request.program) &&
-          maybeState.forall(_ == request.state) &&
-          maybeData.forall { data =>
-            requestTasks.exists { case (task, _) =>
-              task.data.exists { taskData =>
-                // merge them an if they are they same, it is a match!
-                taskData.deepMerge(data) == taskData
-              }
+  def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject]): Future[Seq[RequestWithTasks]] = {
+    allRequests().map { requestsWithTasks =>
+      requestsWithTasks.filter { requestWithTasks =>
+        maybeProgram.forall(_ == requestWithTasks.request.program) &&
+        maybeState.forall(_ == requestWithTasks.request.state) &&
+        maybeData.forall { data =>
+          requestWithTasks.tasks.exists { task =>
+            task.data.exists { taskData =>
+              // merge them an if they are they same, it is a match!
+              taskData.deepMerge(data) == taskData
             }
           }
-        }.map { case (request, numTotalTasks, numCompletedTasks, _) =>
-          (request, numTotalTasks, numCompletedTasks)
-        }.toSeq
-      }
+        }
+      }.toSeq
     }
   }
-
 }
 
 object DAOMock {

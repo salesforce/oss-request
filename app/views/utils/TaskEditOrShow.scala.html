@@ -6,6 +6,7 @@
  *@
 
 @this(taskEditView: TaskEdit, taskShowView: TaskShow, commentsView: partials.Comments)
+
 @(task: models.Task, commentCountOrComments: Either[Long, Seq[Comment]], userInfo: _root_.utils.UserInfo, isAdmin: Boolean, groups: Set[String])(implicit request: RequestHeader)
 
 @panelType = {
@@ -34,22 +35,28 @@
     }
 }
 
+
 @completed = {
-    @for(completedDate <- task.completedDate) {
-        @for(completedBy <- task.completedBy) {
-            <div class="panel-footer">
-                Completed on @views.utils.DateTime.date(completedDate) by
-                @task.completableByEmailsOrUrl match {
-                    case Left(emails) => {
-                        @completedBy
+    <div class="panel-footer">
+        @for(completedDate <- task.completedDate) {
+            @for(completedBy <- task.completedBy) {
+                @(task.completableByEmailsOrUrl, task.completionMessage, task.prototype.`type`) match {
+                    case (Left(_), Some(completionMessage), Task.TaskType.Approval) => {
+                        Conditionally approved on @views.utils.DateTime.date(completedDate) by @completedBy provided @completionMessage
                     }
-                    case Right(url) => {
-                        <a href="@completedBy">@completedBy</a>
+                    case (Left(_), _, _) => {
+                        @task.stateToHuman.capitalize on @views.utils.DateTime.date(completedDate) by @completedBy
+                    }
+                    case (Right(url), maybeCompletionMessage, _) => {
+                        @task.stateToHuman.capitalize on @views.utils.DateTime.date(completedDate) by <a href="@completedBy">@completedBy</a>
+                        @for(completionMessage <- maybeCompletionMessage) {
+                            with message: <code>@completionMessage</code>
+                        }
                     }
                 }
-            </div>
+            }
         }
-    }
+    </div>
 }
 
 <div class="panel @panelType">
@@ -115,32 +122,23 @@
     @(task.prototype.`type`) match {
         case models.Task.TaskType.Input => {
             @task.state match {
-                case models.State.Completed => {
-                    @completed
-                }
-                case models.State.Cancelled => {
-                    <div class="panel-footer">Task Cancelled</div>
-                }
                 case models.State.InProgress => {
                     <div class="panel-footer">
                         @assignment
                     </div>
                 }
+                case _ => {
+                    @completed
+                }
             }
         }
         case models.Task.TaskType.Action => {
             @task.state match {
-                case models.State.Completed => {
-                    @completed
-                }
-                case models.State.Cancelled => {
-                    <div class="panel-footer">Task Cancelled</div>
-                }
                 case models.State.InProgress if assignedToUser => {
                     <div class="panel-footer clearfix">
                         @assignment
 
-                        <form action="@helper.CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, models.State.Completed)).url" method="post" class="pull-right">
+                        <form action="@helper.CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, models.State.Completed, task.completionMessage)).url" method="post" class="pull-right">
                             <button type="submit" class="btn btn-success">Mark as Completed</button>
                         </form>
                     </div>
@@ -150,32 +148,44 @@
                         @assignment
                     </div>
                 }
+                case _ => {
+                    @completed
+                }
             }
         }
         case models.Task.TaskType.Approval => {
             @task.state match {
-                case models.State.Completed => {
-                    @completed
-                }
-                case models.State.Cancelled => {
-                    <div class="panel-footer">Denied</div>
-                }
                 case models.State.InProgress if assignedToUser => {
                     <div class="panel-footer clearfix">
                         @assignment
 
                         <div class="pull-right">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <form action="@helper.CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, models.State.Completed)).url" method="post">
-                                        <button type="submit" class="btn btn-success">Approve</button>
-                                    </form>
+                            <div style="display: inline-block">
+                                <form action="@helper.CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, models.State.Completed, task.completionMessage)).url" method="post">
+                                    <button type="submit" class="btn btn-success">Approve</button>
+                                </form>
+                            </div>
+                            @if(task.prototype.approvalConditions.nonEmpty) {
+                                <div style="display: inline-block">
+                                    <div class="btn-group">
+                                        <button type="button" class="btn btn-warning dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                            Approve Conditionally <span class="caret"></span>
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            @for(condition <- task.prototype.approvalConditions) {
+                                                <li data-condition="@condition">
+                                                    <form action="@helper.CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, models.State.Completed, Some(condition))).url" method="post"></form>
+                                                    <a href="#" onclick="$(this).prev().submit()">@condition</a>
+                                                </li>
+                                            }
+                                        </ul>
+                                    </div>
                                 </div>
-                                <div class="col-md-6">
-                                    <form action="@helper.CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, models.State.Cancelled)).url" method="post">
-                                        <button type="submit" class="btn btn-warning">Deny</button>
-                                    </form>
-                                </div>
+                            }
+                            <div style="display: inline-block">
+                                <form action="@helper.CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, models.State.Cancelled, task.completionMessage)).url" method="post">
+                                    <button type="submit" class="btn btn-danger">Deny</button>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -185,9 +195,11 @@
                         @assignment
                     </div>
                 }
+                case _ => {
+                    @completed
+                }
             }
         }
     }
-
 
 </div>

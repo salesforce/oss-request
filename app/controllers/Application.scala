@@ -7,15 +7,12 @@
 
 package controllers
 
-import java.time.ZonedDateTime
-
 import javax.inject.Inject
 import models.Task.CompletableByType
 import models.{State, Task}
 import modules.{Auth, DAO, DB, NotifyProvider}
 import org.webjars.WebJarAssetLocator
 import org.webjars.play.WebJarsUtil
-import play.api.data.Form
 import play.api.libs.json.{JsObject, Json}
 import play.api.mvc._
 import play.api.{Configuration, Environment, Logger, Mode}
@@ -215,9 +212,9 @@ class Application @Inject()
     }
   }
 
-  def updateTaskState(requestSlug: String, taskId: Int, state: State.State) = userAction.async(maybeJsObject) { implicit userRequest =>
+  def updateTaskState(requestSlug: String, taskId: Int, state: State.State, completionMessage: Option[String]) = userAction.async(maybeJsObject) { implicit userRequest =>
     withUserInfo { userInfo =>
-      dataFacade.updateTaskState(userInfo.email, taskId, state, Some(userInfo.email), userRequest.body).map { task =>
+      dataFacade.updateTaskState(userInfo.email, taskId, state, Some(userInfo.email), userRequest.body, completionMessage).map { task =>
         render {
           case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
           case Accepts.Json() => Ok(Json.toJson(task))

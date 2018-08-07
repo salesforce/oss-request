@@ -120,7 +120,10 @@
           "type": "EMAIL",
           "value": "foo@bar.com"
         },
-        "info": "Schedule a meeting with Foo Bar to start the IP approval process."
+        "info": "Schedule a meeting with Foo Bar to start the IP approval process.",
+        "approval_conditions": [
+          "new features must seek new approval"
+        ]
       },
       "vp_approval": {
         "label": "VP Approval",

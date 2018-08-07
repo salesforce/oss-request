@@ -8,7 +8,7 @@
 package utils
 
 import javax.inject.Inject
-import models.{Comment, Request, State, Task, TaskEvent}
+import models.{Comment, Request, RequestWithTasks, State, Task, TaskEvent}
 import modules.{DAO, Notifier}
 import play.api.libs.json.JsObject
 import play.api.mvc.RequestHeader
@@ -26,7 +26,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
   // todo: this compares task prototypes on a task (in the db) with those in metadata and thus if a task changes in metadata, it is no longer equal to the one in the db
   def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress)(implicit requestHeader: RequestHeader): Future[Task] = {
     for {
-      (request, _, _) <- dao.request(requestSlug)
+      request <- dao.request(requestSlug)
 
       existingTasksWithComments <- dao.requestTasks(requestSlug)
 
@@ -44,7 +44,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
 
       url = controllers.routes.Application.task(requestSlug, task.id).absoluteURL()
 
-      updatedTask <- taskService.taskCreated(program, request, task, existingTasks, url, updateTaskState(request.creatorEmail, task.id, _, _, _))
+      updatedTask <- taskService.taskCreated(program, request, task, existingTasks, url, updateTaskState(request.creatorEmail, task.id, _, _, _, _))
 
       _ <- taskEventHandler.process(program, request, TaskEvent.EventType.StateChange, updatedTask, createTask(_, _, _))
 
@@ -52,13 +52,13 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     } yield updatedTask
   }
 
-  def programRequests(program: String): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
+  def programRequests(program: String): Future[Seq[RequestWithTasks]] = {
     for {
       programRequests <- dao.programRequests(program)
     } yield programRequests
   }
 
-  def userRequests(email: String): Future[Seq[(Request, Long, Long)]] = {
+  def userRequests(email: String): Future[Seq[RequestWithTasks]] = {
     for {
       requests <- dao.userRequests(email)
     } yield requests
@@ -67,28 +67,28 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
   def updateRequest(email: String, requestSlug: String, state: State.State)(implicit requestHeader: RequestHeader): Future[Request] = {
     for {
       _ <- security.updateRequest(email, requestSlug, state)
-      (request, _, _) <- dao.updateRequest(requestSlug, state)
+      request <- dao.updateRequest(requestSlug, state)
       _ <- notifier.requestStatusChange(request)
     } yield request
   }
 
   def request(email: String, requestSlug: String): Future[(Request, Boolean, Boolean)] = {
     for {
-      (request, _, _) <- dao.request(requestSlug)
+      request <- dao.request(requestSlug)
       isAdmin <- security.isAdmin(request.program, email)
       canCancelRequest <- security.canCancelRequest(email, Left(request))
     } yield (request, isAdmin, canCancelRequest)
   }
 
-  def updateTaskState(email: String, taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject])(implicit requestHeader: RequestHeader): Future[Task] = {
+  def updateTaskState(email: String, taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], completionMessage: Option[String])(implicit requestHeader: RequestHeader): Future[Task] = {
     for {
       _ <- security.updateTask(email, taskId)
-      task <- dao.updateTaskState(taskId, state, maybeCompletedBy, maybeData)
-      (request, numTotalTasks, numCompletedTasks) <- dao.request(task.requestSlug)
-      program <- metadataService.fetchProgram(request.program)
-      _ <- notifier.taskStateChanged(request, task)
-      _ <- if (numCompletedTasks == numTotalTasks) notifier.allTasksCompleted(request, program.admins) else Future.unit
-      _ <- taskEventHandler.process(program, request, TaskEvent.EventType.StateChange, task, createTask(_, _, _))
+      task <- dao.updateTaskState(taskId, state, maybeCompletedBy, maybeData, completionMessage)
+      requestWithTasks <- dao.requestWithTasks(task.requestSlug)
+      program <- metadataService.fetchProgram(requestWithTasks.request.program)
+      _ <- notifier.taskStateChanged(requestWithTasks.request, task)
+      _ <- if (requestWithTasks.completedTasks.size == requestWithTasks.tasks.size) notifier.allTasksCompleted(requestWithTasks.request, program.admins) else Future.unit
+      _ <- taskEventHandler.process(program, requestWithTasks.request, TaskEvent.EventType.StateChange, task, createTask(_, _, _))
     } yield task
   }
 
@@ -96,7 +96,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     for {
       _ <- security.updateTask(email, taskId)
       task <- dao.assignTask(taskId, emails)
-      (request, _, _) <- dao.request(task.requestSlug)
+      request <- dao.request(task.requestSlug)
       _ <- notifier.taskAssigned(request, task)
     } yield task
   }
@@ -111,8 +111,8 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
   def taskById(taskId: Int)(implicit requestHeader: RequestHeader): Future[Task] = {
     for {
       task <- dao.taskById(taskId)
-      (request, _, _) <- dao.request(task.requestSlug)
-      updatedTask <- taskService.taskStatus(task, updateTaskState(request.creatorEmail, task.id, _, _, _))
+      request <- dao.request(task.requestSlug)
+      updatedTask <- taskService.taskStatus(task, updateTaskState(request.creatorEmail, task.id, _, _, _, _))
     } yield updatedTask
   }
 
@@ -126,7 +126,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     def updateTasks(request: Request, tasks: Seq[(Task, DAO.NumComments)]): Future[Seq[(Task, DAO.NumComments)]] = {
       Future.sequence {
         tasks.map { case (task, numComments) =>
-          taskService.taskStatus(task, updateTaskState(request.creatorEmail, task.id, _, _, _)).map { updatedTask =>
+          taskService.taskStatus(task, updateTaskState(request.creatorEmail, task.id, _, _, _, _)).map { updatedTask =>
             updatedTask -> numComments
           }
         }
@@ -135,7 +135,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
 
     for {
       tasks <- dao.requestTasks(requestSlug, maybeState)
-      (request, _, _) <- dao.request(requestSlug)
+      request <- dao.request(requestSlug)
       updatedTasks <- updateTasks(request, tasks)
       tasksWithCanEdit <- Future.sequence(updatedTasks.map(canEdit))
     } yield tasksWithCanEdit
@@ -145,7 +145,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     for {
       comment <- dao.commentOnTask(taskId, email, contents)
       task <- dao.taskById(taskId)
-      (request, _, _) <- dao.request(requestSlug)
+      request <- dao.request(requestSlug)
       _ <- notifier.taskComment(request, task, comment)
     } yield comment
   }
@@ -160,7 +160,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     dao.tasksForUser(email, state)
   }
 
-  def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject]): Future[Seq[(Request, DAO.NumTotalTasks, DAO.NumCompletedTasks)]] = {
+  def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject]): Future[Seq[RequestWithTasks]] = {
     dao.search(maybeProgram, maybeState, maybeData)
   }
 

@@ -7,9 +7,9 @@
 
 package utils
 
-import play.api.{Logger, Mode}
 import play.api.db.evolutions.{EvolutionsApi, EvolutionsReader}
 import play.api.inject.guice.GuiceApplicationBuilder
+import play.api.{Logger, Mode}
 
 import scala.concurrent.ExecutionContext
 import scala.util.Try

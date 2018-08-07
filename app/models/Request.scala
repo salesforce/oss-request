@@ -22,6 +22,10 @@ case class Request(program: String, slug: String, name: String, createDate: Zone
 
 }
 
+case class RequestWithTasks(request: Request, tasks: Seq[Task]) {
+  lazy val completedTasks = tasks.filter(_.state == State.Completed)
+}
+
 object Request {
   implicit val jsonWrites: Writes[Request] = Json.writes[Request]
 }

@@ -12,8 +12,8 @@ import java.nio.file.Files
 
 import com.jcraft.jsch.{JSch, Session}
 import javax.inject.{Inject, Singleton}
-import models.{State, Task}
 import models.Task.CompletableByType
+import models.{State, Task}
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.transport.{JschConfigSessionFactory, OpenSshConfig, SshTransport}
 import org.eclipse.jgit.util.FS

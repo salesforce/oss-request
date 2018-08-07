@@ -49,7 +49,7 @@
                     @if(isAdmin) {
                         <div class="col-md-2">
                             <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Cancelled))" method="post">
-                                <button type="submit" class="btn btn-success">Cancel Request</button>
+                                <button type="submit" class="btn btn-warning">Cancel Request</button>
                             </form>
                         </div>
                     }
@@ -125,10 +125,21 @@
         case models.State.Completed => {
             @request.completedDate match {
                 case Some(completedDate) => {
-                    Approved on @views.utils.DateTime.date(completedDate)
+                    @defining(Tasks.conditionalApprovals(tasks.map(_._1))) { conditionalApprovalMessages =>
+                        @if(conditionalApprovalMessages.isEmpty) {
+                            <p>Approved on @views.utils.DateTime.date(completedDate)</p>
+                        } else {
+                            <p>Conditionally approved on @views.utils.DateTime.date(completedDate) provided:</p>
+                            @for(condition <- conditionalApprovalMessages) {
+                                <ul>
+                                    <li>@condition.capitalize</li>
+                                </ul>
+                            }
+                        }
+                    }
                 }
                 case None => {
-                    Approved
+                    @request.stateToHuman
                 }
             }
         }
@@ -148,7 +159,6 @@
     <div class="jumbotron">
         <h1>@request.name</h1>
         <p>Created by @request.creatorEmail on @views.utils.DateTime.date(request.createDate)</p>
-
         <div>@state</div>
     </div>
 

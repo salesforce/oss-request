@@ -107,21 +107,21 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
       val task = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
       task.state must equal (State.InProgress)
-      val updatedTask = await(dao.updateTaskState(task.id, State.Completed, Some("foo@foo.com"), None))
+      val updatedTask = await(dao.updateTaskState(task.id, State.Completed, Some("foo@foo.com"), None, None))
       updatedTask.state must equal (State.Completed)
     }
     "add a completedDate when closing a task" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
       val task = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
-      val updatedTask = await(dao.updateTaskState(task.id, State.Completed, Some("foo@foo.com"), None))
+      val updatedTask = await(dao.updateTaskState(task.id, State.Completed, Some("foo@foo.com"), None, None))
       updatedTask.completedDate must be (defined)
     }
     "fail to complete without a completedByEmail" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
       val task = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
-      an [Exception] must be thrownBy await(dao.updateTaskState(task.id, State.Completed, None, None))
+      an [Exception] must be thrownBy await(dao.updateTaskState(task.id, State.Completed, None, None, None))
     }
   }
 
@@ -149,7 +149,7 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
       val task1 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
       await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
-      await(dao.updateTaskState(task1.id, State.Completed, Some("foo@foo.com"), None))
+      await(dao.updateTaskState(task1.id, State.Completed, Some("foo@foo.com"), None, None))
       val inProgressTasks = await(dao.requestTasks(request.slug, Some(State.InProgress)))
       inProgressTasks must have size 1
       val allTasks = await(dao.requestTasks(request.slug))

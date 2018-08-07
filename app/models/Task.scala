@@ -16,7 +16,7 @@ import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import utils.MarkdownTransformer
 
-case class Task(id: Int, createDate: ZonedDateTime, completableBy: Seq[String], completedBy: Option[String], completedDate: Option[ZonedDateTime], state: State.State, prototype: Task.Prototype, data: Option[JsObject], requestSlug: String) {
+case class Task(id: Int, createDate: ZonedDateTime, completableBy: Seq[String], completedBy: Option[String], completedDate: Option[ZonedDateTime], completionMessage: Option[String], state: State.State, prototype: Task.Prototype, data: Option[JsObject], requestSlug: String) {
   val completableByEmailsOrUrl: Either[Set[String], URL] = {
     require(completableBy.nonEmpty)
     if (!prototype.completableBy.exists(_.`type` == CompletableByType.Service)) {
@@ -56,7 +56,7 @@ case class Task(id: Int, createDate: ZonedDateTime, completableBy: Seq[String], 
 
 object Task {
 
-  case class Prototype(label: String, `type`: TaskType.TaskType, info: String, completableBy: Option[CompletableBy] = None, form: Option[JsObject] = None, taskEvents: Seq[TaskEvent] = Seq.empty[TaskEvent], dependencies: Set[String] = Set.empty[String]) {
+  case class Prototype(label: String, `type`: TaskType.TaskType, info: String, completableBy: Option[CompletableBy] = None, form: Option[JsObject] = None, taskEvents: Seq[TaskEvent] = Seq.empty[TaskEvent], dependencies: Set[String] = Set.empty[String], approvalConditions: Set[String] = Set.empty[String]) {
     lazy val infoMarkdownToHtml = {
       MarkdownTransformer.transform(info)
     }
@@ -107,7 +107,8 @@ object Task {
       (__ \ "completable_by").readNullable[CompletableBy] ~
       (__ \ "form").readNullable[JsObject] ~
       (__ \ "task_events").readNullable[Seq[TaskEvent]].map(_.getOrElse(Seq.empty[TaskEvent])) ~
-      (__ \ "dependencies").readNullable[Set[String]].map(_.getOrElse(Set.empty[String]))
+      (__ \ "dependencies").readNullable[Set[String]].map(_.getOrElse(Set.empty[String])) ~
+      (__ \ "approval_conditions").readNullable[Set[String]].map(_.getOrElse(Set.empty[String]))
     )(Prototype.apply _)
     implicit val jsonWrites = (
       (__ \ "label").write[String] ~
@@ -116,7 +117,8 @@ object Task {
       (__ \ "completable_by").writeNullable[CompletableBy] ~
       (__ \ "form").writeNullable[JsObject] ~
       (__ \ "task_events").write[Seq[TaskEvent]] ~
-      (__ \ "dependencies").write[Set[String]]
+      (__ \ "dependencies").write[Set[String]] ~
+      (__ \ "approval_conditions").write[Set[String]]
     )(unlift(Prototype.unapply))
     implicit val prototypeEncoder = MappedEncoding[Task.Prototype, String](prototype => Json.toJson(prototype).toString())
     implicit val prototypeDecoder = MappedEncoding[String, Task.Prototype](Json.parse(_).as[Task.Prototype])
@@ -124,5 +126,19 @@ object Task {
 
   implicit val jsonReads = Json.reads[Task]
   implicit val jsonWrites = Json.writes[Task]
+
+}
+
+object Tasks {
+
+  def conditionalApprovals(tasks: Seq[Task]): Seq[String] = {
+    for {
+      task <- tasks
+      if task.state == State.Completed
+      if task.prototype.`type` == Task.TaskType.Approval
+      if task.completableByEmailsOrUrl.isLeft
+      message <- task.completionMessage
+    } yield message
+  }
 
 }
