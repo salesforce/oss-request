@@ -105,9 +105,10 @@ class DAOMock extends DAO {
 
   override def updateRequest(requestSlug: String, state: State.State): Future[Request] = {
     request(requestSlug).map { request =>
-      val updatedRequest = request.copy(state = state)
+      val maybeCompletedDate = if (state != State.InProgress) Some(ZonedDateTime.now()) else None
+      val updatedRequest = request.copy(state = state, completedDate = maybeCompletedDate)
       requests -= request
-      requests += request
+      requests += updatedRequest
       updatedRequest
     }
   }

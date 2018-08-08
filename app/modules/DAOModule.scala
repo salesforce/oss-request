@@ -117,7 +117,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
   }
 
   override def updateRequest(requestSlug: String, state: State): Future[Request] = {
-    val maybeCompletedDate = if (state == State.Completed) Some(ZonedDateTime.now()) else None
+    val maybeCompletedDate = if (state != State.InProgress) Some(ZonedDateTime.now()) else None
 
     val updateFuture = run {
       quote {

@@ -7,7 +7,9 @@
 
 package utils
 
-import models.State
+import models.Task.TaskType
+import models.TaskEvent.{Criteria, CriteriaType, EventAction, EventActionType, EventType}
+import models.{State, Task, TaskEvent}
 import modules.DAOMock
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
@@ -69,6 +71,17 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
       tasks.exists(_.prototype.label == "Create GitHub Repo") mustBe false
       tasks.exists(_.prototype.label == "IP Approval") mustBe true
     }
+    "support UPDATE_REQUEST_STATE" in {
+      val eventAction = EventAction(EventActionType.UpdateRequestState, State.Completed.toString)
+      val taskEvent = TaskEvent(EventType.StateChange, State.Completed.toString, eventAction, None)
+      val taskPrototype = Task.Prototype("asdf", TaskType.Input, "asfd", None, None, Seq(taskEvent))
+      val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
+      val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
+
+      val (updatedRequest, _, _) = await(dataFacade.request("asdf@asdf.com", request.slug))
+      updatedRequest.state must equal (State.Completed)
+      updatedRequest.completedDate must be (defined)
+    }
   }
 
   "criteriaMatches" must {
@@ -79,11 +92,11 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
           "b" -> true
         )
       )
-      TaskEventHandler.criteriaMatches("s==foo", json) must be (true)
-      TaskEventHandler.criteriaMatches("s==bar", json) must be (false)
-      TaskEventHandler.criteriaMatches("b==true", json) must be (true)
-      TaskEventHandler.criteriaMatches("b==false", json) must be (false)
-      TaskEventHandler.criteriaMatches("n==foo", json) must be (false)
+      TaskEventHandler.valueMatches(json)("s==foo") must be (true)
+      TaskEventHandler.valueMatches(json)("s==bar") must be (false)
+      TaskEventHandler.valueMatches(json)("b==true") must be (true)
+      TaskEventHandler.valueMatches(json)("b==false") must be (false)
+      TaskEventHandler.valueMatches(json)("n==foo") must be (false)
     }
     "work with !=" in {
       val json = Some(
@@ -92,11 +105,29 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
           "b" -> true
         )
       )
-      TaskEventHandler.criteriaMatches("s!=foo", json) must be (false)
-      TaskEventHandler.criteriaMatches("s!=bar", json) must be (true)
-      TaskEventHandler.criteriaMatches("b!=true", json) must be (false)
-      TaskEventHandler.criteriaMatches("b!=false", json) must be (true)
-      TaskEventHandler.criteriaMatches("n!=foo", json) must be (true)
+      TaskEventHandler.valueMatches(json)("s!=foo") must be (false)
+      TaskEventHandler.valueMatches(json)("s!=bar") must be (true)
+      TaskEventHandler.valueMatches(json)("b!=true") must be (false)
+      TaskEventHandler.valueMatches(json)("b!=false") must be (true)
+      TaskEventHandler.valueMatches(json)("n!=foo") must be (true)
+    }
+    "work with AND_CRITERIA" in {
+      val json = Some(
+        Json.obj(
+          "s" -> "foo",
+          "b" -> true
+        )
+      )
+
+      val sFoo = Criteria(CriteriaType.FieldValue, Left("s==foo"))
+      val bTrue = Criteria(CriteriaType.FieldValue, Left("b==true"))
+      val bFalse = Criteria(CriteriaType.FieldValue, Left("b==false"))
+
+      val sFooAndBTrueCriteria = Criteria(CriteriaType.AndCriteria, Right(Set(sFoo, bTrue)))
+      TaskEventHandler.criteriaMatches(json)(sFooAndBTrueCriteria) must be (true)
+
+      val sFooAndBFalseCriteria = Criteria(CriteriaType.AndCriteria, Right(Set(sFoo, bFalse)))
+      TaskEventHandler.criteriaMatches(json)(sFooAndBFalseCriteria) must be (false)
     }
   }
 

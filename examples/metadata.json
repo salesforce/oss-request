@@ -101,6 +101,27 @@
               "type": "CREATE_TASK",
               "value": "ip_approval"
             }
+          },
+          {
+            "type": "STATE_CHANGE",
+            "value": "COMPLETED",
+            "criteria": {
+              "type": "AND_CRITERIA",
+              "value": [
+                {
+                  "type": "FIELD_VALUE",
+                  "value": "github_org==Personal"
+                },
+                {
+                  "type": "FIELD_VALUE",
+                  "value": "patentable==false"
+                }
+              ]
+            },
+            "action": {
+              "type": "UPDATE_REQUEST_STATE",
+              "value": "COMPLETED"
+            }
           }
         ]
       },
