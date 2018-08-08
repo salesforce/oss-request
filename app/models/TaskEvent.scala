@@ -48,6 +48,7 @@ object TaskEvent {
     type CriteriaType = Value
 
     val FieldValue = Value("FIELD_VALUE")
+    val FieldEmpty = Value("FIELD_EMPTY")
     val AndCriteria = Value("AND_CRITERIA")
     val OrCriteria = Value("OR_CRITERIA")
 

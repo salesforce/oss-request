@@ -111,6 +111,20 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
       TaskEventHandler.valueMatches(json)("b!=false") must be (true)
       TaskEventHandler.valueMatches(json)("n!=foo") must be (true)
     }
+    "work with FIELD_EMPTY" in {
+      val json = Some(
+        Json.obj(
+          "e" -> "",
+          "ne" -> "asdf",
+          "b" -> false
+        )
+      )
+
+      TaskEventHandler.empty(json)("e") must be (true)
+      TaskEventHandler.empty(json)("asdf") must be (true)
+      TaskEventHandler.empty(json)("ne") must be (false)
+      TaskEventHandler.empty(json)("b") must be (false)
+    }
     "work with AND_CRITERIA" in {
       val json = Some(
         Json.obj(

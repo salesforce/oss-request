@@ -97,10 +97,18 @@ object TaskEventHandler {
     }
   }
 
+  def empty(maybeObject: Option[JsObject])(field: String): Boolean = {
+    maybeObject.fold(true) { data =>
+      (data \ field).isEmpty || (data \ field).asOpt[String].fold(false)(_.isEmpty)
+    }
+  }
+
   def criteriaMatches(maybeTaskData: Option[JsObject])(criteria: Criteria): Boolean = {
     (criteria.`type`, criteria.value) match {
       case (TaskEvent.CriteriaType.FieldValue, Left(value)) =>
         valueMatches(maybeTaskData)(value)
+      case (TaskEvent.CriteriaType.FieldEmpty, Left(value)) =>
+        empty(maybeTaskData)(value)
       case (TaskEvent.CriteriaType.AndCriteria, Right(criterias)) =>
         criterias.forall(criteriaMatches(maybeTaskData))
       case (TaskEvent.CriteriaType.OrCriteria, Right(criterias)) =>
