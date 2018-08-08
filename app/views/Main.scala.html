@@ -94,6 +94,7 @@
                 </div>
             </div>
 
+            @* todo: this needs a better UI *@
             <div class="modal fade" id="reassignModal" tabindex="-1">
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
@@ -108,6 +109,9 @@
                                     <div class="col-sm-4">
                                         <input type="email" class="form-control" id="reassignEmail">
                                     </div>
+                                    @for(userInfo <- maybeUserInfo) {
+                                        <button onclick="event.preventDefault(); $('#reassignEmail').val('@userInfo.email');" class="btn btn-link">&lt;--- Current User (@userInfo.email)</button>
+                                    }
                                 </div>
                                 <div class="form-group">
                                     <label class="col-sm-2 control-label">Or</label>
