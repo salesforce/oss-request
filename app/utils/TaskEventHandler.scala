@@ -103,6 +103,8 @@ object TaskEventHandler {
         valueMatches(maybeTaskData)(value)
       case (TaskEvent.CriteriaType.AndCriteria, Right(criterias)) =>
         criterias.forall(criteriaMatches(maybeTaskData))
+      case (TaskEvent.CriteriaType.OrCriteria, Right(criterias)) =>
+        criterias.exists(criteriaMatches(maybeTaskData))
       case _ =>
         false
     }

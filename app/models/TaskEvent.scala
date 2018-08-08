@@ -49,6 +49,7 @@ object TaskEvent {
 
     val FieldValue = Value("FIELD_VALUE")
     val AndCriteria = Value("AND_CRITERIA")
+    val OrCriteria = Value("OR_CRITERIA")
 
     implicit val jsonReads = Reads[CriteriaType] { jsValue =>
       values.find(_.toString == jsValue.as[String]).fold[JsResult[CriteriaType]](JsError("Could not find that type"))(JsSuccess(_))

@@ -129,6 +129,28 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
       val sFooAndBFalseCriteria = Criteria(CriteriaType.AndCriteria, Right(Set(sFoo, bFalse)))
       TaskEventHandler.criteriaMatches(json)(sFooAndBFalseCriteria) must be (false)
     }
+    "work with OR_CRITERIA" in {
+      val json = Some(
+        Json.obj(
+          "s" -> "foo",
+          "b" -> true
+        )
+      )
+
+      val sFoo = Criteria(CriteriaType.FieldValue, Left("s==foo"))
+      val sBar = Criteria(CriteriaType.FieldValue, Left("s==bar"))
+      val bTrue = Criteria(CriteriaType.FieldValue, Left("b==true"))
+      val bFalse = Criteria(CriteriaType.FieldValue, Left("b==false"))
+
+      val sFooOrBFalseCriteria = Criteria(CriteriaType.OrCriteria, Right(Set(sFoo, bFalse)))
+      TaskEventHandler.criteriaMatches(json)(sFooOrBFalseCriteria) must be (true)
+
+      val sFooOrBTrueCriteria = Criteria(CriteriaType.OrCriteria, Right(Set(sFoo, bTrue)))
+      TaskEventHandler.criteriaMatches(json)(sFooOrBTrueCriteria) must be (true)
+
+      val sBarOrBFalseCriteria = Criteria(CriteriaType.OrCriteria, Right(Set(sBar, bFalse)))
+      TaskEventHandler.criteriaMatches(json)(sBarOrBFalseCriteria) must be (false)
+    }
   }
 
 }
