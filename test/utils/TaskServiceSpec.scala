@@ -34,21 +34,21 @@ class TaskServiceSpec extends MixedPlaySpec {
 
   "taskCreated" must {
     "not do anything if the task isn't assign to a service" in new App(DAOMock.noDatabaseAppBuilder().build()) {
-      val request = Request("two", "asdf", "asdf", ZonedDateTime.now(), "asdf@asdf.com", State.InProgress, None)
+      val request = Request("two", "asdf", "asdf", ZonedDateTime.now(), "asdf@asdf.com", State.InProgress, None, None)
       val taskPrototype = program.tasks("oss_request_info")
       val task = Task(1, ZonedDateTime.now(), Seq("asdf@asdf.com"), None, None, None, State.InProgress, taskPrototype, None, request.slug)
       val updatedTask = await(taskService.taskCreated(program, request, task, Seq.empty[Task], "http://asdf.com", updateTaskState(task)))
       updatedTask must equal (task)
     }
     "set the task to cancelled if it is assigned to a service that is unreachable" in new App(DAOMock.noDatabaseAppBuilder().build()) {
-      val request = Request("two", "asdf", "asdf", ZonedDateTime.now(), "asdf@asdf.com", State.InProgress, None)
+      val request = Request("two", "asdf", "asdf", ZonedDateTime.now(), "asdf@asdf.com", State.InProgress, None, None)
       val taskPrototype = program.tasks("create_repo")
       val task = Task(1, ZonedDateTime.now(), Seq("http://localhost:12345/"), None, None, None, State.InProgress, taskPrototype, None, request.slug)
       val updatedTask = await(taskService.taskCreated(program, request, task, Seq.empty[Task], "http://asdf.com", updateTaskState(task)))
       updatedTask.state must equal (State.Cancelled)
     }
     "set the task to cancelled if the service does not respond with the correct json" in new App(DAOMock.noDatabaseAppBuilder().build()) {
-      val request = Request("two", "asdf", "asdf", ZonedDateTime.now(), "asdf@asdf.com", State.InProgress, None)
+      val request = Request("two", "asdf", "asdf", ZonedDateTime.now(), "asdf@asdf.com", State.InProgress, None, None)
       val taskPrototype = program.tasks("create_repo")
       val url = "https://echo-webhook.herokuapp.com/asdf"
       val task = Task(1, ZonedDateTime.now(), Seq(url), None, None, None, State.InProgress, taskPrototype, None, request.slug)
@@ -57,7 +57,7 @@ class TaskServiceSpec extends MixedPlaySpec {
 
     }
     "update the task when the server responds correctly" in new Server(DAOMock.noDatabaseAppBuilder().build()) {
-      val request = Request("two", "asdf", "asdf", ZonedDateTime.now(), "asdf@asdf.com", State.InProgress, None)
+      val request = Request("two", "asdf", "asdf", ZonedDateTime.now(), "asdf@asdf.com", State.InProgress, None, None)
       val taskPrototype = program.tasks("create_repo")
       val url = controllers.routes.Application.createDemoRepo().absoluteURL(false, s"localhost:$port")
       val task = Task(1, ZonedDateTime.now(), Seq(url), None, None, None, State.InProgress, taskPrototype, None, request.slug)

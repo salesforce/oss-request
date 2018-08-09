@@ -11,7 +11,7 @@ import java.time.ZonedDateTime
 
 import play.api.libs.json.{Json, Writes}
 
-case class Request(program: String, slug: String, name: String, createDate: ZonedDateTime, creatorEmail: String, state: State.State, completedDate: Option[ZonedDateTime]) {
+case class Request(program: String, slug: String, name: String, createDate: ZonedDateTime, creatorEmail: String, state: State.State, completedDate: Option[ZonedDateTime], completionMessage: Option[String]) {
 
   def stateToHuman: String = state match {
     case State.InProgress => "in review"

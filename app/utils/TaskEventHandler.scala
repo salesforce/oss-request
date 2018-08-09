@@ -17,7 +17,7 @@ import scala.util.Try
 
 class TaskEventHandler @Inject()(implicit ec: ExecutionContext) {
 
-  def process(program: Program, request: Request, eventType: TaskEvent.EventType.EventType, task: Task, createTask: (String, Task.Prototype, Seq[String]) => Future[Task], updateRequestState: State.State => Future[Request]): Future[Seq[_]] = {
+  def process(program: Program, request: Request, eventType: TaskEvent.EventType.EventType, task: Task, createTask: (String, Task.Prototype, Seq[String]) => Future[Task], updateRequestState: (State.State, Option[String]) => Future[Request]): Future[Seq[_]] = {
     Future.sequence {
       task.prototype.taskEvents.filter { taskEvent =>
         taskEvent.`type` == eventType && taskEvent.value == task.state.toString
@@ -38,7 +38,7 @@ class TaskEventHandler @Inject()(implicit ec: ExecutionContext) {
                 }
               }
             case TaskEvent.EventActionType.UpdateRequestState =>
-              updateRequestState(State.withName(taskEvent.action.value))
+              updateRequestState(State.withName(taskEvent.action.value), taskEvent.action.message)
             case _ =>
               Future.failed[Task](new Exception(s"Could not process action type: ${taskEvent.action.`type`}"))
           }

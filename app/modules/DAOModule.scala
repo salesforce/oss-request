@@ -16,7 +16,6 @@ import com.github.mauricio.async.db.postgresql.pool.PostgreSQLConnectionFactory
 import com.github.mauricio.async.db.postgresql.util.URLParser
 import io.getquill.{PostgresAsyncContext, SnakeCase}
 import javax.inject.{Inject, Singleton}
-import models.State.State
 import models.{Comment, Request, RequestWithTasks, State, Task}
 import play.api.inject.{ApplicationLifecycle, Binding, Module}
 import play.api.libs.json.{JsObject, Json}
@@ -40,16 +39,16 @@ trait DAO {
   def userRequests(email: String): Future[Seq[RequestWithTasks]]
   def request(requestSlug: String): Future[Request]
   def requestWithTasks(requestSlug: String): Future[RequestWithTasks]
-  def updateRequest(requestSlug: String, state: State.State): Future[Request]
-  def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task]
-  def updateTaskState(taskId: Int, state: State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], maybeCompletionMessage: Option[String]): Future[Task]
+  def updateRequest(requestSlug: String, state: State.State, message: Option[String]): Future[Request]
+  def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress): Future[Task]
+  def updateTaskState(taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], maybeCompletionMessage: Option[String]): Future[Task]
   def deleteTask(taskId: Int): Future[Unit]
   def assignTask(taskId: Int, emails: Seq[String]): Future[Task]
   def taskById(taskId: Int): Future[Task]
-  def requestTasks(requestSlug: String, maybeState: Option[State] = None): Future[Seq[(Task, DAO.NumComments)]]
+  def requestTasks(requestSlug: String, maybeState: Option[State.State] = None): Future[Seq[(Task, DAO.NumComments)]]
   def commentOnTask(taskId: Int, email: String, contents: String): Future[Comment]
   def commentsOnTask(taskId: Int): Future[Seq[Comment]]
-  def tasksForUser(email: String, state: State): Future[Seq[(Task, DAO.NumComments, Request)]]
+  def tasksForUser(email: String, state: State.State): Future[Seq[(Task, DAO.NumComments, Request)]]
   def search(maybeProgram: Option[String], maybeState: Option[State.State], data: Option[JsObject]): Future[Seq[RequestWithTasks]]
 }
 
@@ -78,7 +77,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
       val state = State.InProgress
       val createDate = ZonedDateTime.now()
 
-      val request = Request(program, slug, name, createDate, creatorEmail, state, None)
+      val request = Request(program, slug, name, createDate, creatorEmail, state, None, None)
 
       run {
         quote {
@@ -116,14 +115,15 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }.map(joinedRequestTasksToRequests)
   }
 
-  override def updateRequest(requestSlug: String, state: State): Future[Request] = {
+  override def updateRequest(requestSlug: String, state: State.State, message: Option[String]): Future[Request] = {
     val maybeCompletedDate = if (state != State.InProgress) Some(ZonedDateTime.now()) else None
 
     val updateFuture = run {
       quote {
         query[Request].filter(_.slug == lift(requestSlug)).update(
           _.state -> lift(state),
-          _.completedDate -> lift(maybeCompletedDate)
+          _.completedDate -> lift(maybeCompletedDate),
+          _.completionMessage -> lift(message)
         )
       }
     }
@@ -150,7 +150,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String], maybeData: Option[JsObject] = None, state: State = State.InProgress): Future[Task] = {
+  override def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String], maybeData: Option[JsObject] = None, state: State.State = State.InProgress): Future[Task] = {
     // todo: move this to a validation module via the DAO
     if (state == State.Completed && maybeCompletedBy.isEmpty) {
       Future.failed(new Exception("maybeCompletedBy was not specified"))
@@ -184,7 +184,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def updateTaskState(taskId: Int, state: State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], maybeCompletionMessages: Option[String]): Future[Task] = {
+  override def updateTaskState(taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], maybeCompletionMessages: Option[String]): Future[Task] = {
     // todo: move this to a validation module via the DAO
     if (state != State.InProgress && maybeCompletedBy.isEmpty) {
       Future.failed(new Exception("maybeCompletedBy was not specified"))
@@ -223,7 +223,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }.flatMap(_ => taskById(taskId))
   }
 
-  override def requestTasks(requestSlug: String, maybeState: Option[State] = None): Future[Seq[(Task, DAO.NumComments)]] = {
+  override def requestTasks(requestSlug: String, maybeState: Option[State.State] = None): Future[Seq[(Task, DAO.NumComments)]] = {
     maybeState.fold {
       run {
         quote {
@@ -271,7 +271,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def tasksForUser(email: String, state: State): Future[Seq[(Task, DAO.NumComments, Request)]] = {
+  override def tasksForUser(email: String, state: State.State): Future[Seq[(Task, DAO.NumComments, Request)]] = {
     run {
       quote {
         for {
@@ -313,7 +313,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
         (q: Query[Request], program: String) => q.filter(_.program == program)
       }
       .ifDefined(maybeState) {
-        (q: Query[Request], state: State) => q.filter(_.state == state)
+        (q: Query[Request], state: State.State) => q.filter(_.state == state)
       }
       .ifDefined(maybeData) {
         (q: Query[Request], data: JsObject) => q.filter { request =>

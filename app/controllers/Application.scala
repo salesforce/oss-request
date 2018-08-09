@@ -159,7 +159,8 @@ class Application @Inject()
 
   def updateRequest(requestSlug: String, state: State.State) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      dataFacade.updateRequest(userInfo.email, requestSlug, state).map { request =>
+      // todo: allow user to provide a message
+      dataFacade.updateRequest(userInfo.email, requestSlug, state, None).map { request =>
         Redirect(routes.Application.request(request.slug))
       }
     }

@@ -46,7 +46,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
 
       updatedTask <- taskService.taskCreated(program, request, task, existingTasks, url, updateTaskState(request.creatorEmail, task.id, _, _, _, _))
 
-      _ <- taskEventHandler.process(program, request, TaskEvent.EventType.StateChange, updatedTask, createTask(_, _, _), updateRequest(request.creatorEmail, task.requestSlug, _, true))
+      _ <- taskEventHandler.process(program, request, TaskEvent.EventType.StateChange, updatedTask, createTask(_, _, _), updateRequest(request.creatorEmail, task.requestSlug, _, _, true))
 
       _ <- if (state == State.InProgress) notifier.taskAssigned(request, updatedTask) else Future.unit
     } yield updatedTask
@@ -64,10 +64,10 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     } yield requests
   }
 
-  def updateRequest(email: String, requestSlug: String, state: State.State, securityBypass: Boolean = false)(implicit requestHeader: RequestHeader): Future[Request] = {
+  def updateRequest(email: String, requestSlug: String, state: State.State, message: Option[String], securityBypass: Boolean = false)(implicit requestHeader: RequestHeader): Future[Request] = {
     for {
       _ <- if (securityBypass) Future.unit else security.updateRequest(email, requestSlug, state)
-      request <- dao.updateRequest(requestSlug, state)
+      request <- dao.updateRequest(requestSlug, state, message)
       _ <- notifier.requestStatusChange(request)
     } yield request
   }
@@ -88,7 +88,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
       program <- metadataService.fetchProgram(requestWithTasks.request.program)
       _ <- notifier.taskStateChanged(requestWithTasks.request, task)
       _ <- if (requestWithTasks.completedTasks.size == requestWithTasks.tasks.size) notifier.allTasksCompleted(requestWithTasks.request, program.admins) else Future.unit
-      _ <- taskEventHandler.process(program, requestWithTasks.request, TaskEvent.EventType.StateChange, task, createTask(_, _, _), updateRequest(email, task.requestSlug, _, true))
+      _ <- taskEventHandler.process(program, requestWithTasks.request, TaskEvent.EventType.StateChange, task, createTask(_, _, _), updateRequest(email, task.requestSlug, _, _, true))
     } yield task
   }
 

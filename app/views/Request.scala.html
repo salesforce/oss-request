@@ -126,15 +126,18 @@
             @request.completedDate match {
                 case Some(completedDate) => {
                     @defining(Tasks.conditionalApprovals(tasks.map(_._1))) { conditions =>
-                        @if(conditions.isEmpty) {
+                        @if(conditions.isEmpty && request.completionMessage.isEmpty) {
                             <p>Approved on @views.utils.DateTime.date(completedDate)</p>
                         } else {
                             <p>Conditionally approved on @views.utils.DateTime.date(completedDate) provided:</p>
-                            @for((taskTitle, message) <- conditions) {
-                                <ul>
+                            <ul>
+                                @for((taskTitle, message) <- conditions) {
                                     <li>@taskTitle - @message.capitalize</li>
-                                </ul>
-                            }
+                                }
+                                @for(message <- request.completionMessage) {
+                                    <li>@message.capitalize</li>
+                                }
+                            </ul>
                         }
                     }
                 }

@@ -102,7 +102,7 @@ class DataFacadeSpec extends MixedPlaySpec {
     "work for admins" in new App(withDb) {
       Evolutions.withEvolutions(database) {
         val request = await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
-        noException must be thrownBy await(dataFacade.updateRequest("foo@bar.com", request.slug, State.Completed))
+        noException must be thrownBy await(dataFacade.updateRequest("foo@bar.com", request.slug, State.Completed, None))
 
         await(dataFacade.request("foo@foo.com", request.slug))._1.state must equal(State.Completed)
       }
@@ -110,7 +110,7 @@ class DataFacadeSpec extends MixedPlaySpec {
     "be denied for non-admin / non-owner" in new App(withDb) {
       Evolutions.withEvolutions(database) {
         val request = await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
-        a[Security.NotAllowed] must be thrownBy await(dataFacade.updateRequest("baz@baz.com", request.slug, State.Completed))
+        a[Security.NotAllowed] must be thrownBy await(dataFacade.updateRequest("baz@baz.com", request.slug, State.Completed, None))
 
         await(dataFacade.request("foo@foo.com", request.slug))._1.state must not equal State.Completed
       }
@@ -140,7 +140,7 @@ class DataFacadeSpec extends MixedPlaySpec {
     "work with a state" in new App(withDb) {
       Evolutions.withEvolutions(database) {
         val request = await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
-        await(dataFacade.updateRequest("foo@foo.com", request.slug, State.Cancelled))
+        await(dataFacade.updateRequest("foo@foo.com", request.slug, State.Cancelled, None))
 
         await(dataFacade.createRequest("two", "foo", "foo@foo.com"))
 
@@ -152,7 +152,7 @@ class DataFacadeSpec extends MixedPlaySpec {
     "work with program & state" in new App(withDb) {
       Evolutions.withEvolutions(database) {
         val request = await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
-        await(dataFacade.updateRequest("foo@foo.com", request.slug, State.Cancelled))
+        await(dataFacade.updateRequest("foo@foo.com", request.slug, State.Cancelled, None))
 
         await(dataFacade.createRequest("two", "foo", "foo@foo.com"))
 

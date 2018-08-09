@@ -30,11 +30,11 @@
             @requestWithTasks.request.completedDate match {
                 case Some(completedDate) if requestWithTasks.request.state == State.Completed => {
                     <p>
-                    @defining(Tasks.conditionalApprovals(requestWithTasks.tasks)) { conditions =>
+                    @defining(Tasks.conditionalApprovals(requestWithTasks.tasks).map(_._2) ++ requestWithTasks.request.completionMessage) { conditions =>
                         @if(conditions.isEmpty) {
                             Approved on @views.utils.DateTime.date(completedDate)
                         } else {
-                            Conditionally approved on @views.utils.DateTime.date(completedDate) @conditions.map(_._2).distinct.mkString("(", ", ", ")")
+                            Conditionally approved on @views.utils.DateTime.date(completedDate) @conditions.distinct.mkString("(", ", ", ")")
                         }
                     }
                     </p>

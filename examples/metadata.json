@@ -120,7 +120,8 @@
             },
             "action": {
               "type": "UPDATE_REQUEST_STATE",
-              "value": "COMPLETED"
+              "value": "COMPLETED",
+              "message": "seek security review if needed"
             }
           }
         ]

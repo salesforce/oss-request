@@ -32,7 +32,7 @@ class DAOMock extends DAO {
 
   override def createRequest(program: String, name: String, creatorEmail: String): Future[Request] = {
     Future.successful {
-      val request = Request(program, DB.slug(name), name, ZonedDateTime.now(), creatorEmail, State.InProgress, None)
+      val request = Request(program, DB.slug(name), name, ZonedDateTime.now(), creatorEmail, State.InProgress, None, None)
       requests += request
       request
     }
@@ -103,10 +103,10 @@ class DAOMock extends DAO {
     }
   }
 
-  override def updateRequest(requestSlug: String, state: State.State): Future[Request] = {
+  override def updateRequest(requestSlug: String, state: State.State, message: Option[String]): Future[Request] = {
     request(requestSlug).map { request =>
       val maybeCompletedDate = if (state != State.InProgress) Some(ZonedDateTime.now()) else None
-      val updatedRequest = request.copy(state = state, completedDate = maybeCompletedDate)
+      val updatedRequest = request.copy(state = state, completedDate = maybeCompletedDate, completionMessage = message)
       requests -= request
       requests += updatedRequest
       updatedRequest
