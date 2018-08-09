@@ -125,14 +125,14 @@
         case models.State.Completed => {
             @request.completedDate match {
                 case Some(completedDate) => {
-                    @defining(Tasks.conditionalApprovals(tasks.map(_._1))) { conditionalApprovalMessages =>
-                        @if(conditionalApprovalMessages.isEmpty) {
+                    @defining(Tasks.conditionalApprovals(tasks.map(_._1))) { conditions =>
+                        @if(conditions.isEmpty) {
                             <p>Approved on @views.utils.DateTime.date(completedDate)</p>
                         } else {
                             <p>Conditionally approved on @views.utils.DateTime.date(completedDate) provided:</p>
-                            @for(condition <- conditionalApprovalMessages) {
+                            @for((taskTitle, message) <- conditions) {
                                 <ul>
-                                    <li>@condition.capitalize</li>
+                                    <li>@taskTitle - @message.capitalize</li>
                                 </ul>
                             }
                         }

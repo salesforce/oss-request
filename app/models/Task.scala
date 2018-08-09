@@ -131,14 +131,17 @@ object Task {
 
 object Tasks {
 
-  def conditionalApprovals(tasks: Seq[Task]): Seq[String] = {
+  type TaskTitle = String
+  type Message = String
+
+  def conditionalApprovals(tasks: Seq[Task]): Seq[(TaskTitle, Message)] = {
     for {
       task <- tasks
       if task.state == State.Completed
       if task.prototype.`type` == Task.TaskType.Approval
       if task.completableByEmailsOrUrl.isLeft
       message <- task.completionMessage
-    } yield message
+    } yield task.prototype.label -> message
   }
 
 }
