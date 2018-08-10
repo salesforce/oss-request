@@ -42,7 +42,7 @@
                     }
                     </p>
                 }
-                case None => {
+                case _ => {
                     <p>Created @views.utils.DateTime.date(requestWithTasks.request.createDate) by @requestWithTasks.request.creatorEmail</p>
                 }
             }
