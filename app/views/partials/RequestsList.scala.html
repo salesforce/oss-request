@@ -12,8 +12,11 @@
         case models.State.InProgress => {
             list-group-item-info
         }
-        case models.State.Cancelled => {
+        case models.State.OnHold => {
             list-group-item-warning
+        }
+        case models.State.Cancelled => {
+            list-group-item-error
         }
         case models.State.Completed => {
             list-group-item-success
