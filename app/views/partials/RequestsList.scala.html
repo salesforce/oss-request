@@ -7,19 +7,22 @@
 
 @(requests: Seq[RequestWithTasks])
 
-@stateClass(state: models.State.State) = {
+@stateClass(state: models.State.State, conditions: Seq[_]) = {
     @state match {
-        case models.State.InProgress => {
-            list-group-item-info
-        }
         case models.State.OnHold => {
             list-group-item-warning
         }
         case models.State.Cancelled => {
             list-group-item-danger
         }
-        case models.State.Completed => {
+        case models.State.Completed if conditions.nonEmpty => {
+            list-group-item-warning
+        }
+        case models.State.Completed if conditions.isEmpty => {
             list-group-item-success
+        }
+        case _ => {
+            list-group-item
         }
     }
 }
@@ -27,26 +30,26 @@
 @if(requests.nonEmpty) {
     <div class="list-group">
     @for(requestWithTasks <- requests) {
-        <a href="@routes.Application.request(requestWithTasks.request.slug)" class="list-group-item @stateClass(requestWithTasks.request.state)">
-            <span class="badge" style="margin-top: 25px;">@requestWithTasks.completedTasks.size of @requestWithTasks.tasks.size tasks completed</span>
-            <h4>@requestWithTasks.request.name</h4>
-            @requestWithTasks.request.completedDate match {
-                case Some(completedDate) if requestWithTasks.request.state == State.Completed => {
-                    <p>
-                    @defining(Tasks.conditionalApprovals(requestWithTasks.tasks).map(_._2) ++ requestWithTasks.request.completionMessage) { conditions =>
-                        @if(conditions.isEmpty) {
-                            Approved on @views.utils.DateTime.date(completedDate)
-                        } else {
-                            Conditionally approved on @views.utils.DateTime.date(completedDate) @conditions.distinct.mkString("(", ", ", ")")
-                        }
+        @defining(Tasks.conditionalApprovals(requestWithTasks.tasks).map(_._2) ++ requestWithTasks.request.completionMessage) { conditions =>
+            <a href="@routes.Application.request(requestWithTasks.request.slug)" class="list-group-item @stateClass(requestWithTasks.request.state, conditions)">
+                <span class="badge" style="margin-top: 25px;">@requestWithTasks.completedTasks.size of @requestWithTasks.tasks.size tasks completed</span>
+                <h4>@requestWithTasks.request.name</h4>
+                @requestWithTasks.request.completedDate match {
+                    case Some(completedDate) if requestWithTasks.request.state == State.Completed => {
+                        <p>
+                            @if(conditions.isEmpty) {
+                                Approved on @views.utils.DateTime.date(completedDate)
+                            } else {
+                                Conditionally approved on @views.utils.DateTime.date(completedDate) @conditions.distinct.mkString("(", ", ", ")")
+                            }
+                        </p>
                     }
-                    </p>
+                    case _ => {
+                        <p>Created @views.utils.DateTime.date(requestWithTasks.request.createDate) by @requestWithTasks.request.creatorEmail</p>
+                    }
                 }
-                case _ => {
-                    <p>Created @views.utils.DateTime.date(requestWithTasks.request.createDate) by @requestWithTasks.request.creatorEmail</p>
-                }
-            }
-        </a>
+            </a>
+        }
     }
     </div>
 } else {
