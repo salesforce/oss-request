@@ -34,20 +34,26 @@
             <a href="@routes.Application.request(requestWithTasks.request.slug)" class="list-group-item @stateClass(requestWithTasks.request.state, conditions)">
                 <span class="badge" style="margin-top: 25px;">@requestWithTasks.completedTasks.size of @requestWithTasks.tasks.size tasks completed</span>
                 <h4>@requestWithTasks.request.name</h4>
-                @requestWithTasks.request.completedDate match {
-                    case Some(completedDate) if requestWithTasks.request.state == State.Completed => {
-                        <p>
-                            @if(conditions.isEmpty) {
-                                Approved on @views.utils.DateTime.date(completedDate)
-                            } else {
-                                Conditionally approved on @views.utils.DateTime.date(completedDate) @conditions.distinct.mkString("(", ", ", ")")
-                            }
-                        </p>
+                <p>
+                    @(requestWithTasks.request.state, requestWithTasks.request.completedDate) match {
+                        case (State.Completed, Some(completedDate)) if conditions.nonEmpty => {
+                            Conditionally approved on @views.utils.DateTime.date(completedDate)
+                        }
+                        case (State.InProgress, _) => {
+                            Created on @views.utils.DateTime.date(requestWithTasks.request.createDate) by @requestWithTasks.request.creatorEmail
+                        }
+                        case (_, Some(completedDate)) => {
+                            @requestWithTasks.request.stateToHuman.capitalize on @views.utils.DateTime.date(completedDate)
+                        }
+                        case _ => {
+                            @requestWithTasks.request.stateToHuman.capitalize
+                        }
                     }
-                    case _ => {
-                        <p>Created @views.utils.DateTime.date(requestWithTasks.request.createDate) by @requestWithTasks.request.creatorEmail</p>
+
+                    @if(conditions.nonEmpty) {
+                        @conditions.distinct.mkString("(", ", ", ")")
                     }
-                }
+                </p>
             </a>
         }
     }

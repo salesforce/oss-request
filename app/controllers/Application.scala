@@ -43,6 +43,21 @@ class Application @Inject()
     userRequest.maybeUserInfo.fold(auth.authUrl.map(Redirect(_)))(f)
   }
 
+  def index = userAction.async { implicit userRequest =>
+    withUserInfo { userInfo =>
+      metadataService.fetchMetadata.flatMap { implicit metadata =>
+        dataFacade.tasksForUser(userInfo.email, State.InProgress).map { tasks =>
+          if (tasks.isEmpty) {
+            Redirect(routes.Application.requests(None))
+          }
+          else {
+            Redirect(routes.Application.openUserTasks())
+          }
+        }
+      }
+    }
+  }
+
   def openUserTasks = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
       metadataService.fetchMetadata.flatMap { implicit metadata =>

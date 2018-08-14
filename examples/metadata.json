@@ -194,6 +194,10 @@
                 "title": "Project Description",
                 "type": "string",
                 "required": true
+              },
+              "a_date": {
+                "title": "A Date",
+                "format": "date"
               }
             }
           }

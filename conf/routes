@@ -3,7 +3,8 @@
 # ~~~~
 
 # User Visible URLs
-GET         /                                                  controllers.Application.openUserTasks
+GET         /                                                  controllers.Application.index
+GET         /open-tasks                                        controllers.Application.openUserTasks
 GET         /requests                                          controllers.Application.requests(program: Option[String])
 GET         /search                                            controllers.Application.search(program: Option[String], state: Option[models.State.State], data: Option[String])
 GET         /request                                           controllers.Application.newRequest(name: Option[String], program: Option[String], startTask: Option[String])
