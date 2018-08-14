@@ -29,11 +29,10 @@ class TaskEventHandler @Inject()(implicit ec: ExecutionContext) {
           taskEvent.action.`type` match {
             case TaskEvent.EventActionType.CreateTask =>
               program.tasks.get(taskEvent.action.value).fold(Future.failed[Task](new Exception(s"Could not find task named '${taskEvent.action.value}'"))) { taskPrototype =>
-                taskPrototype.completableBy.fold(Future.failed[Task](new Exception("Could not create task because it does not have completable_by info"))) { completableBy =>
-                  completableBy.value.fold(Future.failed[Task](new Exception("Could not create task because it does not have a completable_by value"))) { completableByValue =>
-                    program.completableBy(completableBy.`type`, completableByValue).fold(Future.failed[Task](new Exception("Could not create task because it can't be assigned to anyone"))) { emails =>
-                      createTask(request.slug, taskPrototype, emails.toSeq)
-                    }
+                val completableBy = taskPrototype.completableBy.getOrElse(Task.CompletableBy(Task.CompletableByType.Email, Some(request.creatorEmail)))
+                completableBy.value.fold(Future.failed[Task](new Exception("Could not create task because it does not have a completable_by value"))) { completableByValue =>
+                  program.completableBy(completableBy.`type`, completableByValue).fold(Future.failed[Task](new Exception("Could not create task because it can't be assigned to anyone"))) { emails =>
+                    createTask(request.slug, taskPrototype, emails.toSeq)
                   }
                 }
               }
