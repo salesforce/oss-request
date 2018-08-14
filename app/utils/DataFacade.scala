@@ -87,8 +87,8 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
       requestWithTasks <- dao.requestWithTasks(task.requestSlug)
       program <- metadataService.fetchProgram(requestWithTasks.request.program)
       _ <- notifier.taskStateChanged(requestWithTasks.request, task)
-      _ <- if (requestWithTasks.completedTasks.size == requestWithTasks.tasks.size) notifier.allTasksCompleted(requestWithTasks.request, program.admins) else Future.unit
       _ <- taskEventHandler.process(program, requestWithTasks.request, TaskEvent.EventType.StateChange, task, createTask(_, _, _), updateRequest(email, task.requestSlug, _, _, securityBypass))
+      _ <- if (requestWithTasks.completedTasks.size == requestWithTasks.tasks.size) notifier.allTasksCompleted(requestWithTasks.request, program.admins) else Future.unit
     } yield task
   }
 

@@ -129,7 +129,7 @@ class TaskService @Inject()(environment: Environment, configuration: Configurati
   def taskStatus(task: Task, updateTaskState: (State.State, Option[String], Option[JsObject], Option[String]) => Future[Task]): Future[Task] = {
     if (task.prototype.completableBy.exists(_.`type` == CompletableByType.Service) && task.state == State.InProgress) {
       wsRequest(task).flatMap { wsRequest =>
-        task.completedBy.fold(updateTaskState(State.Cancelled, None, None, Some("Could not determine URL to call"))) { url =>
+        task.completedBy.fold(updateTaskState(State.Cancelled, Some(wsRequest.url), None, Some("Could not determine URL to call"))) { url =>
           wsRequest.withQueryStringParameters("url" -> url).get().flatMap { response =>
             response.status match {
               case Status.OK =>
