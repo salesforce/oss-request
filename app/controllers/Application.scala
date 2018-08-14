@@ -169,12 +169,17 @@ class Application @Inject()
   def task(requestSlug: String, taskId: Int) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
       metadataService.fetchMetadata.flatMap { implicit metadata =>
-        for {
+        val f = for {
           (request, isAdmin, _) <- dataFacade.request(userInfo.email, requestSlug)
           task <- dataFacade.taskById(taskId)
           comments <- dataFacade.commentsOnTask(taskId)
           program <- metadata.programs.get(request.program).fold(Future.failed[Program](new Exception("Program not found")))(Future.successful)
         } yield Ok(taskView(request, task, comments, userInfo, isAdmin, program.groups.keySet))
+
+        f.recover {
+          case e: Exception =>
+            InternalServerError(errorView(e.getMessage, userInfo))
+        }
       }
     }
   }
