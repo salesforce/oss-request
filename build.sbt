@@ -36,7 +36,7 @@ libraryDependencies ++= Seq(
   "org.webjars"            %% "webjars-play"                       % "2.6.3",
   "org.webjars"            %  "salesforce-lightning-design-system" % "2.4.1",
   "org.webjars"            %  "handlebars"                         % "4.0.11-1",
-  "org.webjars"            %  "alpaca"                             % "1.5.24",
+  "org.webjars"            %  "alpaca"                             % "1.5.23",
   "org.webjars"            %  "Eonasdan-bootstrap-datetimepicker"  % "4.17.47",
   "org.webjars.npm"        %  "jsoneditor"                         % "5.17.1",
   "org.webjars.npm"        %  "github-com-alexcorvi-anchorme-js"   % "1.1.2",
