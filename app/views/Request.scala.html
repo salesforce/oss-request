@@ -7,7 +7,7 @@
 
 @this(mainView: Main, taskView: utils.TaskEditOrShow)
 
-@(programMetadata: _root_.utils.Program, request: models.Request, tasks: Seq[(models.Task, Long, Boolean)], userInfo: _root_.utils.UserInfo, isAdmin: Boolean)(implicit requestHeader: RequestHeader, metadata: _root_.utils.Metadata)
+@(programMetadata: _root_.utils.Program, request: models.Request, tasks: Seq[(models.Task, _root_.modules.DAO.NumComments)], userInfo: _root_.utils.UserInfo)(implicit requestHeader: RequestHeader, metadata: _root_.utils.Metadata)
 
 @tasksWithState(state: State.State) = @{
     tasks.filter(_._1.state == state)
@@ -46,7 +46,7 @@
                         </div>
                     }
 
-                    @if(isAdmin) {
+                    @if(programMetadata.isAdmin(userInfo)) {
                         <div class="col-md-2">
                             <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Cancelled))" method="post">
                                 <button type="submit" class="btn btn-warning">Deny Request</button>
@@ -83,43 +83,43 @@
                                 <button type="submit" class="btn btn-primary">Add It</button>
                             </form>
                         </div>
+
+                        <script>
+                            // Only send a completableBy form value if it was needed by the prototype
+                            const taskPrototypes = @Html(play.api.libs.json.Json.toJson(programMetadata.tasks).toString);
+
+                            const completableByEmailDiv = document.getElementById("completableByEmailDiv");
+                            const completableByGroupDiv = document.getElementById("completableByGroupDiv");
+                            const completableByEmail = document.getElementById("completableByEmail");
+                            const completableByGroup = document.getElementById("completableByGroup");
+                            const taskPrototypeKeySelect = document.getElementById("taskPrototypeKeySelect");
+
+                            completableByEmailDiv.style.display = "none";
+                            completableByGroupDiv.style.display = "none";
+
+                            taskPrototypeKeySelect.onchange = function() {
+                                const taskPrototype = taskPrototypes[this.value];
+
+                                completableByEmailDiv.style.display = "none";
+                                completableByGroupDiv.style.display = "none";
+                                completableByEmail.name = "";
+                                completableByGroup.name = "";
+
+                                if ((taskPrototype.completable_by !== undefined) && (taskPrototype.completable_by.value === undefined)) {
+                                    if (taskPrototype.completable_by.type === "GROUP") {
+                                        completableByGroupDiv.style.display = "inline-block";
+                                        completableByGroup.name = "completableBy";
+                                    }
+                                    else if (taskPrototype.completable_by.type === "EMAIL") {
+                                        completableByEmailDiv.style.display = "inline-block";
+                                        completableByEmail.name = "completableBy";
+                                    }
+                                }
+                            };
+                        </script>
                     }
                 </div>
             }
-
-            <script>
-                // Only send a completableBy form value if it was needed by the prototype
-                const taskPrototypes = @Html(play.api.libs.json.Json.toJson(programMetadata.tasks).toString);
-
-                const completableByEmailDiv = document.getElementById("completableByEmailDiv");
-                const completableByGroupDiv = document.getElementById("completableByGroupDiv");
-                const completableByEmail = document.getElementById("completableByEmail");
-                const completableByGroup = document.getElementById("completableByGroup");
-                const taskPrototypeKeySelect = document.getElementById("taskPrototypeKeySelect");
-
-                completableByEmailDiv.style.display = "none";
-                completableByGroupDiv.style.display = "none";
-
-                taskPrototypeKeySelect.onchange = function() {
-                    const taskPrototype = taskPrototypes[this.value];
-
-                    completableByEmailDiv.style.display = "none";
-                    completableByGroupDiv.style.display = "none";
-                    completableByEmail.name = "";
-                    completableByGroup.name = "";
-
-                    if ((taskPrototype.completable_by !== undefined) && (taskPrototype.completable_by.value === undefined)) {
-                        if (taskPrototype.completable_by.type === "GROUP") {
-                            completableByGroupDiv.style.display = "inline-block";
-                            completableByGroup.name = "completableBy";
-                        }
-                        else if (taskPrototype.completable_by.type === "EMAIL") {
-                            completableByEmailDiv.style.display = "inline-block";
-                            completableByEmail.name = "completableBy";
-                        }
-                    }
-                };
-            </script>
         }
 
         case models.State.Completed => {

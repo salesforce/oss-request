@@ -15,7 +15,16 @@ import play.api.mvc.RequestHeader
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskService: TaskService, notifier: Notifier, security: Security, metadataService: MetadataService)(implicit ec: ExecutionContext) {
+class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskService: TaskService, notifier: Notifier, metadataService: MetadataService)(implicit ec: ExecutionContext) {
+
+  private def checkAccess(check: => Boolean): Future[Unit] = {
+    if (check) {
+      Future.unit
+    }
+    else {
+      Future.failed(DataFacade.NotAllowed())
+    }
+  }
 
   def createRequest(program: String, name: String, creatorEmail: String): Future[Request] = {
     for {
@@ -66,26 +75,26 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
 
   def updateRequest(email: String, requestSlug: String, state: State.State, message: Option[String], securityBypass: Boolean = false)(implicit requestHeader: RequestHeader): Future[Request] = {
     for {
-      _ <- if (securityBypass) Future.unit else security.updateRequest(email, requestSlug, state)
-      request <- dao.updateRequest(requestSlug, state, message)
-      _ <- notifier.requestStatusChange(request)
-    } yield request
+      currentRequest <- dao.request(requestSlug)
+      program <- metadataService.fetchProgram(currentRequest.program)
+      _ <- checkAccess(securityBypass || program.isAdmin(email))
+      updatedRequest <- dao.updateRequest(requestSlug, state, message)
+      _ <- notifier.requestStatusChange(updatedRequest)
+    } yield updatedRequest
   }
 
-  def request(email: String, requestSlug: String): Future[(Request, Boolean, Boolean)] = {
-    for {
-      request <- dao.request(requestSlug)
-      isAdmin <- security.isAdmin(request.program, email)
-      canCancelRequest <- security.canCancelRequest(email, Left(request))
-    } yield (request, isAdmin, canCancelRequest)
+  def request(email: String, requestSlug: String): Future[Request] = {
+    dao.request(requestSlug)
   }
 
   def updateTaskState(email: String, taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], completionMessage: Option[String], securityBypass: Boolean = false)(implicit requestHeader: RequestHeader): Future[Task] = {
     for {
-      _ <- if (securityBypass) Future.unit else security.updateTask(email, taskId)
+      currentTask <- dao.taskById(taskId)
+      request <- dao.request(currentTask.requestSlug)
+      program <- metadataService.fetchProgram(request.program)
+      _ <- checkAccess(securityBypass || program.isAdmin(email) || currentTask.completableBy.contains(email))
       task <- dao.updateTaskState(taskId, state, maybeCompletedBy, maybeData, completionMessage)
       requestWithTasks <- dao.requestWithTasks(task.requestSlug)
-      program <- metadataService.fetchProgram(requestWithTasks.request.program)
       _ <- notifier.taskStateChanged(requestWithTasks.request, task)
       _ <- taskEventHandler.process(program, requestWithTasks.request, TaskEvent.EventType.StateChange, task, createTask(_, _, _), updateRequest(email, task.requestSlug, _, _, securityBypass))
       _ <- if (requestWithTasks.completedTasks.size == requestWithTasks.tasks.size) notifier.allTasksCompleted(requestWithTasks.request, program.admins) else Future.unit
@@ -94,16 +103,21 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
 
   def assignTask(email: String, taskId: Int, emails: Seq[String])(implicit requestHeader: RequestHeader): Future[Task] = {
     for {
-      _ <- security.updateTask(email, taskId)
-      task <- dao.assignTask(taskId, emails)
-      request <- dao.request(task.requestSlug)
-      _ <- notifier.taskAssigned(request, task)
-    } yield task
+      currentTask <- dao.taskById(taskId)
+      request <- dao.request(currentTask.requestSlug)
+      program <- metadataService.fetchProgram(request.program)
+      _ <- checkAccess(program.isAdmin(email))
+      updatedTask <- dao.assignTask(taskId, emails)
+      _ <- notifier.taskAssigned(request, updatedTask)
+    } yield updatedTask
   }
 
   def deleteTask(email: String, taskId: Int): Future[Unit] = {
     for {
-      _ <- security.deleteTask(email, taskId)
+      currentTask <- dao.taskById(taskId)
+      request <- dao.request(currentTask.requestSlug)
+      program <- metadataService.fetchProgram(request.program)
+      _ <- checkAccess(program.isAdmin(email))
       result <- dao.deleteTask(taskId)
     } yield result
   }
@@ -116,13 +130,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     } yield updatedTask
   }
 
-  def requestTasks(email: String, requestSlug: String, maybeState: Option[State.State] = None)(implicit requestHeader: RequestHeader): Future[Seq[(Task, Long, Boolean)]] = {
-    def canEdit(taskWithNumComments: (Task, Long)): Future[(Task, Long, Boolean)] = {
-      security.canEditTask(email, Left(taskWithNumComments._1)).map { canEdit =>
-        (taskWithNumComments._1, taskWithNumComments._2, canEdit)
-      }
-    }
-
+  def requestTasks(email: String, requestSlug: String, maybeState: Option[State.State] = None)(implicit requestHeader: RequestHeader): Future[Seq[(Task, DAO.NumComments)]] = {
     def updateTasks(request: Request, tasks: Seq[(Task, DAO.NumComments)]): Future[Seq[(Task, DAO.NumComments)]] = {
       Future.sequence {
         tasks.map { case (task, numComments) =>
@@ -137,8 +145,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
       tasks <- dao.requestTasks(requestSlug, maybeState)
       request <- dao.request(requestSlug)
       updatedTasks <- updateTasks(request, tasks)
-      tasksWithCanEdit <- Future.sequence(updatedTasks.map(canEdit))
-    } yield tasksWithCanEdit
+    } yield updatedTasks
   }
 
   def commentOnTask(requestSlug: String, taskId: Int, email: String, contents: String)(implicit requestHeader: RequestHeader): Future[Comment] = {
@@ -167,6 +174,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
 }
 
 object DataFacade {
+  case class NotAllowed() extends Exception("You are not allowed to perform this action")
   case class DuplicateTaskException() extends Exception("The task already exists on the request")
   case class MissingTaskDependencyException() extends Exception("This task depends on a task that either does not exist or isn't completed")
 }

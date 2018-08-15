@@ -22,6 +22,7 @@ class DataFacadeSpec extends MixedPlaySpec {
   def withDb = DAOMock.databaseAppBuilder().overrides(bind[NotifyProvider].to[NotifyMock]).build()
 
   def database(implicit app: play.api.Application) = app.injector.instanceOf[Database]
+  def defaultProgram(implicit app: play.api.Application) = await(app.injector.instanceOf[MetadataService].fetchProgram("default"))
   def dataFacade(implicit app: play.api.Application) = app.injector.instanceOf[DataFacade]
 
   implicit val fakeRequest = FakeRequest()
@@ -55,7 +56,7 @@ class DataFacadeSpec extends MixedPlaySpec {
         val metadataService = app.injector.instanceOf[MetadataService]
 
         val request = await(dataFacade.createRequest("default", "foo", "foo@bar.com"))
-        val startPrototype = await(metadataService.fetchProgram("default")).tasks("start")
+        val startPrototype = defaultProgram.tasks("start")
         await(dataFacade.createTask(request.slug, startPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
 
         val prototype = Task.Prototype("asdf", Task.TaskType.Approval, "asdf", None, None, Seq.empty[TaskEvent], Set("start"))
@@ -74,7 +75,7 @@ class DataFacadeSpec extends MixedPlaySpec {
         val metadataService = app.injector.instanceOf[MetadataService]
         val request = await(dataFacade.createRequest("default", "foo", "foo@bar.com"))
         val prototype = Task.Prototype("asdf", Task.TaskType.Approval, "asdf", None, None, Seq.empty[TaskEvent], Set("start"))
-        val startPrototype = await(metadataService.fetchProgram("default")).tasks("start")
+        val startPrototype = defaultProgram.tasks("start")
         await(dataFacade.createTask(request.slug, startPrototype, Seq("foo@foo.com")))
         a[DataFacade.MissingTaskDependencyException] must be thrownBy await(dataFacade.createTask(request.slug, prototype, Seq("foo@foo.com")))
       }
@@ -104,15 +105,15 @@ class DataFacadeSpec extends MixedPlaySpec {
         val request = await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
         noException must be thrownBy await(dataFacade.updateRequest("foo@bar.com", request.slug, State.Completed, None))
 
-        await(dataFacade.request("foo@foo.com", request.slug))._1.state must equal(State.Completed)
+        await(dataFacade.request("foo@foo.com", request.slug)).state must equal(State.Completed)
       }
     }
     "be denied for non-admin / non-owner" in new App(withDb) {
       Evolutions.withEvolutions(database) {
         val request = await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
-        a[Security.NotAllowed] must be thrownBy await(dataFacade.updateRequest("baz@baz.com", request.slug, State.Completed, None))
+        a[DataFacade.NotAllowed] must be thrownBy await(dataFacade.updateRequest("baz@baz.com", request.slug, State.Completed, None))
 
-        await(dataFacade.request("foo@foo.com", request.slug))._1.state must not equal State.Completed
+        await(dataFacade.request("foo@foo.com", request.slug)).state must not equal State.Completed
       }
     }
   }
@@ -140,7 +141,7 @@ class DataFacadeSpec extends MixedPlaySpec {
     "work with a state" in new App(withDb) {
       Evolutions.withEvolutions(database) {
         val request = await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
-        await(dataFacade.updateRequest("foo@foo.com", request.slug, State.Cancelled, None))
+        await(dataFacade.updateRequest("foo@bar.com", request.slug, State.Cancelled, None))
 
         await(dataFacade.createRequest("two", "foo", "foo@foo.com"))
 
@@ -152,7 +153,7 @@ class DataFacadeSpec extends MixedPlaySpec {
     "work with program & state" in new App(withDb) {
       Evolutions.withEvolutions(database) {
         val request = await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
-        await(dataFacade.updateRequest("foo@foo.com", request.slug, State.Cancelled, None))
+        await(dataFacade.updateRequest("foo@bar.com", request.slug, State.Cancelled, None))
 
         await(dataFacade.createRequest("two", "foo", "foo@foo.com"))
 
@@ -176,6 +177,47 @@ class DataFacadeSpec extends MixedPlaySpec {
         await(dataFacade.search(None, None, None)).size must equal (2)
         await(dataFacade.search(None, None, Some(json))).size must equal (1)
         await(dataFacade.search(None, None, Some(Json.obj("foo" -> "asdf")))).size must equal (0)
+      }
+    }
+  }
+
+  "updateTaskState" must {
+    val taskPrototype = Task.Prototype("test", Task.TaskType.Action, "test")
+    "allow changes for admins" in new App(withDb) {
+      Evolutions.withEvolutions(database) {
+        val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
+        val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com")))
+        noException must be thrownBy await(dataFacade.updateTaskState("foo@bar.com", task.id, State.Completed, Some("foo@foo.com"), None, None))
+      }
+    }
+    "allow changes for task owner(s)" in new App(withDb) {
+      Evolutions.withEvolutions(database) {
+        val email = "foo@foo.com"
+        val task1Emails = Seq(email)
+
+        val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
+
+        val task1 = await(dataFacade.createTask(request.slug, taskPrototype, task1Emails))
+        noException must be thrownBy await(dataFacade.updateTaskState(email, task1.id, State.Completed, Some("asdf@asdf.com"), None, None))
+
+        val securityGroup = defaultProgram.groups("security")
+
+        val task2Emails = defaultProgram.completableBy(Task.CompletableByType.Group, "security").get.toSeq
+
+        val taskPrototype2 = Task.Prototype("asdf", Task.TaskType.Action, "test")
+        val task2 = await(dataFacade.createTask(request.slug, taskPrototype2, task2Emails))
+        noException must be thrownBy await(dataFacade.updateTaskState(securityGroup.head, task2.id, State.Completed, Some(securityGroup.head), None, None))
+      }
+    }
+    "deny non-admins and non-owner from making changes" in new App(withDb) {
+      Evolutions.withEvolutions(database) {
+        val email = "foo@foo.com"
+
+        val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
+
+        val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@bar.com")))
+        a[DataFacade.NotAllowed] must be thrownBy await(dataFacade.updateTaskState(email, task.id, State.Completed, Some("foo@foo.com"), None, None))
+        a[DataFacade.NotAllowed] must be thrownBy await(dataFacade.updateTaskState("asdf@asdf.com", task.id, State.Completed, Some("asdf@asdf.com"), None, None))
       }
     }
   }

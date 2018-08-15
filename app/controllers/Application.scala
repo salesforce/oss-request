@@ -157,12 +157,12 @@ class Application @Inject()
   def request(requestSlug: String) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
       metadataService.fetchMetadata.flatMap { implicit metadata =>
-        dataFacade.request(userInfo.email, requestSlug).flatMap { case (request, isAdmin, canCancelRequest) =>
+        dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
           metadata.programs.get(request.program).fold {
             Future.successful(InternalServerError(s"Could not find program ${request.program}"))
           } { program =>
             dataFacade.requestTasks(userInfo.email, request.slug).map { tasks =>
-              Ok(requestView(program, request, tasks, userInfo, canCancelRequest))
+              Ok(requestView(program, request, tasks, userInfo))
             }
           }
         } recover {
@@ -185,11 +185,11 @@ class Application @Inject()
     withUserInfo { userInfo =>
       metadataService.fetchMetadata.flatMap { implicit metadata =>
         val f = for {
-          (request, isAdmin, _) <- dataFacade.request(userInfo.email, requestSlug)
+          request <- dataFacade.request(userInfo.email, requestSlug)
           task <- dataFacade.taskById(taskId)
           comments <- dataFacade.commentsOnTask(taskId)
           program <- metadata.programs.get(request.program).fold(Future.failed[Program](new Exception("Program not found")))(Future.successful)
-        } yield Ok(taskView(request, task, comments, userInfo, isAdmin, program.groups.keySet))
+        } yield Ok(taskView(request, task, comments, userInfo, program.isAdmin(userInfo), program.groups.keySet))
 
         f.recover {
           case e: Exception =>
@@ -205,7 +205,7 @@ class Application @Inject()
         val maybeTaskPrototypeKey = userRequest.body.get("taskPrototypeKey").flatMap(_.headOption)
         val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption).filterNot(_.isEmpty)
 
-        dataFacade.request(userInfo.email, requestSlug).flatMap { case (request, _, _) =>
+        dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
           maybeTaskPrototypeKey.fold(Future.successful(BadRequest("No taskPrototypeKey specified"))) { taskPrototypeKey =>
             val maybeTask = for {
               programMetadata <- metadata.programs.get(request.program)
@@ -247,7 +247,7 @@ class Application @Inject()
   def updateTaskAssignment(requestSlug: String, taskId: Int) = userAction.async(parse.json) { implicit userRequest =>
     withUserInfo { userInfo =>
       metadataService.fetchMetadata.flatMap { metadata =>
-        dataFacade.request(userInfo.email, requestSlug).flatMap { case (request, _, _) =>
+        dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
           val maybeCompletableBy = (userRequest.body \ "email").asOpt[String].map { email =>
             CompletableByType.Email -> email
           } orElse {

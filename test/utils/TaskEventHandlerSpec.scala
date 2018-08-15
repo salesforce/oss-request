@@ -78,7 +78,7 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
       val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
       val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
 
-      val (updatedRequest, _, _) = await(dataFacade.request("asdf@asdf.com", request.slug))
+      val updatedRequest = await(dataFacade.request("asdf@asdf.com", request.slug))
       updatedRequest.state must equal (State.Completed)
       updatedRequest.completedDate must be (defined)
     }
