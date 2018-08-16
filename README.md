@@ -138,7 +138,7 @@ Local Dev Setup
 1. Create local Postgres databases:
 
         $ psql
-        # CREATE ROLE ossrequest LOGIN password 'password';
+        # CREATE ROLE ossrequest LOGIN password 'password' SUPERUSER;
         # CREATE DATABASE ossrequest ENCODING 'UTF8' OWNER ossrequest;
         # CREATE DATABASE "ossrequest-test" ENCODING 'UTF8' OWNER ossrequest;
 

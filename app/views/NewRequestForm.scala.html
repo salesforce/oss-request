@@ -7,9 +7,22 @@
 
 @this(mainView: Main, taskEditView: utils.TaskEdit)
 
-@(programKey: String, projectName: String, taskKey: String, taskPrototype: models.Task.Prototype, userInfo: _root_.utils.UserInfo)(implicit request: RequestHeader, metadata: _root_.utils.Metadata)
+@(programKey: String, projectName: String, taskKey: String, taskPrototype: models.Task.Prototype, userInfo: _root_.utils.UserInfo, similarRequests: Seq[RequestWithTasks])(implicit request: RequestHeader, metadata: _root_.utils.Metadata)
 
 @mainView(Some(userInfo))("New Request") {
+
+    @if(similarRequests.nonEmpty) {
+        <div class="alert alert-warning" role="alert">
+            <span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>
+            Is this request a duplicate?  Similar requests:
+        </div>
+
+        @partials.RequestsList(similarRequests)
+
+        <div class="alert alert-warning" role="alert">
+            Or, proceed creating a new request.
+        </div>
+    }
 
     <div class="panel panel-default">
         <div class="panel-heading">

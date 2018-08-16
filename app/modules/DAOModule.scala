@@ -35,6 +35,7 @@ trait DAO {
   def createRequest(program: String, name: String, creatorEmail: String): Future[Request]
   def createRequest(name: String, creatorEmail: String): Future[Request] = createRequest("default", name, creatorEmail)
   def programRequests(program: String): Future[Seq[RequestWithTasks]]
+  def requestsSimilarToName(program: String, name: String): Future[Seq[RequestWithTasks]]
   def programRequests(): Future[Seq[RequestWithTasks]] = programRequests("default")
   def userRequests(email: String): Future[Seq[RequestWithTasks]]
   def request(requestSlug: String): Future[Request]
@@ -111,6 +112,16 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     run {
       quote {
         query[Request].filter(_.creatorEmail == lift(email)).leftJoin(query[Task]).on(_.slug == _.requestSlug)
+      }
+    }.map(joinedRequestTasksToRequests)
+  }
+
+  def requestsSimilarToName(program: String, name: String): Future[Seq[RequestWithTasks]] = {
+    run {
+      quote {
+        query[Request].filter { request =>
+          infix"""similarity(${request.name}, ${lift(name)}) >= 0.5""".as[Boolean]
+        }.leftJoin(query[Task]).on(_.slug == _.requestSlug)
       }
     }.map(joinedRequestTasksToRequests)
   }

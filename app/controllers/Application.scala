@@ -114,7 +114,7 @@ class Application @Inject()
 
   def newRequest(maybeName: Option[String], maybeProgramKey: Option[String], maybeStartTask: Option[String]) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      metadataService.fetchMetadata.map { implicit metadata =>
+      metadataService.fetchMetadata.flatMap { implicit metadata =>
         val nonEmptyMaybeName = maybeName.filter(_.nonEmpty)
         val nonEmptyMaybeProgramKey = maybeProgramKey.filter(_.nonEmpty)
         val nonEmptyMaybeStartTask = maybeStartTask.filter(_.nonEmpty)
@@ -125,9 +125,13 @@ class Application @Inject()
           programMetadata <- metadata.programs.get(programKey)
           startTask <- nonEmptyMaybeStartTask
           task <- programMetadata.tasks.get(startTask)
-        } yield Ok(newRequestFormView(programKey, name, startTask, task, userInfo))
+        } yield {
+          dataFacade.requestsSimilarToName(programKey, name).map { similarRequests =>
+            Ok(newRequestFormView(programKey, name, startTask, task, userInfo, similarRequests))
+          }
+        }
 
-        maybeTaskView.getOrElse(Ok(newRequestView(userInfo, nonEmptyMaybeName, nonEmptyMaybeProgramKey, nonEmptyMaybeStartTask)))
+        maybeTaskView.getOrElse(Future.successful(Ok(newRequestView(userInfo, nonEmptyMaybeName, nonEmptyMaybeProgramKey, nonEmptyMaybeStartTask))))
       }
     }
   }

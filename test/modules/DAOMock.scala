@@ -56,6 +56,10 @@ class DAOMock extends DAO {
     allRequests().map(_.filter(_.request.creatorEmail == email)).map(_.toSeq)
   }
 
+  def requestsSimilarToName(program: String, name: String): Future[Seq[RequestWithTasks]] = {
+    allRequests().map(_.filter(_.request.name.toLowerCase == name.toLowerCase)).map(_.toSeq)
+  }
+
   override def updateTaskState(taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], completionMessage: Option[String]): Future[Task] = {
     tasks.find(_.id == taskId).fold(Future.failed[Task](new Exception("Task not found"))) { task =>
       val updatedTask = task.copy(

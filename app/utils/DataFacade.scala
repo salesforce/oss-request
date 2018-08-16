@@ -62,15 +62,15 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
   }
 
   def programRequests(program: String): Future[Seq[RequestWithTasks]] = {
-    for {
-      programRequests <- dao.programRequests(program)
-    } yield programRequests
+    dao.programRequests(program)
   }
 
   def userRequests(email: String): Future[Seq[RequestWithTasks]] = {
-    for {
-      requests <- dao.userRequests(email)
-    } yield requests
+    dao.userRequests(email)
+  }
+
+  def requestsSimilarToName(program: String, name: String): Future[Seq[RequestWithTasks]] = {
+    dao.requestsSimilarToName(program, name)
   }
 
   def updateRequest(email: String, requestSlug: String, state: State.State, message: Option[String], securityBypass: Boolean = false)(implicit requestHeader: RequestHeader): Future[Request] = {
