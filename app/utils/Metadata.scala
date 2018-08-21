@@ -73,7 +73,11 @@ object Program {
 case class ReportQuery(state: Option[State.State], program: Option[String], data: JsObject)
 
 object ReportQuery {
-  implicit val jsonReads: Reads[ReportQuery] = Json.reads[ReportQuery]
+  implicit val jsonReads: Reads[ReportQuery] = (
+    (__ \ "state").readNullable[State.State] ~
+    (__ \ "program").readNullable[String] ~
+    (__ \ "data").read[JsObject].orElse(Reads.pure(JsObject.empty))
+  )(ReportQuery.apply _)
 }
 
 

@@ -21,6 +21,13 @@
             "github_org": "Foo"
           }
         }
+      },
+      "in_progress": {
+        "title": "In Progress",
+        "query": {
+          "state": "IN_PROGRESS",
+          "program": "default"
+        }
       }
     },
     "tasks": {
