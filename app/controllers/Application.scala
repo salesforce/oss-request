@@ -95,7 +95,9 @@ class Application @Inject()
             Ok(requestsView(title, requests, userInfo))
           }
         } getOrElse {
-          Future.successful(InternalServerError(errorView("Could not find program", userInfo)))
+          Future.successful {
+            InternalServerError(errorView("Could not find program", userInfo))
+          }
         }
       }
     }
