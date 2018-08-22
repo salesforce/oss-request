@@ -16,7 +16,6 @@
         "title": "Requests in Foo",
         "query": {
           "state": "COMPLETED",
-          "program": "default",
           "data": {
             "github_org": "Foo"
           }
@@ -25,8 +24,7 @@
       "in_progress": {
         "title": "In Progress",
         "query": {
-          "state": "IN_PROGRESS",
-          "program": "default"
+          "state": "IN_PROGRESS"
         }
       }
     },

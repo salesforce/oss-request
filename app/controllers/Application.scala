@@ -114,6 +114,20 @@ class Application @Inject()
     }
   }
 
+  def report(programKey: String, reportKey: String) = userAction.async { implicit userRequest =>
+    withUserInfo { userInfo =>
+      metadataService.fetchMetadata.flatMap { implicit metadata =>
+        metadata.programs.get(programKey).fold(Future.successful(NotFound(errorView("Program Not Found", userInfo)))) { program =>
+          program.reports.get(reportKey).fold(Future.successful(NotFound(errorView("Report Not Found", userInfo)))) { report =>
+            dataFacade.search(Some(programKey), report.query.state, report.query.data).map { requests =>
+              Ok(searchView(requests, userInfo))
+            }
+          }
+        }
+      }
+    }
+  }
+
   def newRequest(maybeName: Option[String], maybeProgramKey: Option[String], maybeStartTask: Option[String]) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
       metadataService.fetchMetadata.flatMap { implicit metadata =>
