@@ -16,7 +16,7 @@
     <li><a href="@routes.Application.requests(Some(programKey))">@program.name - All</a></li>
 
     @for((reportKey, report) <- program.reports) {
-        <li><a href="@routes.Application.search(report.query.program, report.query.state, Some(report.query.data.toString))">@report.title</a></li>
+        <li><a href="@routes.Application.search(report.query.program, report.query.state, report.query.data.map(_.toString))">@report.title</a></li>
     }
 
     @if(programKey != metadata.programs.last._1) {
