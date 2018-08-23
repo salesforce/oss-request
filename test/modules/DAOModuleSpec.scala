@@ -77,6 +77,14 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       val requests = await(dao.programRequests())
       requests must have size 2
     }
+    "beAlphabetic" in Evolutions.withEvolutions(database) {
+      await(dao.createRequest("foo", "foo@bar.com"))
+      await(dao.createRequest("bar", "asdf@asdf.com"))
+      await(dao.createRequest("cheese", "asdf@asdf.com"))
+
+      val requests = await(dao.programRequests())
+      requests.map(_.request.name) must equal (Seq("bar", "cheese", "foo"))
+    }
   }
 
   "requestsForUser" must {
