@@ -348,7 +348,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
           requestWithTasks.tasks.exists { task =>
             task.data.exists { data =>
               // todo: only works on strings
-              dataIn.values.contains((data \ dataIn.attribute).as[String])
+              dataIn.values.exists((data \ dataIn.attribute).asOpt[String].contains)
             }
           }
         }
