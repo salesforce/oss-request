@@ -15,9 +15,17 @@
       "in_foo_org": {
         "title": "Requests in Foo",
         "query": {
-          "state": "COMPLETED",
           "data": {
             "github_org": "Foo"
+          }
+        }
+      },
+      "in_foo_or_bar_org": {
+        "title": "Requests in Foo or Bar",
+        "query": {
+          "data-in": {
+            "attribute": "github_org",
+            "values": ["Foo", "Bar"]
           }
         }
       },

@@ -20,6 +20,7 @@ import models.{Comment, Request, RequestWithTasks, State, Task}
 import play.api.inject.{ApplicationLifecycle, Binding, Module}
 import play.api.libs.json.{JsObject, Json}
 import play.api.{Configuration, Environment}
+import utils.DataIn
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -50,7 +51,7 @@ trait DAO {
   def commentOnTask(taskId: Int, email: String, contents: String): Future[Comment]
   def commentsOnTask(taskId: Int): Future[Seq[Comment]]
   def tasksForUser(email: String, state: State.State): Future[Seq[(Task, DAO.NumComments, Request)]]
-  def search(maybeProgram: Option[String], maybeState: Option[State.State], data: Option[JsObject]): Future[Seq[RequestWithTasks]]
+  def search(maybeProgram: Option[String], maybeState: Option[State.State], data: Option[JsObject], dataIn: Option[DataIn]): Future[Seq[RequestWithTasks]]
 }
 
 object DAO {
@@ -302,7 +303,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject]): Future[Seq[RequestWithTasks]] = {
+  override def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject], maybeDataIn: Option[DataIn]): Future[Seq[RequestWithTasks]] = {
 
     case class QueryBuilder[T](query: Quoted[Query[T]]) {
       def ifDefined[U: Encoder](value: Option[U])(f: Quoted[(Query[T], U) => Query[T]]): QueryBuilder[T] =
@@ -319,7 +320,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
       def build: database.ctx.Quoted[database.ctx.Query[T]] = query
     }
 
-    val requestQuery = QueryBuilder(query[Request])
+    val baseQueryBuilder = QueryBuilder(query[Request])
       .ifDefined(maybeProgram) {
         (q: Query[Request], program: String) => q.filter(_.program == program)
       }
@@ -333,13 +334,26 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
           }.nonEmpty
         }
       }
-      .build
+
+    val requestQuery = baseQueryBuilder.build
 
     run {
       quote {
         requestQuery.leftJoin(query[Task]).on(_.slug == _.requestSlug)
       }
-    }.map(joinedRequestTasksToRequests)
+    }.map(joinedRequestTasksToRequests).map { requestsWithTasks =>
+      // this could / should be done in the DB using ->>
+      requestsWithTasks.filter { requestWithTasks =>
+        maybeDataIn.fold(true) { dataIn =>
+          requestWithTasks.tasks.exists { task =>
+            task.data.exists { data =>
+              // todo: only works on strings
+              dataIn.values.contains((data \ dataIn.attribute).as[String])
+            }
+          }
+        }
+      }
+    }
   }
 
 }

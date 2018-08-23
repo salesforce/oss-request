@@ -11,6 +11,7 @@ import java.time.ZonedDateTime
 import java.util.concurrent.ConcurrentHashMap
 
 import javax.inject.Singleton
+import models.State.State
 import models.{Comment, Request, RequestWithTasks, State, Task}
 import play.api.Mode
 import play.api.db.evolutions.EvolutionsModule
@@ -18,6 +19,7 @@ import play.api.db.{DBModule, HikariCPModule}
 import play.api.inject.bind
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.json.JsObject
+import utils.DataIn
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -174,7 +176,7 @@ class DAOMock extends DAO {
     }.map(_.toSeq)
   }
 
-  def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject]): Future[Seq[RequestWithTasks]] = {
+  def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject], maybeDataIn: Option[DataIn]): Future[Seq[RequestWithTasks]] = {
     allRequests().map { requestsWithTasks =>
       requestsWithTasks.filter { requestWithTasks =>
         maybeProgram.forall(_ == requestWithTasks.request.program) &&
@@ -187,9 +189,11 @@ class DAOMock extends DAO {
             }
           }
         }
+        // todo: maybeDataIn
       }.toSeq
     }
   }
+
 }
 
 object DAOMock {

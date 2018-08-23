@@ -107,7 +107,7 @@ class Application @Inject()
     withUserInfo { userInfo =>
       metadataService.fetchMetadata.flatMap { implicit metadata =>
         val maybeData = data.flatMap(Json.parse(_).asOpt[JsObject])
-        dataFacade.search(program, state, maybeData).map { requests =>
+        dataFacade.search(program, state, maybeData, None).map { requests =>
           Ok(searchView(requests, userInfo))
         }
       }
@@ -119,7 +119,7 @@ class Application @Inject()
       metadataService.fetchMetadata.flatMap { implicit metadata =>
         metadata.programs.get(programKey).fold(Future.successful(NotFound(errorView("Program Not Found", userInfo)))) { program =>
           program.reports.get(reportKey).fold(Future.successful(NotFound(errorView("Report Not Found", userInfo)))) { report =>
-            dataFacade.search(Some(programKey), report.query.state, report.query.data).map { requests =>
+            dataFacade.search(Some(programKey), report.query.state, report.query.data, report.query.dataIn).map { requests =>
               Ok(searchView(requests, userInfo))
             }
           }

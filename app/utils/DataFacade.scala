@@ -10,7 +10,7 @@ package utils
 import javax.inject.Inject
 import models.{Comment, Request, RequestWithTasks, State, Task, TaskEvent}
 import modules.{DAO, Notifier}
-import play.api.libs.json.JsObject
+import play.api.libs.json.{JsObject, JsValue}
 import play.api.mvc.RequestHeader
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -167,8 +167,8 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     dao.tasksForUser(email, state)
   }
 
-  def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject]): Future[Seq[RequestWithTasks]] = {
-    dao.search(maybeProgram, maybeState, maybeData)
+  def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject], maybeDataIn: Option[DataIn]): Future[Seq[RequestWithTasks]] = {
+    dao.search(maybeProgram, maybeState, maybeData, maybeDataIn)
   }
 
 }

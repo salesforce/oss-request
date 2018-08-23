@@ -14,6 +14,7 @@ import play.api.db.Database
 import play.api.db.evolutions.Evolutions
 import play.api.inject.bind
 import play.api.libs.json.Json
+import play.api.mvc.RequestHeader
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
 
@@ -25,7 +26,7 @@ class DataFacadeSpec extends MixedPlaySpec {
   def defaultProgram(implicit app: play.api.Application) = await(app.injector.instanceOf[MetadataService].fetchProgram("default"))
   def dataFacade(implicit app: play.api.Application) = app.injector.instanceOf[DataFacade]
 
-  implicit val fakeRequest = FakeRequest()
+  implicit val fakeRequest: RequestHeader = FakeRequest()
 
   "createTask" must {
     "work with events" in new App(withDb) {
@@ -123,7 +124,7 @@ class DataFacadeSpec extends MixedPlaySpec {
       Evolutions.withEvolutions(database) {
         await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
 
-        val results = await(dataFacade.search(None, None, None))
+        val results = await(dataFacade.search(None, None, None, None))
 
         results.size must equal (1)
       }
@@ -133,7 +134,7 @@ class DataFacadeSpec extends MixedPlaySpec {
         await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
         await(dataFacade.createRequest("two", "foo", "foo@foo.com"))
 
-        val results = await(dataFacade.search(Some("default"), None, None))
+        val results = await(dataFacade.search(Some("default"), None, None, None))
 
         results.size must equal (1)
       }
@@ -145,7 +146,7 @@ class DataFacadeSpec extends MixedPlaySpec {
 
         await(dataFacade.createRequest("two", "foo", "foo@foo.com"))
 
-        val results = await(dataFacade.search(None, Some(State.InProgress), None))
+        val results = await(dataFacade.search(None, Some(State.InProgress), None, None))
 
         results.size must equal (1)
       }
@@ -157,8 +158,8 @@ class DataFacadeSpec extends MixedPlaySpec {
 
         await(dataFacade.createRequest("two", "foo", "foo@foo.com"))
 
-        await(dataFacade.search(Some("default"), Some(State.InProgress), None)).size must equal (0)
-        await(dataFacade.search(Some("default"), Some(State.Cancelled), None)).size must equal (1)
+        await(dataFacade.search(Some("default"), Some(State.InProgress), None, None)).size must equal (0)
+        await(dataFacade.search(Some("default"), Some(State.Cancelled), None, None)).size must equal (1)
       }
     }
     "work with data" in new App(withDb) {
@@ -174,9 +175,9 @@ class DataFacadeSpec extends MixedPlaySpec {
 
         await(dataFacade.createRequest("two", "foo", "foo@foo.com"))
 
-        await(dataFacade.search(None, None, None)).size must equal (2)
-        await(dataFacade.search(None, None, Some(json))).size must equal (1)
-        await(dataFacade.search(None, None, Some(Json.obj("foo" -> "asdf")))).size must equal (0)
+        await(dataFacade.search(None, None, None, None)).size must equal (2)
+        await(dataFacade.search(None, None, Some(json), None)).size must equal (1)
+        await(dataFacade.search(None, None, Some(Json.obj("foo" -> "asdf")), None)).size must equal (0)
       }
     }
   }
