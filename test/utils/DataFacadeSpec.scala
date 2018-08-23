@@ -182,14 +182,12 @@ class DataFacadeSpec extends MixedPlaySpec {
     }
     "work with data-in" in new App(withDb) {
       Evolutions.withEvolutions(database) {
-        val json = Json.obj(
-          "foo" -> "bar"
-        )
-
-        val prototype = Task.Prototype("test", Task.TaskType.Input, "test")
+        val prototype1 = Task.Prototype("test", Task.TaskType.Input, "test")
+        val prototype2 = Task.Prototype("asdf", Task.TaskType.Input, "asdf")
 
         val request = await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
-        await(dataFacade.createTask(request.slug, prototype, Seq("foo@foo.com"), Some("foo@foo.com"), Some(json), State.Completed))
+        await(dataFacade.createTask(request.slug, prototype1, Seq("foo@foo.com"), Some("foo@foo.com"), Some(Json.obj("foo" -> "bar")), State.Completed))
+        await(dataFacade.createTask(request.slug, prototype2, Seq("foo@foo.com"), Some("foo@foo.com"), Some(Json.obj("asdf" -> "asdf")), State.Completed))
 
         await(dataFacade.createRequest("two", "foo", "foo@foo.com"))
 
