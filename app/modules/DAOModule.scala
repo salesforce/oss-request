@@ -320,6 +320,10 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
       def build: database.ctx.Quoted[database.ctx.Query[T]] = query
     }
 
+    def inject[T](s: String) = new Quoted[T] {
+      override def ast = io.getquill.ast.Infix(List(s), Nil)
+    }
+
     val baseQueryBuilder = QueryBuilder(query[Request])
       .ifDefined(maybeProgram) {
         (q: Query[Request], program: String) => q.filter(_.program == program)
@@ -335,25 +339,30 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
         }
       }
 
-    val requestQuery = baseQueryBuilder.build
+    val queryBuilder = maybeDataIn match {
+      case None =>
+        baseQueryBuilder
+      case Some(dataIn) =>
+        QueryBuilder {
+          quote {
+            baseQueryBuilder.query.filter { request =>
+              query[Task].filter(_.requestSlug == request.slug).filter { task =>
+                liftQuery(dataIn.values).contains {
+                  infix"${task.data}->>'${inject(dataIn.attribute)}'"
+                }
+              }.nonEmpty
+            }
+          }
+        }
+    }
+
+    val requestQuery = queryBuilder.build
 
     run {
       quote {
         requestQuery.leftJoin(query[Task]).on(_.slug == _.requestSlug)
       }
-    }.map(joinedRequestTasksToRequests).map { requestsWithTasks =>
-      // this could / should be done in the DB using ->>
-      requestsWithTasks.filter { requestWithTasks =>
-        maybeDataIn.fold(true) { dataIn =>
-          requestWithTasks.tasks.exists { task =>
-            task.data.exists { data =>
-              // todo: only works on strings
-              dataIn.values.exists((data \ dataIn.attribute).asOpt[String].contains)
-            }
-          }
-        }
-      }
-    }
+    }.map(joinedRequestTasksToRequests)
   }
 
 }

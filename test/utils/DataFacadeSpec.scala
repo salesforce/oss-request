@@ -180,6 +180,26 @@ class DataFacadeSpec extends MixedPlaySpec {
         await(dataFacade.search(None, None, Some(Json.obj("foo" -> "asdf")), None)).size must equal (0)
       }
     }
+    "work with data-in" in new App(withDb) {
+      Evolutions.withEvolutions(database) {
+        val json = Json.obj(
+          "foo" -> "bar"
+        )
+
+        val prototype = Task.Prototype("test", Task.TaskType.Input, "test")
+
+        val request = await(dataFacade.createRequest("default", "foo", "foo@foo.com"))
+        await(dataFacade.createTask(request.slug, prototype, Seq("foo@foo.com"), Some("foo@foo.com"), Some(json), State.Completed))
+
+        await(dataFacade.createRequest("two", "foo", "foo@foo.com"))
+
+        await(dataFacade.search(None, None, None, Some(DataIn("foo", Set.empty)))).size must equal (0)
+        await(dataFacade.search(None, None, None, Some(DataIn("bar", Set.empty)))).size must equal (0)
+        await(dataFacade.search(None, None, None, Some(DataIn("foo", Set("baz"))))).size must equal (0)
+        await(dataFacade.search(None, None, None, Some(DataIn("foo", Set("bar"))))).size must equal (1)
+        await(dataFacade.search(None, None, None, Some(DataIn("foo", Set("bar", "baz"))))).size must equal (1)
+      }
+    }
   }
 
   "updateTaskState" must {
