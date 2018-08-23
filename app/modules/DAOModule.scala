@@ -96,7 +96,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
   def joinedRequestTasksToRequests(requestsTasks: Seq[(Request, Option[Task])]): Seq[RequestWithTasks] = {
     requestsTasks.groupBy(_._1).mapValues(_.map(_._2)).map { case (request, tasks) =>
       RequestWithTasks(request, tasks.flatten.sortBy(_.createDate.toEpochSecond))
-    }.toSeq.sortBy(_.request.name)
+    }.toSeq.sortBy(_.request.name.toLowerCase)
   }
 
   override def programRequests(program: String): Future[Seq[RequestWithTasks]] = {
