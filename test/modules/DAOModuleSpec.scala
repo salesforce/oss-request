@@ -8,9 +8,10 @@
 package modules
 
 import java.time.ZonedDateTime
+import java.time.temporal.TemporalUnit
 
 import models.Task.TaskType
-import models.{State, Task}
+import models.{Request, State, Task}
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.db.Database
@@ -162,6 +163,21 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       inProgressTasks must have size 1
       val allTasks = await(dao.requestTasks(request.slug))
       allTasks must have size 2
+    }
+  }
+
+  "joinedRequestTasksToRequests" must {
+    "sort tasks by create date" in {
+      val daoModule = app.injector.instanceOf[DAOWithCtx]
+
+      val request = Request("program", "slug", "foo", ZonedDateTime.now(), "foo@bar.com", State.InProgress, None, None)
+      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
+      val task1 = Task(1, ZonedDateTime.now().minusDays(1), Seq("foo@bar.com"), None, None, None, State.InProgress, prototype, None, request.slug)
+      val task2 = Task(2, ZonedDateTime.now(), Seq("foo@bar.com"), None, None, None, State.InProgress, prototype, None, request.slug)
+      val task3 = Task(3, ZonedDateTime.now().minusHours(10), Seq("foo@bar.com"), None, None, None, State.InProgress, prototype, None, request.slug)
+
+      val joinedTasks = daoModule.joinedRequestTasksToRequests(Seq((request, Some(task1)), (request, Some(task2)), (request, Some(task3))))
+      joinedTasks.flatMap(_.tasks).map(_.id) must equal (Seq(1, 3, 2))
     }
   }
 
