@@ -165,20 +165,15 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       val allTasks = await(dao.requestTasks(request.slug))
       allTasks must have size 2
     }
-  }
-
-  "joinedRequestTasksToRequests" must {
-    "sort tasks by create date" in {
-      val daoModule = app.injector.instanceOf[DAOWithCtx]
-
-      val request = Request("program", "slug", "foo", ZonedDateTime.now(), "foo@bar.com", State.InProgress, None, None)
+    "sort tasks chronologically" in Evolutions.withEvolutions(database) {
+      val request = await(dao.createRequest("foo", "foo@bar.com"))
       val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task1 = Task(1, ZonedDateTime.now().minusDays(1), Seq("foo@bar.com"), None, None, None, State.InProgress, prototype, None, request.slug)
-      val task2 = Task(2, ZonedDateTime.now(), Seq("foo@bar.com"), None, None, None, State.InProgress, prototype, None, request.slug)
-      val task3 = Task(3, ZonedDateTime.now().minusHours(10), Seq("foo@bar.com"), None, None, None, State.InProgress, prototype, None, request.slug)
+      val task1 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
+      val task2 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
+      val task3 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
 
-      val joinedTasks = daoModule.joinedRequestTasksToRequests(Seq((request, Some(task1)), (request, Some(task2)), (request, Some(task3))))
-      joinedTasks.flatMap(_.tasks).map(_.id) must equal (Seq(1, 3, 2))
+      val tasks = await(dao.requestTasks(request.slug))
+      tasks.map(_._1.id) must equal (Seq(task1.id, task2.id, task3.id))
     }
   }
 
