@@ -240,7 +240,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
       run {
         quote {
           for {
-            task <- query[Task].filter(_.requestSlug == lift(requestSlug)).sortBy(_.createDate)
+            task <- query[Task].filter(_.requestSlug == lift(requestSlug)).sortBy(_.id)
             numComments = query[Comment].filter(_.taskId == task.id).size
           } yield task -> numComments
         }
