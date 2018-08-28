@@ -120,8 +120,8 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
   def requestsSimilarToName(program: String, name: String): Future[Seq[RequestWithTasks]] = {
     run {
       quote {
-        query[Request].filter { request =>
-          infix"""similarity(${request.name}, ${lift(name)}) >= 0.5""".as[Boolean]
+        query[Request].filter(_.program == lift(program)).filter { request =>
+          infix"""similarity(${request.name}, ${lift(name)}) >= 0.3""".as[Boolean]
         }.leftJoin(query[Task]).on(_.slug == _.requestSlug)
       }
     }.map(joinedRequestTasksToRequests)
