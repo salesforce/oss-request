@@ -93,6 +93,26 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
       tasks.size must equal (1)
       tasks.head._1.completableBy must equal (Seq("asdf@asdf.com"))
     }
+    "fail when the completableby is not set" in {
+      val eventAction = EventAction(EventActionType.CreateTask, "vp_approval")
+      val taskEvent = TaskEvent(EventType.StateChange, State.Completed.toString, eventAction, None)
+      val taskPrototype = Task.Prototype("asdf", TaskType.Input, "asfd", None, None, Seq(taskEvent))
+      val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
+      an[Exception] must be thrownBy await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
+    }
+    "assign task based on a field in the data" in {
+      val overrides = Json.obj("completable_by" -> "vp_email")
+      val eventAction = EventAction(EventActionType.CreateTask, "vp_approval", None, Some(overrides))
+      val taskEvent = TaskEvent(EventType.StateChange, State.Completed.toString, eventAction, None)
+      val taskPrototype = Task.Prototype("asdf", TaskType.Input, "asfd", None, None, Seq(taskEvent))
+      val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
+      val data = Json.obj("vp_email" -> "foo@bar.com")
+      await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), Some(data), State.Completed))
+
+      val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug, Some(State.InProgress)))
+      tasks.size must equal (1)
+      tasks.head._1.completableBy must equal (Seq("foo@bar.com"))
+    }
   }
 
   "criteriaMatches" must {

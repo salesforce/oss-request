@@ -25,7 +25,7 @@ object TaskEvent {
     }
   }
 
-  case class EventAction(`type`: EventActionType.EventActionType, value: String, message: Option[String] = None)
+  case class EventAction(`type`: EventActionType.EventActionType, value: String, message: Option[String] = None, overrides: Option[JsObject] = None)
 
   object EventActionType extends Enumeration {
     type EventActionType = Value
