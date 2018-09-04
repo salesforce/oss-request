@@ -12,8 +12,11 @@
         case models.State.OnHold => {
             list-group-item-warning
         }
-        case models.State.Cancelled => {
+        case models.State.Denied => {
             list-group-item-danger
+        }
+        case models.State.Cancelled => {
+            list-group-item
         }
         case models.State.Completed if conditions.nonEmpty => {
             list-group-item-warning

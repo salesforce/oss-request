@@ -183,7 +183,7 @@
                                 </div>
                             }
                             <div style="display: inline-block">
-                                <form action="@helper.CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, models.State.Cancelled, task.completionMessage)).url" method="post">
+                                <form action="@helper.CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, models.State.Denied, task.completionMessage)).url" method="post">
                                     <button type="submit" class="btn btn-danger">Deny</button>
                                 </form>
                             </div>

@@ -16,7 +16,8 @@ case class Request(program: String, slug: String, name: String, createDate: Zone
   def stateToHuman: String = state match {
     case State.InProgress => "in review"
     case State.OnHold => "put on hold"
-    case State.Cancelled => "denied"
+    case State.Denied => "denied"
+    case State.Cancelled => "cancelled"
     case State.Completed => "approved"
   }
 

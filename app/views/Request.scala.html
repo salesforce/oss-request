@@ -37,21 +37,23 @@
                     </div>
                 </div>
 
-                <div class="row" style="margin-bottom: 20px;">
+                <div style="margin-bottom: 20px;">
                     @if(completedTasks.size == tasks.size && programMetadata.isAdmin(userInfo)) {
-                        <div class="col-md-2">
-                            <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Completed))" method="post">
-                                <button type="submit" class="btn btn-success">Approve Request</button>
-                            </form>
-                        </div>
+                        <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Completed))" method="post" class="btn-group">
+                            <button type="submit" class="btn btn-success">Approve Request</button>
+                        </form>
                     }
 
                     @if(programMetadata.isAdmin(userInfo)) {
-                        <div class="col-md-2">
-                            <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Cancelled))" method="post">
-                                <button type="submit" class="btn btn-warning">Deny Request</button>
-                            </form>
-                        </div>
+                        <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Denied))" method="post" class="btn-group">
+                            <button type="submit" class="btn btn-danger">Deny Request</button>
+                        </form>
+                    }
+
+                    @if(programMetadata.isAdmin(userInfo) || request.creatorEmail == userInfo.email) {
+                        <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Cancelled))" method="post" class="btn-group">
+                            <button type="submit" class="btn btn-warning">Cancel Request</button>
+                        </form>
                     }
                 </div>
 
@@ -147,8 +149,12 @@
             }
         }
 
-        case models.State.Cancelled => {
+        case models.State.Denied => {
             Request Denied
+        }
+
+        case models.State.Cancelled => {
+            Request Cancelled
         }
 
         case _ => {

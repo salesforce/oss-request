@@ -16,6 +16,7 @@ object State extends Enumeration {
 
   val InProgress = Value("IN_PROGRESS")
   val OnHold = Value("ON_HOLD")
+  val Denied = Value("DENIED")
   val Cancelled = Value("CANCELLED")
   val Completed = Value("COMPLETED")
 

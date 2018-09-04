@@ -33,13 +33,15 @@ case class Task(id: Int, createDate: ZonedDateTime, completableBy: Seq[String], 
       state match {
         case State.InProgress => "in review"
         case State.OnHold => "put on hold"
-        case State.Cancelled => "denied"
+        case State.Denied => "denied"
+        case State.Cancelled => "cancelled"
         case State.Completed => "approved"
       }
     case Task.TaskType.Action =>
       state match {
         case State.InProgress => "in progress"
         case State.OnHold => "put on hold"
+        case State.Denied => "failed"
         case State.Cancelled => "cancelled"
         case State.Completed => "completed"
       }
@@ -47,6 +49,7 @@ case class Task(id: Int, createDate: ZonedDateTime, completableBy: Seq[String], 
       state match {
         case State.InProgress => "awaiting input"
         case State.OnHold => "put on hold"
+        case State.Denied => "rejected"
         case State.Cancelled => "cancelled"
         case State.Completed => "completed"
       }
