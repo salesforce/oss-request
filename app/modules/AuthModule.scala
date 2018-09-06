@@ -19,7 +19,7 @@ import play.api.libs.json.JsObject
 import play.api.libs.ws.WSClient
 import play.api.mvc.RequestHeader
 import play.api.{Configuration, Environment}
-import utils.dev.DevUsers
+import services.dev.DevUsers
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}

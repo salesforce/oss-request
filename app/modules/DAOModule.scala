@@ -16,11 +16,11 @@ import com.github.mauricio.async.db.postgresql.pool.PostgreSQLConnectionFactory
 import com.github.mauricio.async.db.postgresql.util.URLParser
 import io.getquill.{PostgresAsyncContext, SnakeCase}
 import javax.inject.{Inject, Singleton}
-import models.{Comment, Request, RequestWithTasks, State, Task}
+import models.{Comment, DataIn, Request, RequestWithTasks, State, Task}
+import org.eclipse.jgit.lib.ObjectId
 import play.api.inject.{ApplicationLifecycle, Binding, Module}
 import play.api.libs.json.{JsObject, Json}
 import play.api.{Configuration, Environment}
-import utils.DataIn
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -33,8 +33,8 @@ class DAOModule extends Module {
 }
 
 trait DAO {
-  def createRequest(program: String, name: String, creatorEmail: String): Future[Request]
-  def createRequest(name: String, creatorEmail: String): Future[Request] = createRequest("default", name, creatorEmail)
+  def createRequest(metadataVersion: Option[ObjectId], program: String, name: String, creatorEmail: String): Future[Request]
+  def createRequest(metadataVersion: Option[ObjectId], name: String, creatorEmail: String): Future[Request] = createRequest(metadataVersion, "default", name, creatorEmail)
   def programRequests(program: String): Future[Seq[RequestWithTasks]]
   def requestsSimilarToName(program: String, name: String): Future[Seq[RequestWithTasks]]
   def programRequests(): Future[Seq[RequestWithTasks]] = programRequests("default")
@@ -42,7 +42,7 @@ trait DAO {
   def request(requestSlug: String): Future[Request]
   def requestWithTasks(requestSlug: String): Future[RequestWithTasks]
   def updateRequest(requestSlug: String, state: State.State, message: Option[String]): Future[Request]
-  def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress): Future[Task]
+  def createTask(requestSlug: String, taskKey: String, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress): Future[Task]
   def updateTaskState(taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], maybeCompletionMessage: Option[String]): Future[Task]
   def deleteTask(taskId: Int): Future[Unit]
   def assignTask(taskId: Int, emails: Seq[String]): Future[Task]
@@ -64,7 +64,10 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
   implicit val jsObjectDecoder = MappedEncoding[String, JsObject](Json.parse(_).as[JsObject])
   implicit val jsObjectEncoder = MappedEncoding[JsObject, String](_.toString())
 
-  override def createRequest(program: String, name: String, creatorEmail: String): Future[Request] = {
+  implicit val objectIdDecoder = MappedEncoding[Array[Byte], ObjectId](ObjectId.fromRaw)
+  implicit val objectIdEncoder = MappedEncoding[ObjectId, Array[Byte]](_.name().getBytes)
+
+  override def createRequest(metadataVersion: Option[ObjectId], programKey: String, name: String, creatorEmail: String): Future[Request] = {
     // todo: slug choice in transaction with create
 
     // figure out slug
@@ -79,7 +82,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
       val state = State.InProgress
       val createDate = ZonedDateTime.now()
 
-      val request = Request(program, slug, name, createDate, creatorEmail, state, None, None)
+      val request = Request(metadataVersion, programKey, slug, name, createDate, creatorEmail, state, None, None)
 
       run {
         quote {
@@ -162,7 +165,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String], maybeData: Option[JsObject] = None, state: State.State = State.InProgress): Future[Task] = {
+  override def createTask(requestSlug: String, taskKey: String, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress): Future[Task] = {
     // todo: move this to a validation module via the DAO
     if (state == State.Completed && maybeCompletedBy.isEmpty) {
       Future.failed(new Exception("maybeCompletedBy was not specified"))
@@ -173,11 +176,11 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
       run {
         quote {
           query[Task].insert(
+            _.taskKey -> lift(taskKey),
             _.completableBy -> lift(completableBy),
             _.completedBy -> lift(maybeCompletedBy),
             _.requestSlug -> lift(requestSlug),
             _.state -> lift(state),
-            _.prototype -> lift(prototype),
             _.data -> lift(maybeData),
             _.completedDate -> lift(maybeCompletedDate)
           ).returning(_.id)

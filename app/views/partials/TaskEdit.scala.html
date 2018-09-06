@@ -7,20 +7,13 @@
 
 @this()
 
-@(newOrExistingTask: Either[(String, String, String, models.Task.Prototype, Set[String]), models.Task])(implicit request: RequestHeader)
+@(newOrExistingTask: Either[(String, String, String, Set[String]), models.Task], taskPrototype: models.Task.Prototype)(implicit request: RequestHeader)
 
 @import helper._
 
-@taskPrototype = @{
-    newOrExistingTask match {
-        case Left((_, _, _, taskPrototype, _)) => taskPrototype
-        case Right(task) => task.prototype
-    }
-}
-
 @formUrl(state: models.State.State = State.Completed) = @{
     newOrExistingTask match {
-        case Left((programKey, name, taskKey, _, _)) => CSRF(routes.Application.createRequest(name, programKey, taskKey)).url
+        case Left((programKey, name, taskKey, _)) => CSRF(routes.Application.createRequest(name, programKey, taskKey)).url
         case Right(task) => CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, state, task.completionMessage)).url
     }
 }

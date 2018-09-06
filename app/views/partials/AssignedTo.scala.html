@@ -5,9 +5,9 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  *@
 
-@(task: models.Task)
+@(task: models.Task, program: models.Program)
 
-@task.completableByEmailsOrUrl match {
+@task.completableByEmailsOrUrl(program) match {
     case Left(emails) => {
         @if(emails.size == 1) {
             Assigned to: @emails.head

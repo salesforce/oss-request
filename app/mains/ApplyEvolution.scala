@@ -5,15 +5,14 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 
-package utils
+package mains
 
+import play.api.{Logger, Mode}
 import play.api.db.evolutions.{EvolutionsApi, EvolutionsReader}
 import play.api.inject.guice.GuiceApplicationBuilder
-import play.api.{Logger, Mode}
 
 import scala.concurrent.ExecutionContext
 import scala.util.Try
-
 
 object ApplyEvolution extends App {
 

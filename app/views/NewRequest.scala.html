@@ -7,7 +7,7 @@
 
 @this(mainView: Main)
 
-@(userInfo: _root_.utils.UserInfo, maybeName: Option[String], maybeProgramKey: Option[String], maybeStartTask: Option[String])(implicit request: RequestHeader, metadata: _root_.utils.Metadata)
+@(userInfo: controllers.UserInfo, maybeName: Option[String], maybeProgramKey: Option[String], maybeStartTask: Option[String])(implicit request: RequestHeader, metadata: models.Metadata)
 
 @mainView(Some(userInfo))("New Request") {
 

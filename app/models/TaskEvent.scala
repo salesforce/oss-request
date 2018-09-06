@@ -7,8 +7,8 @@
 
 package models
 
-import play.api.libs.json._
 import play.api.libs.functional.syntax._
+import play.api.libs.json._
 
 // todo: parameterize value
 case class TaskEvent(`type`: TaskEvent.EventType.EventType, value: String, action: TaskEvent.EventAction, criteria: Option[TaskEvent.Criteria])

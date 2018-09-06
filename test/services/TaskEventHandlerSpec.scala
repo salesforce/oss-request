@@ -5,15 +5,15 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 
-package utils
+package services
 
-import models.Task.TaskType
-import models.TaskEvent.{Criteria, CriteriaType, EventAction, EventActionType, EventType}
-import models.{State, Task, TaskEvent}
+import models.State
+import models.TaskEvent.{Criteria, CriteriaType}
 import modules.DAOMock
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.libs.json.Json
+import play.api.mvc.RequestHeader
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
 
@@ -21,93 +21,74 @@ class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
 
   def taskEventHandler = app.injector.instanceOf[TaskEventHandler]
   def dataFacade = app.injector.instanceOf[DataFacade]
-  def metadataService = app.injector.instanceOf[MetadataService]
-  def metadata = await(metadataService.fetchMetadata).programs("default")
-  implicit val fakeRequest = FakeRequest()
+  implicit val fakeRequest: RequestHeader = FakeRequest()
 
   implicit override def fakeApplication() = DAOMock.noDatabaseAppBuilder().build()
 
   "TaskEventHandler" must {
     "automatically add a new task when the metadata says to do so" in {
-      val taskPrototype = metadata.tasks("start")
-      val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
-      val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
-      val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug)).map(_._1)
+      val request = await(dataFacade.createRequest(None, "default", "asdf", "asdf@asdf.com"))
+      val task = await(dataFacade.createTask(request.slug, "start", Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
+      val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug))
 
-      tasks.exists(_.prototype.label == "Review Request") mustBe true
-      tasks.exists(_.prototype.label == "Create GitHub Repo") mustBe false
-      tasks.exists(_.prototype.label == "IP Approval") mustBe false
+      tasks.exists(_._2.label == "Review Request") mustBe true
+      tasks.exists(_._2.label == "Create GitHub Repo") mustBe false
+      tasks.exists(_._2.label == "IP Approval") mustBe false
     }
     "work with criteria and non-matching data" in {
-      val taskPrototype = metadata.tasks("start")
       val data = Json.obj("github_org" -> "Bar")
-      val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
-      val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), Some(data), State.Completed))
-      val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug)).map(_._1)
+      val request = await(dataFacade.createRequest(None, "default", "asdf", "asdf@asdf.com"))
+      val task = await(dataFacade.createTask(request.slug, "start", Seq("foo@foo.com"), Some("foo@foo.com"), Some(data), State.Completed))
+      val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug))
 
-      tasks.exists(_.prototype.label == "Review Request") mustBe true
-      tasks.exists(_.prototype.label == "Create GitHub Repo") mustBe false
-      tasks.exists(_.prototype.label == "IP Approval") mustBe false
+      tasks.exists(_._2.label == "Review Request") mustBe true
+      tasks.exists(_._2.label == "Create GitHub Repo") mustBe false
+      tasks.exists(_._2.label == "IP Approval") mustBe false
     }
     "work with criteria and matching data" in {
-      val taskPrototype = metadata.tasks("start")
       val data = Json.obj("github_org" -> "Foo")
-      val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
-      val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), Some(data), State.Completed))
-      val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug)).map(_._1)
+      val request = await(dataFacade.createRequest(None, "default", "asdf", "asdf@asdf.com"))
+      val task = await(dataFacade.createTask(request.slug, "start", Seq("foo@foo.com"), Some("foo@foo.com"), Some(data), State.Completed))
+      val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug))
 
-      tasks.exists(_.prototype.label == "Review Request") mustBe true
-      tasks.exists(_.prototype.label == "Create GitHub Repo") mustBe true
-      tasks.exists(_.prototype.label == "IP Approval") mustBe false
+      tasks.exists(_._2.label == "Review Request") mustBe true
+      tasks.exists(_._2.label == "Create GitHub Repo") mustBe true
+      tasks.exists(_._2.label == "IP Approval") mustBe false
     }
     "work with criteria and matching data that is a boolean" in {
-      val taskPrototype = metadata.tasks("start")
       val data = Json.obj("patentable" -> true)
-      val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
-      val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), Some(data), State.Completed))
-      val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug)).map(_._1)
+      val request = await(dataFacade.createRequest(None, "default", "asdf", "asdf@asdf.com"))
+      val task = await(dataFacade.createTask(request.slug, "start", Seq("foo@foo.com"), Some("foo@foo.com"), Some(data), State.Completed))
+      val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug))
 
-      tasks.exists(_.prototype.label == "Review Request") mustBe true
-      tasks.exists(_.prototype.label == "Create GitHub Repo") mustBe false
-      tasks.exists(_.prototype.label == "IP Approval") mustBe true
+      tasks.exists(_._2.label == "Review Request") mustBe true
+      tasks.exists(_._2.label == "Create GitHub Repo") mustBe false
+      tasks.exists(_._2.label == "IP Approval") mustBe true
     }
     "support UPDATE_REQUEST_STATE" in {
-      val eventAction = EventAction(EventActionType.UpdateRequestState, State.Completed.toString)
-      val taskEvent = TaskEvent(EventType.StateChange, State.Completed.toString, eventAction, None)
-      val taskPrototype = Task.Prototype("asdf", TaskType.Input, "asfd", None, None, Seq(taskEvent))
-      val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
-      val task = await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
+      val request = await(dataFacade.createRequest(None, "test", "asdf", "asdf@asdf.com"))
+      val task = await(dataFacade.createTask(request.slug, "one", Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
 
       val updatedRequest = await(dataFacade.request("asdf@asdf.com", request.slug))
       updatedRequest.state must equal (State.Completed)
       updatedRequest.completedDate must be (defined)
     }
     "assign tasks to the request creator" in {
-      val eventAction = EventAction(EventActionType.CreateTask, "start")
-      val taskEvent = TaskEvent(EventType.StateChange, State.Completed.toString, eventAction, None)
-      val taskPrototype = Task.Prototype("asdf", TaskType.Input, "asfd", None, None, Seq(taskEvent))
-      val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
-      await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
+      val request = await(dataFacade.createRequest(None, "test", "asdf", "asdf@asdf.com"))
+      await(dataFacade.createTask(request.slug, "two", Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
 
       val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug, Some(State.InProgress)))
       tasks.size must equal (1)
       tasks.head._1.completableBy must equal (Seq("asdf@asdf.com"))
     }
     "fail when the completableby is not set" in {
-      val eventAction = EventAction(EventActionType.CreateTask, "vp_approval")
-      val taskEvent = TaskEvent(EventType.StateChange, State.Completed.toString, eventAction, None)
-      val taskPrototype = Task.Prototype("asdf", TaskType.Input, "asfd", None, None, Seq(taskEvent))
-      val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
-      an[Exception] must be thrownBy await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
+      val request = await(dataFacade.createRequest(None, "test", "asdf", "asdf@asdf.com"))
+      an[Exception] must be thrownBy await(dataFacade.createTask(request.slug, "three", Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
     }
     "assign task based on a field in the data" in {
-      val overrides = Json.obj("completable_by" -> "vp_email")
-      val eventAction = EventAction(EventActionType.CreateTask, "vp_approval", None, Some(overrides))
-      val taskEvent = TaskEvent(EventType.StateChange, State.Completed.toString, eventAction, None)
-      val taskPrototype = Task.Prototype("asdf", TaskType.Input, "asfd", None, None, Seq(taskEvent))
-      val request = await(dataFacade.createRequest("default", "asdf", "asdf@asdf.com"))
-      val data = Json.obj("vp_email" -> "foo@bar.com")
-      await(dataFacade.createTask(request.slug, taskPrototype, Seq("foo@foo.com"), Some("foo@foo.com"), Some(data), State.Completed))
+      val request = await(dataFacade.createRequest(None, "test", "asdf", "asdf@asdf.com"))
+      val data = Json.obj("email" -> "foo@bar.com")
+      await(dataFacade.createTask(request.slug, "four", Seq("foo@foo.com"), Some("foo@foo.com"), Some(data), State.Completed))
 
       val tasks = await(dataFacade.requestTasks("asdf@asdf.com", request.slug, Some(State.InProgress)))
       tasks.size must equal (1)

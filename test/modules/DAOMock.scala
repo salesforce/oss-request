@@ -11,15 +11,14 @@ import java.time.ZonedDateTime
 import java.util.concurrent.ConcurrentHashMap
 
 import javax.inject.Singleton
-import models.State.State
-import models.{Comment, Request, RequestWithTasks, State, Task}
+import models.{Comment, DataIn, Request, RequestWithTasks, State, Task}
+import org.eclipse.jgit.lib.ObjectId
 import play.api.Mode
 import play.api.db.evolutions.EvolutionsModule
 import play.api.db.{DBModule, HikariCPModule}
 import play.api.inject.bind
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.libs.json.JsObject
-import utils.DataIn
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -32,9 +31,9 @@ class DAOMock extends DAO {
   val tasks = ConcurrentHashMap.newKeySet[Task].asScala
   val comments = ConcurrentHashMap.newKeySet[Comment].asScala
 
-  override def createRequest(program: String, name: String, creatorEmail: String): Future[Request] = {
+  override def createRequest(metadataVersion: Option[ObjectId], program: String, name: String, creatorEmail: String): Future[Request] = {
     Future.successful {
-      val request = Request(program, DB.slug(name), name, ZonedDateTime.now(), creatorEmail, State.InProgress, None, None)
+      val request = Request(metadataVersion, program, DB.slug(name), name, ZonedDateTime.now(), creatorEmail, State.InProgress, None, None)
       requests += request
       request
     }
@@ -119,10 +118,10 @@ class DAOMock extends DAO {
     }
   }
 
-  override def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String], maybeData: Option[JsObject], state: State.State): Future[Task] = {
+  override def createTask(requestSlug: String, taskKey: String, completableBy: Seq[String], maybeCompletedBy: Option[String], maybeData: Option[JsObject], state: State.State): Future[Task] = {
     Future.successful {
       val id = Try(tasks.map(_.id).max).getOrElse(0) + 1
-      val task = Task(id, ZonedDateTime.now(), completableBy, maybeCompletedBy, maybeCompletedBy.map(_ => ZonedDateTime.now()), None, state, prototype, maybeData, requestSlug)
+      val task = Task(id, taskKey, ZonedDateTime.now(), completableBy, maybeCompletedBy, maybeCompletedBy.map(_ => ZonedDateTime.now()), None, state, maybeData, requestSlug)
       tasks += task
       task
     }

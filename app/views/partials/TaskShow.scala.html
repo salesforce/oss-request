@@ -7,20 +7,22 @@
 
 @this()
 
-@(task: models.Task)
+@(task: models.Task, taskPrototype: models.Task.Prototype)
 
-@formWithData(form: play.api.libs.json.JsObject) = @{
-    val dataBody = task.data.getOrElse(play.api.libs.json.Json.obj())
-    val data = play.api.libs.json.Json.obj("data" -> dataBody)
-    val view = play.api.libs.json.Json.obj("view" -> "bootstrap-display")
+@import play.api.libs.json._
+
+@formWithData(form: JsObject) = @{
+    val dataBody = task.data.getOrElse(Json.obj())
+    val data = Json.obj("data" -> dataBody)
+    val view = Json.obj("view" -> "bootstrap-display")
     form ++ data ++ view
 }
 
-@(task.prototype.`type`) match {
+@(taskPrototype.`type`) match {
     case models.Task.TaskType.Input => {
         <div class="panel-body">
             @defining(scala.util.Random.alphanumeric.take(8).mkString) { formid =>
-                @for(form <- task.prototype.form) {
+                @for(form <- taskPrototype.form) {
                     <div id="@formid"></div>
                     <script>
                         (function() {
@@ -34,12 +36,12 @@
     }
     case models.Task.TaskType.Action => {
         <div class="panel-body">
-            <p>@Html(task.prototype.infoMarkdownToHtml)</p>
+            <p>@Html(taskPrototype.infoMarkdownToHtml)</p>
         </div>
     }
     case models.Task.TaskType.Approval => {
         <div class="panel-body">
-            <p>@Html(task.prototype.infoMarkdownToHtml)</p>
+            <p>@Html(taskPrototype.infoMarkdownToHtml)</p>
         </div>
     }
 }

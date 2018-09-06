@@ -8,10 +8,8 @@
 package modules
 
 import java.time.ZonedDateTime
-import java.time.temporal.TemporalUnit
 
-import models.Task.TaskType
-import models.{Request, State, Task}
+import models.State
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.db.Database
@@ -55,7 +53,7 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 
   "createRequest" must {
     "work" in Evolutions.withEvolutions(database) {
-      val projectRequest = await(dao.createRequest("foo", "foo@bar.com"))
+      val projectRequest = await(dao.createRequest(None, "foo", "foo@bar.com"))
       projectRequest.slug must equal ("foo")
       projectRequest.name must equal ("foo")
       projectRequest.createDate.isBefore(ZonedDateTime.now()) must be (true)
@@ -63,26 +61,26 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       projectRequest.state must equal (State.InProgress)
     }
     "increment the slug" in Evolutions.withEvolutions(database) {
-      await(dao.createRequest("foo", "foo@bar.com"))
-      val projectRequest = await(dao.createRequest("foo", "foo@bar.com"))
+      await(dao.createRequest(None, "foo", "foo@bar.com"))
+      val projectRequest = await(dao.createRequest(None, "foo", "foo@bar.com"))
       projectRequest.slug must equal ("foo-1")
     }
   }
 
   "programRequests" must {
     "work" in Evolutions.withEvolutions(database) {
-      await(dao.createRequest("foo", "foo@bar.com"))
-      await(dao.createRequest("asdf", "asdf@asdf.com"))
-      await(dao.createRequest("asdf", "asdf", "asdf@asdf.com"))
+      await(dao.createRequest(None, "foo", "foo@bar.com"))
+      await(dao.createRequest(None, "asdf", "asdf@asdf.com"))
+      await(dao.createRequest(None, "asdf", "asdf", "asdf@asdf.com"))
 
       val requests = await(dao.programRequests())
       requests must have size 2
     }
     "be alphabetic" in Evolutions.withEvolutions(database) {
-      await(dao.createRequest("Dude", "asdf@asdf.com"))
-      await(dao.createRequest("foo", "foo@bar.com"))
-      await(dao.createRequest("bar", "asdf@asdf.com"))
-      await(dao.createRequest("cheese", "asdf@asdf.com"))
+      await(dao.createRequest(None, "Dude", "asdf@asdf.com"))
+      await(dao.createRequest(None, "foo", "foo@bar.com"))
+      await(dao.createRequest(None, "bar", "asdf@asdf.com"))
+      await(dao.createRequest(None, "cheese", "asdf@asdf.com"))
 
       val requests = await(dao.programRequests())
       requests.map(_.request.name) must equal (Seq("bar", "cheese", "Dude", "foo"))
@@ -91,9 +89,9 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 
   "requestsForUser" must {
     "work" in Evolutions.withEvolutions(database) {
-      await(dao.createRequest("foo", "foo@bar.com"))
-      await(dao.createRequest("foo", "foo", "foo@bar.com"))
-      await(dao.createRequest("asdf", "asdf@asdf.com"))
+      await(dao.createRequest(None, "foo", "foo@bar.com"))
+      await(dao.createRequest(None, "foo", "foo", "foo@bar.com"))
+      await(dao.createRequest(None, "asdf", "asdf@asdf.com"))
 
       val requests = await(dao.userRequests("foo@bar.com"))
       requests must have size 2
@@ -102,52 +100,44 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 
   "createTask" must {
     "work" in Evolutions.withEvolutions(database) {
-      val request = await(dao.createRequest("foo", "foo@bar.com"))
-
-      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-
-      val task = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
+      val request = await(dao.createRequest(None, "foo", "foo@bar.com"))
+      val task = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
       task.state must equal (State.InProgress)
     }
   }
 
   "updateTask" must {
     "work" in Evolutions.withEvolutions(database) {
-      val request = await(dao.createRequest("foo", "foo@bar.com"))
-      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
+      val request = await(dao.createRequest(None, "foo", "foo@bar.com"))
+      val task = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
       task.state must equal (State.InProgress)
       val updatedTask = await(dao.updateTaskState(task.id, State.Completed, Some("foo@foo.com"), None, None))
       updatedTask.state must equal (State.Completed)
     }
     "add a completedDate when closing a task" in Evolutions.withEvolutions(database) {
-      val request = await(dao.createRequest("foo", "foo@bar.com"))
-      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
+      val request = await(dao.createRequest(None, "foo", "foo@bar.com"))
+      val task = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
       val updatedTask = await(dao.updateTaskState(task.id, State.Completed, Some("foo@foo.com"), None, None))
       updatedTask.completedDate must be (defined)
     }
     "fail to complete without a completedByEmail" in Evolutions.withEvolutions(database) {
-      val request = await(dao.createRequest("foo", "foo@bar.com"))
-      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
+      val request = await(dao.createRequest(None, "foo", "foo@bar.com"))
+      val task = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
       an [Exception] must be thrownBy await(dao.updateTaskState(task.id, State.Completed, None, None, None))
     }
   }
 
   "deleteTask" must {
     "work" in Evolutions.withEvolutions(database) {
-      val request = await(dao.createRequest("foo", "foo@bar.com"))
-      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task1 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
-      await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
+      val request = await(dao.createRequest(None, "foo", "foo@bar.com"))
+      val task1 = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
+      await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
       await(dao.deleteTask(task1.id)) must equal (())
       await(dao.requestTasks(request.slug)).size must equal (1)
     }
     "work when there are comments on the task" in Evolutions.withEvolutions(database) {
-      val request = await(dao.createRequest("foo", "foo@bar.com"))
-      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
+      val request = await(dao.createRequest(None, "foo", "foo@bar.com"))
+      val task = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
       await(dao.commentOnTask(task.id, "foo@foo.com", "asdf"))
       await(dao.deleteTask(task.id)) must equal (())
     }
@@ -155,10 +145,9 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 
   "requestTasks" must {
     "work when a task state is specified" in Evolutions.withEvolutions(database) {
-      val request = await(dao.createRequest("foo", "foo@bar.com"))
-      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task1 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
-      await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
+      val request = await(dao.createRequest(None, "foo", "foo@bar.com"))
+      val task1 = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
+      await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
       await(dao.updateTaskState(task1.id, State.Completed, Some("foo@foo.com"), None, None))
       val inProgressTasks = await(dao.requestTasks(request.slug, Some(State.InProgress)))
       inProgressTasks must have size 1
@@ -166,11 +155,10 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       allTasks must have size 2
     }
     "sort tasks chronologically" in Evolutions.withEvolutions(database) {
-      val request = await(dao.createRequest("foo", "foo@bar.com"))
-      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task1 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
-      val task2 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
-      val task3 = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
+      val request = await(dao.createRequest(None, "foo", "foo@bar.com"))
+      val task1 = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
+      val task2 = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
+      val task3 = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
 
       val tasks = await(dao.requestTasks(request.slug))
       tasks.map(_._1.id) must equal (Seq(task1.id, task2.id, task3.id))
@@ -179,9 +167,8 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 
   "commentOnTask" must {
     "work" in Evolutions.withEvolutions(database) {
-      val request = await(dao.createRequest("foo", "foo@bar.com"))
-      val prototype = Task.Prototype("asdf", TaskType.Approval, "asdf")
-      val task = await(dao.createTask(request.slug, prototype, Seq("foo@foo.com")))
+      val request = await(dao.createRequest(None, "foo", "foo@bar.com"))
+      val task = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
       val comment = await(dao.commentOnTask(task.id, "foo@bar.com", "test"))
       comment.id must be >= 0
       comment.contents must equal ("test")

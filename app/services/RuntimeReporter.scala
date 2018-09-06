@@ -5,7 +5,7 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 
-package utils
+package services
 
 import io.airbrake.javabrake.Notifier
 import javax.inject.{Inject, Singleton}

@@ -11,28 +11,30 @@ import java.net.URL
 import java.time.ZonedDateTime
 
 import io.getquill.MappedEncoding
-import models.Task.CompletableByType
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
-import utils.MarkdownTransformer
+import core.Extensions._
 
-case class Task(id: Int, createDate: ZonedDateTime, completableBy: Seq[String], completedBy: Option[String], completedDate: Option[ZonedDateTime], completionMessage: Option[String], state: State.State, prototype: Task.Prototype, data: Option[JsObject], requestSlug: String) {
-  val completableByEmailsOrUrl: Either[Set[String], URL] = {
+case class Task(id: Int, taskKey: String, createDate: ZonedDateTime, completableBy: Seq[String], completedBy: Option[String], completedDate: Option[ZonedDateTime], completionMessage: Option[String], state: State.State, data: Option[JsObject], requestSlug: String) {
+
+  def prototype(program: Program): Task.Prototype = {
+    program.tasks(taskKey)
+  }
+
+  def completableByEmailsOrUrl(program:Program): Either[Set[String], URL] = {
     require(completableBy.nonEmpty)
-    if (!prototype.completableBy.exists(_.`type` == CompletableByType.Service)) {
+    if (!prototype(program).completableBy.exists(_.`type` == Task.CompletableByType.Service)) {
       Left(completableBy.toSet)
     }
     else {
       Right(new URL(completableBy.head))
     }
   }
-  val maybeServiceKey: Option[String] = prototype.completableBy.filter(_.`type` == CompletableByType.Service).flatMap(_.value)
 
-  def stateToHuman: String = prototype.`type` match {
+  def stateToHuman(program: Program): String = prototype(program).`type` match {
     case Task.TaskType.Approval =>
       state match {
         case State.InProgress => "in review"
-        case State.OnHold => "put on hold"
         case State.Denied => "denied"
         case State.Cancelled => "cancelled"
         case State.Completed => "approved"
@@ -40,7 +42,6 @@ case class Task(id: Int, createDate: ZonedDateTime, completableBy: Seq[String], 
     case Task.TaskType.Action =>
       state match {
         case State.InProgress => "in progress"
-        case State.OnHold => "put on hold"
         case State.Denied => "failed"
         case State.Cancelled => "cancelled"
         case State.Completed => "completed"
@@ -48,7 +49,6 @@ case class Task(id: Int, createDate: ZonedDateTime, completableBy: Seq[String], 
     case Task.TaskType.Input =>
       state match {
         case State.InProgress => "awaiting input"
-        case State.OnHold => "put on hold"
         case State.Denied => "rejected"
         case State.Cancelled => "cancelled"
         case State.Completed => "completed"
@@ -60,9 +60,7 @@ case class Task(id: Int, createDate: ZonedDateTime, completableBy: Seq[String], 
 object Task {
 
   case class Prototype(label: String, `type`: TaskType.TaskType, info: String, completableBy: Option[CompletableBy] = None, form: Option[JsObject] = None, taskEvents: Seq[TaskEvent] = Seq.empty[TaskEvent], dependencies: Set[String] = Set.empty[String], approvalConditions: Set[String] = Set.empty[String]) {
-    lazy val infoMarkdownToHtml = {
-      MarkdownTransformer.transform(info)
-    }
+    lazy val infoMarkdownToHtml = info.markdown
   }
 
   object TaskType extends Enumeration {
@@ -137,14 +135,14 @@ object Tasks {
   type TaskTitle = String
   type Message = String
 
-  def conditionalApprovals(tasks: Seq[Task]): Seq[(TaskTitle, Message)] = {
+  def conditionalApprovals(program: Program, tasks: Seq[Task]): Seq[(TaskTitle, Message)] = {
     for {
       task <- tasks
       if task.state == State.Completed
-      if task.prototype.`type` == Task.TaskType.Approval
-      if task.completableByEmailsOrUrl.isLeft
+      if task.prototype(program).`type` == Task.TaskType.Approval
+      if task.completableByEmailsOrUrl(program).isLeft
       message <- task.completionMessage
-    } yield task.prototype.label -> message
+    } yield task.prototype(program).label -> message
   }
 
 }

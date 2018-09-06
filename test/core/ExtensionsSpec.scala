@@ -5,15 +5,16 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 
-package utils
+package core
 
+import core.Extensions._
 import org.scalatest.{MustMatchers, WordSpec}
 
-class MarkdownTransformerSpec extends WordSpec with MustMatchers {
+class ExtensionsSpec extends WordSpec with MustMatchers {
 
-  "transform" must {
+  "markdown" must {
     "convert markdown to html" in {
-      MarkdownTransformer.transform("[asdf](http://asdf.com)") must equal ("""<p><a href="http://asdf.com">asdf</a></p>""")
+      "[asdf](http://asdf.com)".markdown must equal ("""<p><a href="http://asdf.com">asdf</a></p>""")
     }
   }
 

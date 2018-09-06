@@ -5,9 +5,11 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  *@
 
-@this(mainView: Main, taskView: utils.TaskEditOrShow)
+@this(mainView: Main, taskView: partials.TaskEditOrShow)
 
-@(programMetadata: _root_.utils.Program, request: models.Request, tasks: Seq[(models.Task, _root_.modules.DAO.NumComments)], userInfo: _root_.utils.UserInfo)(implicit requestHeader: RequestHeader, metadata: _root_.utils.Metadata)
+@(program: models.Program, request: models.Request, tasks: Seq[(models.Task, models.Task.Prototype, modules.DAO.NumComments)], userInfo: controllers.UserInfo)(implicit requestHeader: RequestHeader, metadata: models.Metadata)
+
+@import core.Extensions._
 
 @tasksWithState(state: State.State) = @{
     tasks.filter(_._1.state == state)
@@ -38,19 +40,19 @@
                 </div>
 
                 <div style="margin-bottom: 20px;">
-                    @if(completedTasks.size == tasks.size && programMetadata.isAdmin(userInfo)) {
+                    @if(completedTasks.size == tasks.size && program.isAdmin(userInfo.email)) {
                         <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Completed))" method="post" class="btn-group">
                             <button type="submit" class="btn btn-success">Approve Request</button>
                         </form>
                     }
 
-                    @if(programMetadata.isAdmin(userInfo)) {
+                    @if(program.isAdmin(userInfo.email)) {
                         <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Denied))" method="post" class="btn-group">
                             <button type="submit" class="btn btn-danger">Deny Request</button>
                         </form>
                     }
 
-                    @if(programMetadata.isAdmin(userInfo) || request.creatorEmail == userInfo.email) {
+                    @if(program.isAdmin(userInfo.email) || request.creatorEmail == userInfo.email) {
                         <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Cancelled))" method="post" class="btn-group">
                             <button type="submit" class="btn btn-warning">Cancel Request</button>
                         </form>
@@ -58,14 +60,14 @@
                 </div>
 
                 <div class="row">
-                    @if(programMetadata.isAdmin(userInfo)) {
+                    @if(program.isAdmin(userInfo.email)) {
                         <div class="col-md-12">
                             <form action="@helper.CSRF(routes.Application.addTask(request.slug))" method="post" class="form-inline">
                                 <div class="form-group">
                                     <label for="taskPrototypeKeySelect">Add a Task</label>
                                     <select id="taskPrototypeKeySelect" name="taskPrototypeKey" class="form-control">
                                         <option disabled selected value> -- task type -- </option>
-                                        @for((key, taskPrototype) <- programMetadata.tasks) {
+                                        @for((key, taskPrototype) <- program.tasks) {
                                             <option value="@key">@taskPrototype.label</option>
                                         }
                                     </select>
@@ -77,7 +79,7 @@
                                 <div id="completableByGroupDiv" class="form-group" style="display: none;">
                                     <label for="completableByGroup">Completable By</label>
                                     <select id="completableByGroup" class="form-control">
-                                    @for(group <- programMetadata.groups.keys) {
+                                    @for(group <- program.groups.keys) {
                                         <option>@group</option>
                                     }
                                     </select>
@@ -88,7 +90,7 @@
 
                         <script>
                             // Only send a completableBy form value if it was needed by the prototype
-                            const taskPrototypes = @Html(play.api.libs.json.Json.toJson(programMetadata.tasks).toString);
+                            const taskPrototypes = @Html(play.api.libs.json.Json.toJson(program.tasks).toString);
 
                             const completableByEmailDiv = document.getElementById("completableByEmailDiv");
                             const completableByGroupDiv = document.getElementById("completableByGroupDiv");
@@ -127,11 +129,11 @@
         case models.State.Completed => {
             @request.completedDate match {
                 case Some(completedDate) => {
-                    @defining(Tasks.conditionalApprovals(tasks.map(_._1))) { conditions =>
+                    @defining(Tasks.conditionalApprovals(program, tasks.map(_._1))) { conditions =>
                         @if(conditions.isEmpty && request.completionMessage.isEmpty) {
-                            <p>Approved on @views.utils.DateTime.date(completedDate)</p>
+                            <p>Approved on @completedDate.monthDayYear</p>
                         } else {
-                            <p>Conditionally approved on @views.utils.DateTime.date(completedDate) provided:</p>
+                            <p>Conditionally approved on @completedDate.monthDayYear provided:</p>
                             <ul>
                                 @for((taskTitle, message) <- conditions) {
                                     <li>@taskTitle - @message.capitalize</li>
@@ -167,12 +169,12 @@
 
     <div class="jumbotron">
         <h1>@request.name</h1>
-        <p>Created by @request.creatorEmail on @views.utils.DateTime.date(request.createDate)</p>
+        <p>Created by @request.creatorEmail on @request.createDate.monthDayYear</p>
         <div>@state</div>
     </div>
 
     @for(task <- tasks) {
-        @taskView(task._1, Left(task._2), userInfo, programMetadata.isAdmin(userInfo), programMetadata.groups.keySet)
+        @taskView(program, task._1, task._2, Left(task._3), userInfo, program.isAdmin(userInfo.email), program.groups.keySet)
     }
 
 }

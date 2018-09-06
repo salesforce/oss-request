@@ -266,5 +266,103 @@
         }
       }
     }
+  },
+  "test": {
+    "name": "Test",
+    "groups": {
+      "admin": [
+        "foo@bar.com"
+      ]
+    },
+    "tasks": {
+      "one": {
+        "label": "One",
+        "type": "ACTION",
+        "info": "One",
+        "task_events": [
+          {
+            "type": "STATE_CHANGE",
+            "value": "COMPLETED",
+            "action": {
+              "type": "UPDATE_REQUEST_STATE",
+              "value": "COMPLETED",
+              "message": "seek security review if needed"
+            }
+          }
+        ]
+      },
+      "two": {
+        "label": "Two",
+        "type": "ACTION",
+        "info": "Two",
+        "task_events": [
+          {
+            "type": "STATE_CHANGE",
+            "value": "COMPLETED",
+            "action": {
+              "type": "CREATE_TASK",
+              "value": "one"
+            }
+          }
+        ]
+      },
+      "three": {
+        "label": "Three",
+        "type": "ACTION",
+        "info": "Three",
+        "task_events": [
+          {
+            "type": "STATE_CHANGE",
+            "value": "COMPLETED",
+            "action": {
+              "type": "CREATE_TASK",
+              "value": "five"
+            }
+          }
+        ]
+      },
+      "four": {
+        "label": "Four",
+        "type": "ACTION",
+        "info": "Four",
+        "task_events": [
+          {
+            "type": "STATE_CHANGE",
+            "value": "COMPLETED",
+            "action": {
+              "type": "CREATE_TASK",
+              "value": "five",
+              "overrides": {
+                "completable_by": "email"
+              }
+            }
+          }
+        ]
+      },
+      "five": {
+        "label": "Five",
+        "type": "ACTION",
+        "info": "Five",
+        "completable_by": {
+          "type": "EMAIL"
+        }
+      },
+      "six": {
+        "label": "Six",
+        "type": "ACTION",
+        "info": "Six",
+        "dependencies": ["one"]
+      },
+      "seven": {
+        "label": "Seven",
+        "type": "ACTION",
+        "info": "Seven"
+      },
+      "eight": {
+        "label": "Eight",
+        "type": "ACTION",
+        "info": "Eight"
+      }
+    }
   }
 }

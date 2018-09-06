@@ -7,7 +7,7 @@
 
 @this(mainView: Main, webJarsUtil: org.webjars.play.WebJarsUtil)
 
-@(userInfo: _root_.utils.UserInfo)(implicit request: RequestHeader, metadata: _root_.utils.Metadata)
+@(userInfo: controllers.UserInfo)(implicit request: RequestHeader, metadata: models.Metadata)
 
 @extraHead() =  {
     @webJarsUtil.locate("jsoneditor.min.css").css()

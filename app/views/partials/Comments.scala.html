@@ -9,13 +9,15 @@
 
 @(comments: Seq[Comment])
 
+@import core.Extensions._
+
 @if(comments.isEmpty) {
     No comments yet
 } else {
     <div class="list-group">
         @for(comment <- comments) {
             <div class="list-group-item">
-                <h4 class="list-group-item-heading">@comment.creatorEmail - @views.utils.DateTime.date(comment.createDate)</h4>
+                <h4 class="list-group-item-heading">@comment.creatorEmail - @comment.createDate.monthDayYear</h4>
                 <p class="list-group-item-text">@Html(comment.contentsMarkdownToHtml)</p>
             </div>
         }

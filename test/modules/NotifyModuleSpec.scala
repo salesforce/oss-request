@@ -11,15 +11,16 @@ import java.time.{LocalDateTime, ZoneOffset}
 
 import com.roundeights.hasher.Algo
 import javax.inject.Singleton
-import models.Task
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.db.Database
 import play.api.db.evolutions.Evolutions
 import play.api.inject.bind
 import play.api.libs.json.{JsObject, Json}
+import play.api.mvc.RequestHeader
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
+import services.GitMetadata
 
 import scala.concurrent.Future
 import scala.util.{Random, Try}
@@ -29,31 +30,34 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
   def notifier = app.injector.instanceOf[Notifier]
   def database = app.injector.instanceOf[Database]
   def dao = app.injector.instanceOf[DAO]
+  def gitMetadata = app.injector.instanceOf[GitMetadata]
   def notifyMock = app.injector.instanceOf[NotifyMock]
   def notifySparkPost = app.injector.instanceOf[NotifySparkPost]
   def notifyMailgun = app.injector.instanceOf[NotifyMailgun]
   def testRecipient = sys.env("NOTIFY_TEST_RECIPIENT")
 
-  implicit val fakeRequest = FakeRequest()
+  def defaultProgram = await(gitMetadata.fetchProgram(None, "default"))
+
+  implicit val fakeRequest: RequestHeader = FakeRequest()
 
   implicit override def fakeApplication() = DAOMock.databaseAppBuilder().overrides(bind[NotifyProvider].to[NotifyMock]).build()
 
   "taskComment" must {
     "work" in Evolutions.withEvolutions(database) {
-      val request = await(dao.createRequest("asdf", "asdf@asdf.com"))
-      val task = await(dao.createTask(request.slug, Task.Prototype("foo", Task.TaskType.Action, "foo"), Seq("foo@foo.com")))
+      val request = await(dao.createRequest(None, "default", "asdf", "asdf@asdf.com"))
+      val task = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
       val comment = await(dao.commentOnTask(task.id, "bar@bar.com", "bar"))
 
-      await(notifier.taskComment(request, task, comment))
+      await(notifier.taskComment(request, task, comment, defaultProgram))
 
       notifyMock.notifications.map(_._1) must contain (Set("asdf@asdf.com", "foo@foo.com"))
     }
     "not send notifications when the commenter, task assignee, and request owner are the same" in Evolutions.withEvolutions(database) {
-      val request = await(dao.createRequest("foo", "foo@foo.com"))
-      val task = await(dao.createTask(request.slug, Task.Prototype("foo", Task.TaskType.Action, "foo"), Seq("foo@foo.com")))
+      val request = await(dao.createRequest(None, "default", "foo", "foo@foo.com"))
+      val task = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
       val comment = await(dao.commentOnTask(task.id, "foo@foo.com", "foo"))
 
-      await(notifier.taskComment(request, task, comment))
+      await(notifier.taskComment(request, task, comment, defaultProgram))
 
       notifyMock.notifications must be (empty)
     }
@@ -61,10 +65,10 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 
   "taskAssigned" must {
     "work" in Evolutions.withEvolutions(database) {
-      val request = await(dao.createRequest("asdf", "asdf@asdf.com"))
-      val task = await(dao.createTask(request.slug, Task.Prototype("foo", Task.TaskType.Action, "foo"), Seq("foo@foo.com")))
+      val request = await(dao.createRequest(None, "default", "asdf", "asdf@asdf.com"))
+      val task = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
 
-      await(notifier.taskAssigned(request, task))
+      await(notifier.taskAssigned(request, task, defaultProgram))
 
       notifyMock.notifications.map(_._1) must contain (Set("foo@foo.com"))
     }
@@ -72,7 +76,7 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 
   "requestStatusChange" must {
     "work" in Evolutions.withEvolutions(database) {
-      val request = await(dao.createRequest("asdf", "asdf@asdf.com"))
+      val request = await(dao.createRequest(None, "asdf", "asdf@asdf.com"))
 
       await(notifier.requestStatusChange(request))
 

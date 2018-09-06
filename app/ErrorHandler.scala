@@ -10,16 +10,16 @@ import play.api.http.DefaultHttpErrorHandler
 import play.api.mvc.RequestHeader
 import play.api.routing.Router
 import play.api.{Configuration, Environment, OptionalSourceMapper, UsefulException}
-import utils.RuntimeReporter
+import services.RuntimeReporter
 
 @Singleton
-class ErrorHandler @Inject() (
-                               env: Environment,
-                               config: Configuration,
-                               sourceMapper: OptionalSourceMapper,
-                               router: Provider[Router],
-                               runtimeReporter: RuntimeReporter
-                             ) extends DefaultHttpErrorHandler(env, config, sourceMapper, router) {
+class ErrorHandler @Inject()(
+                              env: Environment,
+                              config: Configuration,
+                              sourceMapper: OptionalSourceMapper,
+                              router: Provider[Router],
+                              runtimeReporter: RuntimeReporter
+                            ) extends DefaultHttpErrorHandler(env, config, sourceMapper, router) {
 
   override protected def logServerError(request: RequestHeader, usefulException: UsefulException): Unit = {
     runtimeReporter.error(request.toString, usefulException)

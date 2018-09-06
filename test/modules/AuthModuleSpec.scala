@@ -10,6 +10,7 @@ package modules
 import akka.http.scaladsl.model.Uri
 import org.scalatestplus.play.MixedPlaySpec
 import play.api.libs.ws.WSClient
+import play.api.mvc.RequestHeader
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
 import play.api.{Configuration, Mode}
@@ -44,7 +45,7 @@ class AuthModuleSpec extends MixedPlaySpec {
     case (k, Some(v)) => k -> v
   }
 
-  implicit val request = FakeRequest()
+  implicit val request: RequestHeader = FakeRequest()
 
   "LocalAuth" must {
     "return a emails" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev, Map("auth.provider" -> "local")).build()) {
