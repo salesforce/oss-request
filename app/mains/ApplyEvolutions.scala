@@ -136,11 +136,11 @@ class ApplyEvolutions(app: Application) {
       requestsWithTasks.foreach { case (requestSlug, tasks) =>
         val versions = tasks.flatMap { case (id, prototype, _) =>
           val metadataVersionAndTaskKeyMap = for {
-            (metadataVerion, metadata) <- allMetadata
+            (metadataVersion, metadata) <- allMetadata
             (_, program) <- metadata.programs
             (taskKey, taskPrototype) <- program.tasks
             if taskPrototype == prototype
-          } yield metadataVerion -> taskKey
+          } yield metadataVersion -> taskKey
 
           metadataVersionAndTaskKeyMap.headOption.fold {
             throw new Exception(s"Could not find taskKey for task $id")
@@ -156,8 +156,8 @@ class ApplyEvolutions(app: Application) {
             Await.result(updateTask, Duration.Inf)
           }
 
-          metadataVersionAndTaskKeyMap.keySet.headOption
-        }
+          metadataVersionAndTaskKeyMap.keySet
+        }.toSet
 
         val version = if (versions.isEmpty) {
           allMetadata.filter(_._1.id.isDefined).maxBy(_._1.date.toEpochSecond)._1

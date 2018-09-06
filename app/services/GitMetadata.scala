@@ -95,7 +95,8 @@ class GitMetadata @Inject() (cache: SyncCacheApi, configuration: Configuration, 
           val baseClone = Git.cloneRepository()
             .setURI(gitUri.toString)
             .setDirectory(tmpBaseDir)
-            .setBranch(branch)
+            .setBranchesToClone(Seq(s"refs/heads/$branch").asJava)
+            .setBranch(s"refs/heads/$branch")
 
           val clone = maybeSshSessionFactory.fold(baseClone) { sshSessionFactory =>
             baseClone.setTransportConfigCallback { transport =>
