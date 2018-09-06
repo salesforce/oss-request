@@ -20,7 +20,7 @@ import scala.util.Try
 case class Task(id: Int, taskKey: String, createDate: ZonedDateTime, completableBy: Seq[String], completedBy: Option[String], completedDate: Option[ZonedDateTime], completionMessage: Option[String], state: State.State, data: Option[JsObject], requestSlug: String) {
 
   def prototype(program: Program): Task.Prototype = {
-    program.tasks(taskKey)
+    program.tasks.getOrElse(taskKey, throw new Exception(s"Could not get task $taskKey for $id on request $requestSlug"))
   }
 
   def completableByEmailsOrUrl(program:Program): Either[Set[String], URL] = {

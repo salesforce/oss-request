@@ -136,6 +136,8 @@ class ApplyEvolutions(app: Application) {
       val requestsWithTasks = Await.result(tasksQuery, Duration.Inf).groupBy(_._5)
 
       requestsWithTasks.foreach { case (requestSlug, tasks) =>
+        Logger.info(s"Migrating request $requestSlug")
+
         val newestCreateDate = tasks.map(_._3).maxBy(_.toEpochSecond)
 
         val (version, metadata) = allMetadata.filter(_._1.date.isBefore(newestCreateDate)).maxBy(_._1.date.toEpochSecond)
