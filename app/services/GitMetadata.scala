@@ -83,6 +83,9 @@ class GitMetadata @Inject() (cache: SyncCacheApi, configuration: Configuration, 
           val (gitUri, branch) = if (metadataGitUri.getFragment != null) {
             new URI(metadataGitUri.getScheme, metadataGitUri.getUserInfo, metadataGitUri.getHost, metadataGitUri.getPort, metadataGitUri.getPath, null, null) -> metadataGitUri.getFragment
           }
+          else if (environment.mode == Mode.Test && sys.env.get("HEROKU_TEST_RUN_BRANCH").isDefined) {
+            new URI(metadataGitUri.getScheme, metadataGitUri.getUserInfo, metadataGitUri.getHost, metadataGitUri.getPort, metadataGitUri.getPath, null, null) -> sys.env("HEROKU_TEST_RUN_BRANCH")
+          }
           else {
             metadataGitUri -> "master"
           }
@@ -186,9 +189,11 @@ class GitMetadata @Inject() (cache: SyncCacheApi, configuration: Configuration, 
         Future.failed(new Exception("The metadata version should always be specified in prod mode"))
       }
       else {
-        val src = new File(new File(metadataGitUri), metadataGitFile)
-        val dst = new File(gitRepo.getRepository.getWorkTree, metadataGitFile)
-        Files.copy(src.toPath, dst.toPath, StandardCopyOption.REPLACE_EXISTING)
+        if (metadataGitUri.getScheme == "file") {
+          val src = new File(new File(metadataGitUri), metadataGitFile)
+          val dst = new File(gitRepo.getRepository.getWorkTree, metadataGitFile)
+          Files.copy(src.toPath, dst.toPath, StandardCopyOption.REPLACE_EXISTING)
+        }
         readMetadata(gitRepo)
       }
     } { version =>

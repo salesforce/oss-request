@@ -10,7 +10,7 @@ package services
 import modules.DAOMock
 import org.scalatestplus.play._
 import play.api.test.Helpers._
-import play.api.Mode
+import play.api.{Configuration, Mode}
 
 class GitMetadataSpec extends MixedPlaySpec {
 
@@ -37,10 +37,10 @@ class GitMetadataSpec extends MixedPlaySpec {
         }
       }
     }
-    "fail in prod mode without a value" in { () =>
-      val app = DAOMock.noDatabaseAppBuilder(Mode.Prod, GitMetadataSpec.prodConfig).build()
+    "fail in prod mode without a value" in new App(DAOMock.noDatabaseAppBuilder(Mode.Prod, GitMetadataSpec.prodConfig).build()) {
+      val config = app.injector.instanceOf[Configuration]
+      assume(config.getOptional[String]("metadata-git-file").isEmpty)
       an[Exception] should be thrownBy app.injector.instanceOf[GitMetadata].metadataGitFile
-      await(app.stop())
     }
     "work with an external ssh metadata file that requires auth" in new App(DAOMock.noDatabaseAppBuilder(Mode.Prod, GitMetadataSpec.gitConfig).build()) {
       assume(GitMetadataSpec.gitConfig.get("metadata-git-uri").isDefined)
@@ -99,12 +99,8 @@ class GitMetadataSpec extends MixedPlaySpec {
   "versions" must {
     "work" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
       val gitMetadata = app.injector.instanceOf[GitMetadata]
-
       val versions = await(gitMetadata.withGitRepo(gitMetadata.versions))
-
       versions must not be empty
-
-      versions.find(_.id.isEmpty) must be ('defined)
     }
   }
 
@@ -114,7 +110,6 @@ class GitMetadataSpec extends MixedPlaySpec {
 
       val (maybeVersion, metadata) = await(gitMetadata.latestMetadata)
 
-      maybeVersion must be (None)
       metadata.programs must not be empty
     }
   }
