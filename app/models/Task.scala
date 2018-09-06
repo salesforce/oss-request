@@ -15,6 +15,8 @@ import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import core.Extensions._
 
+import scala.util.Try
+
 case class Task(id: Int, taskKey: String, createDate: ZonedDateTime, completableBy: Seq[String], completedBy: Option[String], completedDate: Option[ZonedDateTime], completionMessage: Option[String], state: State.State, data: Option[JsObject], requestSlug: String) {
 
   def prototype(program: Program): Task.Prototype = {
@@ -27,7 +29,11 @@ case class Task(id: Int, taskKey: String, createDate: ZonedDateTime, completable
       Left(completableBy.toSet)
     }
     else {
-      Right(new URL(completableBy.head))
+      val urlTry = Try {
+        new URL(completableBy.head)
+      }
+
+      urlTry.toEither.left.map(_ => completableBy.toSet)
     }
   }
 
