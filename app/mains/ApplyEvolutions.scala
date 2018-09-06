@@ -7,6 +7,8 @@
 
 package mains
 
+import java.time.ZonedDateTime
+
 import models.Task
 import models.Task.CompletableByType
 import modules.{DAOWithCtx, DatabaseWithCtx}
@@ -127,24 +129,32 @@ class ApplyEvolutions(app: Application) {
 
       val tasksQuery = databaseWithCtx.ctx.run {
         quote {
-          infix"""SELECT id AS "_1", prototype AS "_2", request_slug AS "_3" FROM task""".as[Query[(Int, Task.Prototype, String)]]
+          infix"""SELECT task.id AS "_1", task.prototype AS "_2", task.create_date AS "_3", request.program AS "_4", request.slug AS "_5" FROM task, request WHERE task.request_slug = request.slug""".as[Query[(Int, Task.Prototype, ZonedDateTime, String, String)]]
         }
       }
 
-      val requestsWithTasks = Await.result(tasksQuery, Duration.Inf).groupBy(_._3)
+      val requestsWithTasks = Await.result(tasksQuery, Duration.Inf).groupBy(_._5)
 
       requestsWithTasks.foreach { case (requestSlug, tasks) =>
-        val versions = tasks.flatMap { case (id, prototype, _) =>
-          val metadataVersionAndTaskKeyMap = for {
-            (metadataVersion, metadata) <- allMetadata
-            (_, program) <- metadata.programs
-            (taskKey, taskPrototype) <- program.tasks
-            if taskPrototype == prototype
-          } yield metadataVersion -> taskKey
+        val newestCreateDate = tasks.map(_._3).maxBy(_.toEpochSecond)
 
-          metadataVersionAndTaskKeyMap.headOption.fold {
-            throw new Exception(s"Could not find taskKey for task $id")
-          } { case (_, taskKey) =>
+        val (version, metadata) = allMetadata.filter(_._1.date.isBefore(newestCreateDate)).maxBy(_._1.date.toEpochSecond)
+
+        version.id.fold {
+          throw new Exception(s"Could not find a metadata version for $requestSlug")
+        } { versionId =>
+
+          val tasksWithKeys = tasks.map { case (id, prototype, _, programKey, _) =>
+            val maybeTask = metadata.programs.get(programKey).flatMap { program =>
+              program.tasks.find { case (_, thisPrototype) =>
+                thisPrototype == prototype || thisPrototype.label == prototype.label
+              }
+            }
+
+            maybeTask.fold(throw new Exception(s"Could not find a task prototype for task $id on request $requestSlug"))(id -> _._1)
+          }.toMap
+
+          tasksWithKeys.foreach { case (id, taskKey) =>
             Logger.info(s"Updating task $id with taskKey = $taskKey")
 
             val updateTask = databaseWithCtx.ctx.run {
@@ -156,19 +166,6 @@ class ApplyEvolutions(app: Application) {
             Await.result(updateTask, Duration.Inf)
           }
 
-          metadataVersionAndTaskKeyMap.keySet
-        }.toSet
-
-        val version = if (versions.isEmpty) {
-          allMetadata.filter(_._1.id.isDefined).maxBy(_._1.date.toEpochSecond)._1
-        }
-        else {
-          versions.filter(_.id.isDefined).maxBy(_.date.toEpochSecond)
-        }
-
-        version.id.fold {
-          throw new Exception(s"Could not find a metadata version for $requestSlug")
-        } { versionId =>
           Logger.info(s"Updating request $requestSlug with metadata version = $versionId")
 
           val updateRequest = databaseWithCtx.ctx.run {
