@@ -151,7 +151,7 @@ class GitMetadata @Inject() (cache: SyncCacheApi, configuration: Configuration, 
   }
 
   def versions(gitRepo: Git): Set[MetadataVersion] = {
-    val versions = gitRepo.log().addPath(metadataGitFile).call().asScala.map { revCommit =>
+    val versions = gitRepo.log().all().addPath(metadataGitFile).call().asScala.map { revCommit =>
       val datetime = ZonedDateTime.ofInstant(Instant.ofEpochSecond(revCommit.getCommitTime), revCommit.getAuthorIdent.getTimeZone.toZoneId)
       MetadataVersion(Some(revCommit.getId), datetime)
     }.toSet
