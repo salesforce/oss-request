@@ -173,16 +173,19 @@ class Application @Inject()
 
   def request(requestSlug: String) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.withLatestMetadataF { implicit metadata =>
-        dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
+      dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
+        gitMetadata.fetchMetadata(request.metadataVersion).flatMap { implicit metadata =>
           metadata.program(request.program).flatMap { program =>
             dataFacade.requestTasks(userInfo.email, request.slug).map { tasks =>
               Ok(requestView(program, request, tasks, userInfo))
             }
           }
-        } recover {
-          case rnf: DB.RequestNotFound => NotFound(errorView(rnf.getMessage, userInfo))
         }
+      } recoverWith {
+        case rnf: DB.RequestNotFound =>
+          gitMetadata.withLatestMetadata { implicit metadata =>
+            NotFound(errorView(rnf.getMessage, userInfo))
+          }
       }
     }
   }
@@ -198,18 +201,19 @@ class Application @Inject()
 
   def task(requestSlug: String, taskId: Int) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.withLatestMetadataF { implicit metadata =>
-        val f = for {
-          request <- dataFacade.request(userInfo.email, requestSlug)
-          task <- dataFacade.taskById(taskId)
-          comments <- dataFacade.commentsOnTask(taskId)
-          program <- metadata.program(request.program)
-          prototype <- program.task(task.taskKey)
-        } yield Ok(taskView(request, program, task, prototype, comments, userInfo, program.isAdmin(userInfo.email), program.groups.keySet))
+      dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
+        gitMetadata.fetchMetadata(request.metadataVersion).flatMap { implicit metadata =>
+          val f = for {
+            task <- dataFacade.taskById(taskId)
+            comments <- dataFacade.commentsOnTask(taskId)
+            program <- metadata.program(request.program)
+            prototype <- program.task(task.taskKey)
+          } yield Ok(taskView(request, program, task, prototype, comments, userInfo, program.isAdmin(userInfo.email), program.groups.keySet))
 
-        f.recover {
-          case e: Exception =>
-            InternalServerError(errorView(e.getMessage, userInfo))
+          f.recover {
+            case e: Exception =>
+              InternalServerError(errorView(e.getMessage, userInfo))
+          }
         }
       }
     }
@@ -217,24 +221,26 @@ class Application @Inject()
 
   def addTask(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.withLatestMetadataF { implicit metadata =>
-        val maybeTaskPrototypeKey = userRequest.body.get("taskPrototypeKey").flatMap(_.headOption)
-        val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption).filterNot(_.isEmpty)
+      dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
+        gitMetadata.fetchMetadata(request.metadataVersion).flatMap { implicit metadata =>
+          val maybeTaskPrototypeKey = userRequest.body.get("taskPrototypeKey").flatMap(_.headOption)
+          val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption).filterNot(_.isEmpty)
 
-        dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
-          maybeTaskPrototypeKey.fold(Future.successful(BadRequest("No taskPrototypeKey specified"))) { taskPrototypeKey =>
-            val maybeTask = for {
-              programMetadata <- metadata.programs.get(request.program)
-              task <- programMetadata.tasks.get(taskPrototypeKey)
-              completableBy <- completableByWithDefaults(task.completableBy, Some(request.creatorEmail), maybeCompletableBy).flatMap(programMetadata.completableBy)
-            } yield (task, completableBy)
+          dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
+            maybeTaskPrototypeKey.fold(Future.successful(BadRequest("No taskPrototypeKey specified"))) { taskPrototypeKey =>
+              val maybeTask = for {
+                programMetadata <- metadata.programs.get(request.program)
+                task <- programMetadata.tasks.get(taskPrototypeKey)
+                completableBy <- completableByWithDefaults(task.completableBy, Some(request.creatorEmail), maybeCompletableBy).flatMap(programMetadata.completableBy)
+              } yield (task, completableBy)
 
-            maybeTask.fold(Future.successful(InternalServerError(s"Could not find task prototype $taskPrototypeKey"))) { case (_, completableBy) =>
-              dataFacade.createTask(requestSlug, taskPrototypeKey, completableBy.toSeq).map { _ =>
-                Redirect(routes.Application.request(request.slug))
-              } recover {
-                case e @ (_: DataFacade.DuplicateTaskException | _: DataFacade.MissingTaskDependencyException) =>
-                  BadRequest(errorView(e.getMessage, userInfo))
+              maybeTask.fold(Future.successful(InternalServerError(s"Could not find task prototype $taskPrototypeKey"))) { case (_, completableBy) =>
+                dataFacade.createTask(requestSlug, taskPrototypeKey, completableBy.toSeq).map { _ =>
+                  Redirect(routes.Application.request(request.slug))
+                } recover {
+                  case e @ (_: DataFacade.DuplicateTaskException | _: DataFacade.MissingTaskDependencyException) =>
+                    BadRequest(errorView(e.getMessage, userInfo))
+                }
               }
             }
           }
@@ -262,8 +268,8 @@ class Application @Inject()
 
   def updateTaskAssignment(requestSlug: String, taskId: Int) = userAction.async(parse.json) { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.withLatestMetadataF { metadata =>
-        dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
+      dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
+        gitMetadata.fetchMetadata(request.metadataVersion).flatMap { implicit metadata =>
           val maybeCompletableBy = (userRequest.body \ "email").asOpt[String].map { email =>
             CompletableByType.Email -> email
           } orElse {
