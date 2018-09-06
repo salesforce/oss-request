@@ -10,6 +10,7 @@ package services
 import models.{DataIn, State, Task}
 import modules.{DAOMock, NotifyMock, NotifyProvider}
 import org.scalatestplus.play.MixedPlaySpec
+import play.api.Mode
 import play.api.db.Database
 import play.api.db.evolutions.Evolutions
 import play.api.inject.bind
@@ -82,6 +83,21 @@ class DataFacadeSpec extends MixedPlaySpec {
         val url = controllers.routes.Application.createDemoRepo().absoluteURL(false, s"localhost:$testServerPort")
         val task = await(dataFacade.createTask(request.slug, "create_repo", Seq(url)))
         task.completedBy must equal (Some("http://asdf.com"))
+      }
+    }
+    "work for remote metadata" in new App(DAOMock.databaseAppBuilderWithEvolutionsDisabled(Mode.Prod, GitMetadataSpec.gitConfig).build()) {
+      assume(GitMetadataSpec.gitConfig.get("metadata-git-uri").isDefined)
+
+      val gitMetadata = app.injector.instanceOf[GitMetadata]
+      val (version, _) = await(gitMetadata.latestMetadata)
+
+      version must be (defined)
+
+      Evolutions.withEvolutions(database) {
+        val createdRequest = await(dataFacade.createRequest(version, "test", "foo", "foo@bar.com"))
+
+        val fetchedRequest = await(dataFacade.request("foo@bar.com", createdRequest.slug))
+        fetchedRequest.metadataVersion must equal (version)
       }
     }
   }

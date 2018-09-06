@@ -64,7 +64,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
   implicit val jsObjectDecoder = MappedEncoding[String, JsObject](Json.parse(_).as[JsObject])
   implicit val jsObjectEncoder = MappedEncoding[JsObject, String](_.toString())
 
-  implicit val objectIdDecoder = MappedEncoding[Array[Byte], ObjectId](ObjectId.fromRaw)
+  implicit val objectIdDecoder = MappedEncoding[Array[Byte], ObjectId](ObjectId.fromString(_, 0))
   implicit val objectIdEncoder = MappedEncoding[ObjectId, Array[Byte]](_.name().getBytes)
 
   override def createRequest(metadataVersion: Option[ObjectId], programKey: String, name: String, creatorEmail: String): Future[Request] = {
