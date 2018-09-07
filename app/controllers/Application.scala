@@ -8,7 +8,7 @@
 package controllers
 
 import javax.inject.Inject
-import models.{Program, State, Task}
+import models.{State, Task}
 import models.Task.CompletableByType
 import modules.{Auth, DAO, DB, NotifyProvider}
 import org.webjars.WebJarAssetLocator
@@ -59,20 +59,25 @@ class Application @Inject()
   def openUserTasks = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
       gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
-        dataFacade.tasksForUser(userInfo.email, State.InProgress).map { tasks =>
-          val tasksWithProgram = tasks.flatMap { case (task, numComments, request) =>
-            for {
-              program <- metadata.programs.get(request.program)
-              prototype <- program.tasks.get(task.taskKey)
-            } yield (task, prototype, numComments, request, program)
+        dataFacade.tasksForUser(userInfo.email, State.InProgress).flatMap { tasks =>
+
+          val tasksWithProgramFuture = Future.sequence {
+            tasks.map { case (task, numComments, request) =>
+              for {
+                program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
+                prototype <- program.task(task.taskKey)
+              } yield (task, prototype, numComments, request, program)
+            }
           }
 
-          // todo: this could be better
-          if (tasks.size == tasksWithProgram.size) {
-            Ok(openUserTasksView(tasksWithProgram, userInfo))
-          }
-          else {
-            InternalServerError("Could not find a specified program")
+          tasksWithProgramFuture.map { tasksWithProgram =>
+            // todo: this could be better
+            if (tasks.size == tasksWithProgram.size) {
+              Ok(openUserTasksView(tasksWithProgram, userInfo))
+            }
+            else {
+              InternalServerError("Could not find a specified program")
+            }
           }
         }
       }
@@ -174,8 +179,8 @@ class Application @Inject()
   def request(requestSlug: String) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
       dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
-        gitMetadata.fetchMetadata(request.metadataVersion).flatMap { implicit metadata =>
-          metadata.program(request.program).flatMap { program =>
+        gitMetadata.fetchProgram(request.metadataVersion, request.program).flatMap { program =>
+          gitMetadata.latestVersion.map(_._2).flatMap { implicit latestMetadata =>
             dataFacade.requestTasks(userInfo.email, request.slug).map { tasks =>
               Ok(requestView(program, request, tasks, userInfo))
             }
@@ -201,19 +206,18 @@ class Application @Inject()
 
   def task(requestSlug: String, taskId: Int) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
-        gitMetadata.fetchMetadata(request.metadataVersion).flatMap { implicit metadata =>
-          val f = for {
-            task <- dataFacade.taskById(taskId)
-            comments <- dataFacade.commentsOnTask(taskId)
-            program <- metadata.program(request.program)
-            prototype <- program.task(task.taskKey)
-          } yield Ok(taskView(request, program, task, prototype, comments, userInfo, program.isAdmin(userInfo.email), program.groups.keySet))
+      gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
+        val f = for {
+          request <- dataFacade.request(userInfo.email, requestSlug)
+          task <- dataFacade.taskById(taskId)
+          comments <- dataFacade.commentsOnTask(taskId)
+          program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
+          prototype <- program.task(task.taskKey)
+        } yield Ok(taskView(request, program, task, prototype, comments, userInfo, program.isAdmin(userInfo.email), program.groups.keySet))
 
-          f.recover {
-            case e: Exception =>
-              InternalServerError(errorView(e.getMessage, userInfo))
-          }
+        f.recover {
+          case e: Exception =>
+            InternalServerError(errorView(e.getMessage, userInfo))
         }
       }
     }
@@ -221,17 +225,16 @@ class Application @Inject()
 
   def addTask(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
     withUserInfo { userInfo =>
-      dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
-        gitMetadata.fetchMetadata(request.metadataVersion).flatMap { implicit metadata =>
-          val maybeTaskPrototypeKey = userRequest.body.get("taskPrototypeKey").flatMap(_.headOption)
-          val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption).filterNot(_.isEmpty)
+      gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
+        val maybeTaskPrototypeKey = userRequest.body.get("taskPrototypeKey").flatMap(_.headOption)
+        val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption).filterNot(_.isEmpty)
 
+        maybeTaskPrototypeKey.fold(Future.successful(BadRequest("No taskPrototypeKey specified"))) { taskPrototypeKey =>
           dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
-            maybeTaskPrototypeKey.fold(Future.successful(BadRequest("No taskPrototypeKey specified"))) { taskPrototypeKey =>
+            gitMetadata.fetchProgram(request.metadataVersion, request.program).flatMap { program =>
               val maybeTask = for {
-                programMetadata <- metadata.programs.get(request.program)
-                task <- programMetadata.tasks.get(taskPrototypeKey)
-                completableBy <- completableByWithDefaults(task.completableBy, Some(request.creatorEmail), maybeCompletableBy).flatMap(programMetadata.completableBy)
+                task <- program.tasks.get(taskPrototypeKey)
+                completableBy <- completableByWithDefaults(task.completableBy, Some(request.creatorEmail), maybeCompletableBy).flatMap(program.completableBy)
               } yield (task, completableBy)
 
               maybeTask.fold(Future.successful(InternalServerError(s"Could not find task prototype $taskPrototypeKey"))) { case (_, completableBy) =>
@@ -269,22 +272,22 @@ class Application @Inject()
   def updateTaskAssignment(requestSlug: String, taskId: Int) = userAction.async(parse.json) { implicit userRequest =>
     withUserInfo { userInfo =>
       dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
-        gitMetadata.fetchMetadata(request.metadataVersion).flatMap { implicit metadata =>
-          val maybeCompletableBy = (userRequest.body \ "email").asOpt[String].map { email =>
-            CompletableByType.Email -> email
-          } orElse {
-            (userRequest.body \ "group").asOpt[String].map { group =>
-              CompletableByType.Group -> group
-            }
-          } flatMap { case (completableByType, completableByValue) =>
-            metadata.programs.get(request.program).flatMap { program =>
+        gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
+          gitMetadata.fetchProgram(request.metadataVersion, request.program).flatMap { program =>
+            val maybeCompletableBy = (userRequest.body \ "email").asOpt[String].map { email =>
+              CompletableByType.Email -> email
+            } orElse {
+              (userRequest.body \ "group").asOpt[String].map { group =>
+                CompletableByType.Group -> group
+              }
+            } flatMap { case (completableByType, completableByValue) =>
               program.completableBy(completableByType, completableByValue)
             }
-          }
 
-          maybeCompletableBy.fold(Future.successful(BadRequest("Must specify an email or group"))) { emails =>
-            dataFacade.assignTask(userInfo.email, taskId, emails.toSeq).map { _ =>
-              Ok
+            maybeCompletableBy.fold(Future.successful(BadRequest("Must specify an email or group"))) { emails =>
+              dataFacade.assignTask(userInfo.email, taskId, emails.toSeq).map { _ =>
+                Ok
+              }
             }
           }
         }
