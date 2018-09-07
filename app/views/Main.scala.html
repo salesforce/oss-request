@@ -7,7 +7,7 @@
 
 @this(webJarsUtil: org.webjars.play.WebJarsUtil)
 
-@(maybeUserInfo: Option[_root_.utils.UserInfo])(title: String, extraHead: Html = play.twirl.api.HtmlFormat.empty)(body: Html)(implicit request: RequestHeader, metadata: _root_.utils.Metadata)
+@(maybeUserInfo: Option[controllers.UserInfo])(title: String, extraHead: Html = play.twirl.api.HtmlFormat.empty)(body: Html)(implicit request: RequestHeader, metadata: models.Metadata)
 
 <!DOCTYPE html>
 <html>

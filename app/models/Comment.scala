@@ -8,11 +8,8 @@
 package models
 
 import java.time.ZonedDateTime
-
-import utils.MarkdownTransformer
+import core.Extensions._
 
 case class Comment(id: Int, creatorEmail: String, createDate: ZonedDateTime, contents: String, taskId: Int) {
-  lazy val contentsMarkdownToHtml = {
-    MarkdownTransformer.transform(contents)
-  }
+  lazy val contentsMarkdownToHtml = contents.markdown
 }

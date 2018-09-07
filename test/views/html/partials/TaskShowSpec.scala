@@ -5,7 +5,7 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 
-package views.html.utils
+package views.html.partials
 
 import java.time.ZonedDateTime
 
@@ -25,18 +25,18 @@ class TaskShowSpec extends PlaySpec with GuiceOneAppPerTest {
     "render plain text" in {
       val info = "hello, world"
       val taskPrototype = Task.Prototype("foo", Task.TaskType.Action, info)
-      val task = Task(1, ZonedDateTime.now(), Seq("foo@foo.com"), None, None, None, State.InProgress, taskPrototype, None, "foo")
+      val task = Task(1, "foo", ZonedDateTime.now(), Seq("foo@foo.com"), None, None, None, State.InProgress, None, "foo")
 
-      val body = taskShowView.render(task).body
+      val body = taskShowView.render(task, taskPrototype).body
 
       body must include (info)
     }
     "render markdown" in {
       val info = "[hello, world](https://hello.world)"
       val taskPrototype = Task.Prototype("foo", Task.TaskType.Action, info)
-      val task = Task(1, ZonedDateTime.now(),Seq("foo@foo.com"), None, None, None, State.InProgress, taskPrototype, None, "foo")
+      val task = Task(1, "foo", ZonedDateTime.now(),Seq("foo@foo.com"), None, None, None, State.InProgress, None, "foo")
 
-      val body = taskShowView.render(task).body
+      val body = taskShowView.render(task, taskPrototype).body
 
       body must include (taskPrototype.infoMarkdownToHtml)
     }

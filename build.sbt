@@ -16,7 +16,6 @@ libraryDependencies ++= Seq(
   filters,
   jdbc,
   evolutions,
-  ehcache,
 
   "org.slf4j"              %  "log4j-over-slf4j"                   % "1.7.25",
   "io.airbrake"            %  "javabrake"                          % "0.1.6",
@@ -25,7 +24,7 @@ libraryDependencies ++= Seq(
 
   "io.getquill"            %% "quill-async-postgres"               % "2.5.4",
 
-  "org.eclipse.jgit"       %  "org.eclipse.jgit"                   % "4.10.0.201712302008-r",
+  "org.eclipse.jgit"       %  "org.eclipse.jgit"                   % "5.0.2.201807311906-r",
 
   "com.onelogin"           %  "java-saml-core"                     % "2.2.0",
 
@@ -76,6 +75,7 @@ headerSources.in(Compile) ++= sources.in(Compile, TwirlKeys.compileTemplates).va
 
 javaOptions in Test := Seq("-Dlogger.resource=logback-test.xml")
 
+testOptions in Test += Tests.Argument("-oDF")
 
 // license report stuff
 

@@ -5,11 +5,11 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 
-package utils
+package services
 
 import javax.inject.Inject
 import models.TaskEvent.Criteria
-import models.{Request, State, Task, TaskEvent}
+import models.{Program, Request, State, Task, TaskEvent}
 import play.api.libs.json.{JsLookupResult, JsObject, Reads}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -17,46 +17,48 @@ import scala.util.Try
 
 class TaskEventHandler @Inject()(implicit ec: ExecutionContext) {
 
-  def process(program: Program, request: Request, eventType: TaskEvent.EventType.EventType, task: Task, createTask: (String, Task.Prototype, Seq[String]) => Future[Task], updateRequestState: (State.State, Option[String]) => Future[Request]): Future[Seq[_]] = {
-    Future.sequence {
-      task.prototype.taskEvents.filter { taskEvent =>
-        taskEvent.`type` == eventType && taskEvent.value == task.state.toString
-      } map { taskEvent =>
+  def process(program: Program, request: Request, eventType: TaskEvent.EventType.EventType, task: Task, createTask: (String, String, Seq[String]) => Future[Task], updateRequestState: (State.State, Option[String]) => Future[Request]): Future[Seq[_]] = {
+    program.tasks.get(task.taskKey).fold(Future.failed[Seq[_]](new Exception(s"Task not found: ${task.taskKey}"))) { taskPrototype =>
+      Future.sequence {
+        taskPrototype.taskEvents.filter { taskEvent =>
+          taskEvent.`type` == eventType && taskEvent.value == task.state.toString
+        } map { taskEvent =>
 
-        val handleAction = taskEvent.criteria.forall(TaskEventHandler.criteriaMatches(task.data))
+          val handleAction = taskEvent.criteria.forall(TaskEventHandler.criteriaMatches(task.data))
 
-        if (handleAction) {
-          taskEvent.action.`type` match {
-            case TaskEvent.EventActionType.CreateTask =>
-              program.tasks.get(taskEvent.action.value).fold(Future.failed[Task](new Exception(s"Could not find task named '${taskEvent.action.value}'"))) { taskPrototype =>
-                val completableBy = taskPrototype.completableBy.getOrElse(Task.CompletableBy(Task.CompletableByType.Email, Some(request.creatorEmail)))
+          if (handleAction) {
+            taskEvent.action.`type` match {
+              case TaskEvent.EventActionType.CreateTask =>
+                val newTaskKey = taskEvent.action.value
+                program.tasks.get(newTaskKey).fold(Future.failed[Task](new Exception(s"Could not find task named '${taskEvent.action.value}'"))) { newTaskPrototype =>
+                  val completableBy = newTaskPrototype.completableBy.getOrElse(Task.CompletableBy(Task.CompletableByType.Email, Some(request.creatorEmail)))
 
-                val maybeCompletableByOverride = for {
-                  overrides <- taskEvent.action.overrides
-                  completableByField <- (overrides \ "completable_by").asOpt[String]
-                  data <- task.data
-                  completableBy <- (data \ completableByField).asOpt[String]
-                } yield completableBy
+                  val maybeCompletableByOverride = for {
+                    overrides <- taskEvent.action.overrides
+                    completableByField <- (overrides \ "completable_by").asOpt[String]
+                    data <- task.data
+                    completableBy <- (data \ completableByField).asOpt[String]
+                  } yield completableBy
 
-                completableBy.value.orElse(maybeCompletableByOverride).fold(Future.failed[Task](new Exception("Could not create task because it does not have a completable_by value"))) { completableByValue =>
-                  program.completableBy(completableBy.`type`, completableByValue).fold(Future.failed[Task](new Exception("Could not create task because it can't be assigned to anyone"))) { emails =>
-                    createTask(request.slug, taskPrototype, emails.toSeq)
+                  completableBy.value.orElse(maybeCompletableByOverride).fold(Future.failed[Task](new Exception("Could not create task because it does not have a completable_by value"))) { completableByValue =>
+                    program.completableBy(completableBy.`type`, completableByValue).fold(Future.failed[Task](new Exception("Could not create task because it can't be assigned to anyone"))) { emails =>
+                      createTask(request.slug, newTaskKey, emails.toSeq)
+                    }
                   }
                 }
-              }
-            case TaskEvent.EventActionType.UpdateRequestState =>
-              updateRequestState(State.withName(taskEvent.action.value), taskEvent.action.message)
-            case _ =>
-              Future.failed[Task](new Exception(s"Could not process action type: ${taskEvent.action.`type`}"))
+              case TaskEvent.EventActionType.UpdateRequestState =>
+                updateRequestState(State.withName(taskEvent.action.value), taskEvent.action.message)
+              case _ =>
+                Future.failed[Task](new Exception(s"Could not process action type: ${taskEvent.action.`type`}"))
+            }
           }
-        }
-        else {
-          Future.successful(Seq.empty[Seq[Task]])
+          else {
+            Future.successful(Seq.empty[Seq[Task]])
+          }
         }
       }
     }
   }
-
 }
 
 object TaskEventHandler {

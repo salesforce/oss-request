@@ -5,17 +5,18 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 
-package utils
+package services
 
 import javax.inject.Inject
-import models.{Comment, Request, RequestWithTasks, State, Task, TaskEvent}
+import models.{Comment, DataIn, Program, Request, RequestWithTasks, RequestWithTasksAndProgram, State, Task, TaskEvent}
 import modules.{DAO, Notifier}
-import play.api.libs.json.{JsObject, JsValue}
+import org.eclipse.jgit.lib.ObjectId
+import play.api.libs.json.JsObject
 import play.api.mvc.RequestHeader
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskService: TaskService, notifier: Notifier, metadataService: MetadataService)(implicit ec: ExecutionContext) {
+class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskService: ExternalTask, notifier: Notifier, gitMetadata: GitMetadata)(implicit ec: ExecutionContext) {
 
   private def checkAccess(check: => Boolean): Future[Unit] = {
     if (check) {
@@ -26,30 +27,29 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     }
   }
 
-  def createRequest(program: String, name: String, creatorEmail: String): Future[Request] = {
+  def createRequest(metadataVersion: Option[ObjectId], program: String, name: String, creatorEmail: String): Future[Request] = {
     for {
-      request <- dao.createRequest(program, name, creatorEmail)
+      request <- dao.createRequest(metadataVersion, program, name, creatorEmail)
     } yield request
   }
 
-  // todo: this compares task prototypes on a task (in the db) with those in metadata and thus if a task changes in metadata, it is no longer equal to the one in the db
-  def createTask(requestSlug: String, prototype: Task.Prototype, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress)(implicit requestHeader: RequestHeader): Future[Task] = {
+  def createTask(requestSlug: String, taskKey: String, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress)(implicit requestHeader: RequestHeader): Future[Task] = {
     for {
       request <- dao.request(requestSlug)
+
+      program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
 
       existingTasksWithComments <- dao.requestTasks(requestSlug)
 
       existingTasks = existingTasksWithComments.map(_._1)
 
-      _ <- if (!existingTasks.exists(_.prototype == prototype)) Future.unit else Future.failed(DataFacade.DuplicateTaskException())
+      _ <- if (existingTasks.exists(_.taskKey == taskKey)) Future.failed(DataFacade.DuplicateTaskException()) else Future.unit
 
-      program <- metadataService.fetchProgram(request.program)
+      prototype <- program.tasks.get(taskKey).fold(Future.failed[Task.Prototype](new Exception("Task prototype not found")))(Future.successful)
 
-      dependencyTaskPrototypes = prototype.dependencies.flatMap(program.tasks.get)
+      _ <- if (prototype.dependencies.subsetOf(existingTasks.filter(_.state == State.Completed).map(_.taskKey).toSet)) Future.unit else Future.failed(DataFacade.MissingTaskDependencyException())
 
-      _ <- if (dependencyTaskPrototypes.subsetOf(existingTasks.filter(_.state == State.Completed).map(_.prototype).toSet)) Future.unit else Future.failed(DataFacade.MissingTaskDependencyException())
-
-      task <- dao.createTask(requestSlug, prototype, completableBy, maybeCompletedBy, maybeData, state)
+      task <- dao.createTask(requestSlug, taskKey, completableBy, maybeCompletedBy, maybeData, state)
 
       url = controllers.routes.Application.task(requestSlug, task.id).absoluteURL()
 
@@ -57,26 +57,35 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
 
       _ <- taskEventHandler.process(program, request, TaskEvent.EventType.StateChange, updatedTask, createTask(_, _, _), updateRequest(request.creatorEmail, task.requestSlug, _, _, true))
 
-      _ <- if (state == State.InProgress) notifier.taskAssigned(request, updatedTask) else Future.unit
+      _ <- if (state == State.InProgress) notifier.taskAssigned(request, updatedTask, program) else Future.unit
     } yield updatedTask
   }
 
-  def programRequests(program: String): Future[Seq[RequestWithTasks]] = {
-    dao.programRequests(program)
+  private def withProgram(requestsWithTasks: Seq[RequestWithTasks]): Future[Seq[RequestWithTasksAndProgram]] = {
+    Future.sequence {
+      requestsWithTasks.map { requestWithTasks =>
+        gitMetadata.fetchProgram(requestWithTasks.request.metadataVersion, requestWithTasks.request.program)
+          .map(RequestWithTasksAndProgram(requestWithTasks))
+      }
+    }
   }
 
-  def userRequests(email: String): Future[Seq[RequestWithTasks]] = {
-    dao.userRequests(email)
+  def programRequests(program: String): Future[Seq[RequestWithTasksAndProgram]] = {
+    dao.programRequests(program).flatMap(withProgram)
   }
 
-  def requestsSimilarToName(program: String, name: String): Future[Seq[RequestWithTasks]] = {
-    dao.requestsSimilarToName(program, name)
+  def userRequests(email: String): Future[Seq[RequestWithTasksAndProgram]] = {
+    dao.userRequests(email).flatMap(withProgram)
+  }
+
+  def requestsSimilarToName(program: String, name: String): Future[Seq[RequestWithTasksAndProgram]] = {
+    dao.requestsSimilarToName(program, name).flatMap(withProgram)
   }
 
   def updateRequest(email: String, requestSlug: String, state: State.State, message: Option[String], securityBypass: Boolean = false)(implicit requestHeader: RequestHeader): Future[Request] = {
     for {
       currentRequest <- dao.request(requestSlug)
-      program <- metadataService.fetchProgram(currentRequest.program)
+      program <- gitMetadata.fetchProgram(currentRequest.metadataVersion, currentRequest.program)
       _ <- checkAccess(securityBypass || program.isAdmin(email))
       updatedRequest <- dao.updateRequest(requestSlug, state, message)
       _ <- notifier.requestStatusChange(updatedRequest)
@@ -91,11 +100,11 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     for {
       currentTask <- dao.taskById(taskId)
       request <- dao.request(currentTask.requestSlug)
-      program <- metadataService.fetchProgram(request.program)
+      program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
       _ <- checkAccess(securityBypass || program.isAdmin(email) || currentTask.completableBy.contains(email))
       task <- dao.updateTaskState(taskId, state, maybeCompletedBy, maybeData, completionMessage)
       requestWithTasks <- dao.requestWithTasks(task.requestSlug)
-      _ <- notifier.taskStateChanged(requestWithTasks.request, task)
+      _ <- notifier.taskStateChanged(requestWithTasks.request, task, program)
       _ <- taskEventHandler.process(program, requestWithTasks.request, TaskEvent.EventType.StateChange, task, createTask(_, _, _), updateRequest(email, task.requestSlug, _, _, securityBypass))
       _ <- if (requestWithTasks.completedTasks.size == requestWithTasks.tasks.size) notifier.allTasksCompleted(requestWithTasks.request, program.admins) else Future.unit
     } yield task
@@ -105,10 +114,10 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     for {
       currentTask <- dao.taskById(taskId)
       request <- dao.request(currentTask.requestSlug)
-      program <- metadataService.fetchProgram(request.program)
+      program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
       _ <- checkAccess(program.isAdmin(email))
       updatedTask <- dao.assignTask(taskId, emails)
-      _ <- notifier.taskAssigned(request, updatedTask)
+      _ <- notifier.taskAssigned(request, updatedTask, program)
     } yield updatedTask
   }
 
@@ -116,7 +125,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     for {
       currentTask <- dao.taskById(taskId)
       request <- dao.request(currentTask.requestSlug)
-      program <- metadataService.fetchProgram(request.program)
+      program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
       _ <- checkAccess(program.isAdmin(email))
       result <- dao.deleteTask(taskId)
     } yield result
@@ -126,15 +135,16 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     for {
       task <- dao.taskById(taskId)
       request <- dao.request(task.requestSlug)
-      updatedTask <- taskService.taskStatus(task, updateTaskState(request.creatorEmail, task.id, _, _, _, _, true))
+      program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
+      updatedTask <- taskService.taskStatus(task, program, updateTaskState(request.creatorEmail, task.id, _, _, _, _, true))
     } yield updatedTask
   }
 
-  def requestTasks(email: String, requestSlug: String, maybeState: Option[State.State] = None)(implicit requestHeader: RequestHeader): Future[Seq[(Task, DAO.NumComments)]] = {
-    def updateTasks(request: Request, tasks: Seq[(Task, DAO.NumComments)]): Future[Seq[(Task, DAO.NumComments)]] = {
+  def requestTasks(email: String, requestSlug: String, maybeState: Option[State.State] = None)(implicit requestHeader: RequestHeader): Future[Seq[(Task, Task.Prototype, DAO.NumComments)]] = {
+    def updateTasks(request: Request, program: Program, tasks: Seq[(Task, DAO.NumComments)]): Future[Seq[(Task, DAO.NumComments)]] = {
       Future.sequence {
         tasks.map { case (task, numComments) =>
-          taskService.taskStatus(task, updateTaskState(request.creatorEmail, task.id, _, _, _, _, true)).map { updatedTask =>
+          taskService.taskStatus(task, program, updateTaskState(request.creatorEmail, task.id, _, _, _, _, true)).map { updatedTask =>
             updatedTask -> numComments
           }
         }
@@ -144,8 +154,15 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     for {
       tasks <- dao.requestTasks(requestSlug, maybeState)
       request <- dao.request(requestSlug)
-      updatedTasks <- updateTasks(request, tasks)
-    } yield updatedTasks
+      program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
+      updatedTasks <- updateTasks(request, program, tasks)
+    } yield {
+      updatedTasks.flatMap { case (task, numComments) =>
+        program.tasks.get(task.taskKey).map { prototype =>
+          (task, prototype, numComments)
+        }
+      }
+    }
   }
 
   def commentOnTask(requestSlug: String, taskId: Int, email: String, contents: String)(implicit requestHeader: RequestHeader): Future[Comment] = {
@@ -153,7 +170,8 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
       comment <- dao.commentOnTask(taskId, email, contents)
       task <- dao.taskById(taskId)
       request <- dao.request(requestSlug)
-      _ <- notifier.taskComment(request, task, comment)
+      program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
+      _ <- notifier.taskComment(request, task, comment, program)
     } yield comment
   }
 
@@ -167,8 +185,8 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     dao.tasksForUser(email, state)
   }
 
-  def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject], maybeDataIn: Option[DataIn]): Future[Seq[RequestWithTasks]] = {
-    dao.search(maybeProgram, maybeState, maybeData, maybeDataIn)
+  def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject], maybeDataIn: Option[DataIn]): Future[Seq[RequestWithTasksAndProgram]] = {
+    dao.search(maybeProgram, maybeState, maybeData, maybeDataIn).flatMap(withProgram)
   }
 
 }

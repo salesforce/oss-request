@@ -7,7 +7,7 @@
 
 @this(main: Main)
 
-@(requests: Seq[RequestWithTasks], userInfo: _root_.utils.UserInfo)(implicit request: RequestHeader, metadata: _root_.utils.Metadata)
+@(requests: Seq[RequestWithTasksAndProgram], userInfo: controllers.UserInfo)(implicit request: RequestHeader, metadata: models.Metadata)
 
 @main(Some(userInfo))("OSS Requests") {
 

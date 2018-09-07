@@ -5,9 +5,11 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  *@
 
-@this(taskEditView: TaskEdit, taskShowView: TaskShow, commentsView: partials.Comments)
+@this(taskEditView: TaskEdit, taskShowView: TaskShow, commentsView: Comments)
 
-@(task: models.Task, commentCountOrComments: Either[Long, Seq[Comment]], userInfo: _root_.utils.UserInfo, isAdmin: Boolean, groups: Set[String])(implicit request: RequestHeader)
+@(program: models.Program, task: models.Task, taskPrototype: models.Task.Prototype, commentCountOrComments: Either[Long, Seq[Comment]], userInfo: controllers.UserInfo, isAdmin: Boolean, groups: Set[String])(implicit request: RequestHeader)
+
+@import core.Extensions._
 
 @panelType = {
     @task.state match {
@@ -26,9 +28,9 @@
 @assignedToUser = @{task.completableBy.contains(userInfo.email)}
 
 @assignment = {
-    <span class="assignment-list">@views.html.utils.AssignedTo(task)</span>
+    <span class="assignment-list">@AssignedTo(task, program)</span>
 
-    @if(task.completableByEmailsOrUrl.isLeft && (assignedToUser || isAdmin)) {
+    @if(task.completableByEmailsOrUrl(program).isLeft && (assignedToUser || isAdmin)) {
         <button type="button" class="btn btn-default btn-xs" title="Reassign" data-toggle="modal" data-target="#reassignModal" data-url="@helper.CSRF(routes.Application.updateTaskAssignment(task.requestSlug, task.id))" data-groups="@groups.mkString(",")">
             <span class="glyphicon glyphicon-pencil" style="padding-top: 5px"></span>
         </button>
@@ -40,15 +42,15 @@
     <div class="panel-footer">
         @for(completedDate <- task.completedDate) {
             @for(completedBy <- task.completedBy) {
-                @(task.completableByEmailsOrUrl, task.completionMessage, task.prototype.`type`) match {
+                @(task.completableByEmailsOrUrl(program), task.completionMessage, taskPrototype.`type`) match {
                     case (Left(_), Some(completionMessage), Task.TaskType.Approval) => {
-                        Conditionally approved on @views.utils.DateTime.date(completedDate) by @completedBy provided @completionMessage
+                        Conditionally approved on @completedDate.monthDayYear by @completedBy provided @completionMessage
                     }
                     case (Left(_), _, _) => {
-                        @task.stateToHuman.capitalize on @views.utils.DateTime.date(completedDate) by @completedBy
+                        @task.stateToHuman(program).capitalize on @completedDate.monthDayYear by @completedBy
                     }
                     case (Right(url), maybeCompletionMessage, _) => {
-                        @task.stateToHuman.capitalize on @views.utils.DateTime.date(completedDate) by <a href="@completedBy">@completedBy</a>
+                        @task.stateToHuman(program).capitalize on @completedDate.monthDayYear by <a href="@completedBy">@completedBy</a>
                         @for(completionMessage <- maybeCompletionMessage) {
                             with message: <code>@completionMessage</code>
                         }
@@ -61,7 +63,7 @@
 
 <div class="panel @panelType">
     <div class="panel-heading clearfix">
-        <h3 class="panel-title pull-left"><a href="@routes.Application.task(task.requestSlug, task.id)">@task.prototype.label</a></h3>
+        <h3 class="panel-title pull-left"><a href="@routes.Application.task(task.requestSlug, task.id)">@taskPrototype.label</a></h3>
         <div class="pull-right">
             <div class="row">
                 @commentCountOrComments match {
@@ -88,10 +90,10 @@
 
     @task.state match {
         case models.State.InProgress if assignedToUser => {
-            @taskEditView(Right(task))
+            @taskEditView(Right(task), taskPrototype)
         }
         case _ => {
-            @taskShowView(task)
+            @taskShowView(task, taskPrototype)
         }
     }
 
@@ -119,7 +121,7 @@
 
     @* todo: more info on cancelled tasks *@
 
-    @(task.prototype.`type`) match {
+    @(taskPrototype.`type`) match {
         case models.Task.TaskType.Input => {
             @task.state match {
                 case models.State.InProgress => {
@@ -165,14 +167,14 @@
                                     <button type="submit" class="btn btn-success">Approve</button>
                                 </form>
                             </div>
-                            @if(task.prototype.approvalConditions.nonEmpty) {
+                            @if(taskPrototype.approvalConditions.nonEmpty) {
                                 <div style="display: inline-block">
                                     <div class="btn-group">
                                         <button type="button" class="btn btn-warning dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                             Approve Conditionally <span class="caret"></span>
                                         </button>
                                         <ul class="dropdown-menu">
-                                            @for(condition <- task.prototype.approvalConditions) {
+                                            @for(condition <- taskPrototype.approvalConditions) {
                                                 <li data-condition="@condition">
                                                     <form action="@helper.CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, models.State.Completed, Some(condition))).url" method="post"></form>
                                                     <a href="#" onclick="$(this).prev().submit()">@condition</a>

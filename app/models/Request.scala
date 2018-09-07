@@ -9,13 +9,13 @@ package models
 
 import java.time.ZonedDateTime
 
-import play.api.libs.json.{Json, Writes}
+import org.eclipse.jgit.lib.ObjectId
+import play.api.libs.json.{JsString, Json, Writes}
 
-case class Request(program: String, slug: String, name: String, createDate: ZonedDateTime, creatorEmail: String, state: State.State, completedDate: Option[ZonedDateTime], completionMessage: Option[String]) {
+case class Request(metadataVersion: Option[ObjectId], program: String, slug: String, name: String, createDate: ZonedDateTime, creatorEmail: String, state: State.State, completedDate: Option[ZonedDateTime], completionMessage: Option[String]) {
 
   def stateToHuman: String = state match {
     case State.InProgress => "in review"
-    case State.OnHold => "put on hold"
     case State.Denied => "denied"
     case State.Cancelled => "cancelled"
     case State.Completed => "approved"
@@ -23,10 +23,26 @@ case class Request(program: String, slug: String, name: String, createDate: Zone
 
 }
 
-case class RequestWithTasks(request: Request, tasks: Seq[Task]) {
-  lazy val completedTasks = tasks.filter(_.state == State.Completed)
+trait TaskFilters {
+  val tasks: Seq[Task]
+
+  lazy val completedTasks = tasks.filterNot(_.state == State.InProgress)
+}
+
+case class RequestWithTasks(request: Request, tasks: Seq[Task]) extends TaskFilters
+
+case class RequestWithTasksAndProgram(request: Request, tasks: Seq[Task], program: Program) extends TaskFilters
+
+object RequestWithTasksAndProgram {
+  def apply(requestWithTasks: RequestWithTasks)(program: Program): RequestWithTasksAndProgram = {
+    new RequestWithTasksAndProgram(requestWithTasks.request, requestWithTasks.tasks, program)
+  }
 }
 
 object Request {
+  implicit object ObjectIdWrites extends Writes[ObjectId] {
+    def writes(objectId: ObjectId) = JsString(objectId.getName)
+  }
+
   implicit val jsonWrites: Writes[Request] = Json.writes[Request]
 }

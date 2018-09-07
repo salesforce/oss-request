@@ -5,13 +5,13 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 
-package utils
+package services
 
 import java.net.URL
 
 import javax.inject.Inject
 import models.Task.CompletableByType
-import models.{Request, State, Task}
+import models.{Program, Request, State, Task}
 import play.api.http.{HeaderNames, Status}
 import play.api.libs.json.{JsError, JsObject, JsPath, JsResult, JsString, JsSuccess, JsValue, Json, JsonValidationError, Reads}
 import play.api.libs.ws.{WSClient, WSRequest}
@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 // todo: make auth pluggable
-class TaskService @Inject()(environment: Environment, configuration: Configuration, wsClient: WSClient)(implicit ec: ExecutionContext) {
+class ExternalTask @Inject()(environment: Environment, configuration: Configuration, wsClient: WSClient)(implicit ec: ExecutionContext) {
 
   case class ServiceResponse(state: State.State, url: URL, maybeData: Option[JsObject])
 
@@ -57,8 +57,8 @@ class TaskService @Inject()(environment: Environment, configuration: Configurati
     sys.env.get("PSK_" + url.toString.map(_.toHexString).mkString.toUpperCase)
   }
 
-  def wsRequest(task: Task): Future[WSRequest] = {
-    task.completableByEmailsOrUrl.fold({ _ =>
+  def wsRequest(task: Task, program: Program): Future[WSRequest] = {
+    task.completableByEmailsOrUrl(program).fold({ _ =>
       Future.failed[WSRequest](new Exception("Task was not assigned a to a valid URL"))
     }, { url =>
       val baseRequest = wsClient.url(url.toString)
@@ -72,14 +72,9 @@ class TaskService @Inject()(environment: Environment, configuration: Configurati
   }
 
   def taskCreated(program: Program, request: Request, task: Task, existingTasks: Seq[Task], taskUrl: String, updateTaskState: (State.State, Option[String], Option[JsObject], Option[String]) => Future[Task]): Future[Task] = {
-    if (task.prototype.completableBy.exists(_.`type` == CompletableByType.Service)) {
-      val dependenciesData = task.prototype.dependencies.map { taskKey =>
-
-        val maybeData = program.tasks.get(taskKey).flatMap { prototype =>
-          existingTasks.find(_.prototype == prototype).flatMap(_.data)
-        }
-
-        taskKey -> maybeData
+    if (task.prototype(program).completableBy.exists(_.`type` == CompletableByType.Service)) {
+      val dependenciesData = task.prototype(program).dependencies.flatMap { taskKey =>
+        existingTasks.find(_.taskKey == taskKey).map(taskKey -> _.data)
       }.toMap
 
       val json = Json.obj(
@@ -90,14 +85,14 @@ class TaskService @Inject()(environment: Environment, configuration: Configurati
         ),
         "task" -> Json.obj(
           "id" -> task.id,
-          "label" -> task.prototype.label,
+          "label" -> task.prototype(program).label,
           "url" -> taskUrl,
           "data" -> task.data,
           "dependencies" -> dependenciesData
         )
       )
 
-      wsRequest(task).flatMap { wsRequest =>
+      wsRequest(task, program).flatMap { wsRequest =>
         wsRequest.post(json).flatMap { response =>
           response.status match {
             case Status.CREATED =>
@@ -126,9 +121,9 @@ class TaskService @Inject()(environment: Environment, configuration: Configurati
     }
   }
 
-  def taskStatus(task: Task, updateTaskState: (State.State, Option[String], Option[JsObject], Option[String]) => Future[Task]): Future[Task] = {
-    if (task.prototype.completableBy.exists(_.`type` == CompletableByType.Service) && task.state == State.InProgress) {
-      wsRequest(task).flatMap { wsRequest =>
+  def taskStatus(task: Task, program: Program, updateTaskState: (State.State, Option[String], Option[JsObject], Option[String]) => Future[Task]): Future[Task] = {
+    if (task.prototype(program).completableBy.exists(_.`type` == CompletableByType.Service) && task.state == State.InProgress) {
+      wsRequest(task, program).flatMap { wsRequest =>
         task.completedBy.fold(updateTaskState(State.Cancelled, Some(wsRequest.url), None, Some("Could not determine URL to call"))) { url =>
           wsRequest.withQueryStringParameters("url" -> url).get().flatMap { response =>
             response.status match {

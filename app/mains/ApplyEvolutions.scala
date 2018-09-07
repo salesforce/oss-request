@@ -5,14 +5,18 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 
-package utils
+package mains
 
+import java.time.ZonedDateTime
+
+import models.Task
 import models.Task.CompletableByType
-import modules.DatabaseWithCtx
+import modules.{DAOWithCtx, DatabaseWithCtx}
 import play.api.db.DBApi
 import play.api.db.evolutions.{EvolutionsApi, EvolutionsReader}
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.{Application, Logger, Mode}
+import services.GitMetadata
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext}
@@ -28,9 +32,15 @@ object ApplyEvolutions extends App {
 }
 
 class ApplyEvolutions(app: Application) {
-  def run: Unit = {
-    implicit val ec = app.injector.instanceOf[ExecutionContext]
+  implicit val ec = app.injector.instanceOf[ExecutionContext]
 
+  val gitMetadata = app.injector.instanceOf[GitMetadata]
+
+  val databaseWithCtx = app.injector.instanceOf[DatabaseWithCtx]
+
+  import databaseWithCtx.ctx._
+
+  def run: Unit = {
     val dbApi = app.injector.instanceOf[DBApi]
 
     val evolutionsApi = app.injector.instanceOf[EvolutionsApi]
@@ -38,7 +48,7 @@ class ApplyEvolutions(app: Application) {
 
     val scripts = evolutionsApi.scripts("default", evolutionsReader, "")
 
-    val migrations = Set(Migration(2, migration2))
+    val migrations = Set(Migration(2, migration2), Migration(10, migration10))
 
     scripts.foreach { script =>
       Logger.info(s"Applying evolution ${script.evolution.revision}")
@@ -54,10 +64,7 @@ class ApplyEvolutions(app: Application) {
   case class Migration(after: Int, migrator: () => Unit)
 
   val migration2 = () => {
-    implicit val ec = app.injector.instanceOf[ExecutionContext]
-
-    val metadataService = app.injector.instanceOf[MetadataService]
-    val metadata = Await.result(metadataService.fetchMetadata, Duration.Inf)
+    val (_, metadata) = Await.result(gitMetadata.latestVersion, Duration.Inf)
 
     val databaseWithCtx = app.injector.instanceOf[DatabaseWithCtx]
     import databaseWithCtx.ctx._
@@ -104,6 +111,73 @@ class ApplyEvolutions(app: Application) {
         }
       }
     }
+  }
+
+  val migration10 = () => {
+    val daoWithCtx = app.injector.instanceOf[DAOWithCtx]
+    import daoWithCtx._
+
+    // migrate from embedded prototype to taskKey
+      val metadataVersions = Await.result(gitMetadata.allVersions, Duration.Inf)
+      val allMetadata = metadataVersions.flatMap { metadataVersion =>
+        // ignore unparseable metadata
+        Try {
+          metadataVersion -> Await.result(gitMetadata.fetchMetadata(metadataVersion.id), Duration.Inf)
+        }.toOption
+      }.toMap
+
+      val tasksQuery = databaseWithCtx.ctx.run {
+        quote {
+          infix"""SELECT task.id AS "_1", task.prototype AS "_2", task.create_date AS "_3", request.program AS "_4", request.slug AS "_5" FROM task, request WHERE task.request_slug = request.slug""".as[Query[(Int, Task.Prototype, ZonedDateTime, String, String)]]
+        }
+      }
+
+      val requestsWithTasks = Await.result(tasksQuery, Duration.Inf).groupBy(_._5)
+
+      requestsWithTasks.foreach { case (requestSlug, tasks) =>
+        Logger.info(s"Migrating request $requestSlug")
+
+        val newestCreateDate = tasks.map(_._3).maxBy(_.toEpochSecond)
+
+        val (version, metadata) = allMetadata.filter(_._1.date.isBefore(newestCreateDate)).maxBy(_._1.date.toEpochSecond)
+
+        version.id.fold {
+          throw new Exception(s"Could not find a metadata version for $requestSlug")
+        } { versionId =>
+
+          val tasksWithKeys = tasks.map { case (id, prototype, _, programKey, _) =>
+            val maybeTask = metadata.programs.get(programKey).flatMap { program =>
+              program.tasks.find { case (_, thisPrototype) =>
+                thisPrototype == prototype || thisPrototype.label == prototype.label
+              }
+            }
+
+            maybeTask.fold(throw new Exception(s"Could not find a task prototype for task $id on request $requestSlug"))(id -> _._1)
+          }.toMap
+
+          tasksWithKeys.foreach { case (id, taskKey) =>
+            Logger.info(s"Updating task $id with taskKey = $taskKey")
+
+            val updateTask = databaseWithCtx.ctx.run {
+              quote {
+                infix"UPDATE task SET task_key = ${lift(taskKey)} WHERE id = ${lift(id)}".as[Update[Long]]
+              }
+            }
+
+            Await.result(updateTask, Duration.Inf)
+          }
+
+          Logger.info(s"Updating request $requestSlug with metadata version = $versionId")
+
+          val updateRequest = databaseWithCtx.ctx.run {
+            quote {
+              infix"UPDATE request SET metadata_version = ${lift(versionId)} WHERE slug = ${lift(requestSlug)}".as[Update[Long]]
+            }
+          }
+
+          Await.result(updateRequest, Duration.Inf)
+        }
+      }
   }
 
 }

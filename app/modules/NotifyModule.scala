@@ -9,7 +9,7 @@ package modules
 
 import com.roundeights.hasher.Algo
 import javax.inject.{Inject, Singleton}
-import models.{Comment, Request, Task}
+import models.{Comment, Program, Request, Task}
 import play.api.data.Forms._
 import play.api.data._
 import play.api.data.format.Formats._
@@ -20,7 +20,7 @@ import play.api.libs.json.{JsObject, Json}
 import play.api.libs.ws.{WSAuthScheme, WSClient, WSResponse}
 import play.api.mvc.RequestHeader
 import play.api.{Configuration, Environment, Logger}
-import utils.RuntimeReporter
+import services.RuntimeReporter
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
@@ -61,14 +61,14 @@ trait NotifyProvider {
 class Notifier @Inject()(notifyProvider: NotifyProvider)(implicit ec: ExecutionContext) {
   // todo: move content to templates
 
-  def taskStateChanged(request: Request, task: Task)(implicit requestHeader: RequestHeader): Future[_] = {
+  def taskStateChanged(request: Request, task: Task, program: Program)(implicit requestHeader: RequestHeader): Future[_] = {
     if (!task.completedBy.contains(request.creatorEmail)) {
       val url = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL()
 
-      val subject = s"OSS Request ${request.name} - Task ${task.prototype.label} is now ${task.stateToHuman}"
+      val subject = s"OSS Request ${request.name} - Task ${task.prototype(program).label} is now ${task.stateToHuman(program)}"
       val message =
         s"""
-           |On your OSS Request ${request.name}, the ${task.prototype.label} task is now ${task.stateToHuman}.
+           |On your OSS Request ${request.name}, the ${task.prototype(program).label} task is now ${task.stateToHuman(program)}.
            |For details, see: $url
       """.stripMargin
 
@@ -79,14 +79,14 @@ class Notifier @Inject()(notifyProvider: NotifyProvider)(implicit ec: ExecutionC
     }
   }
 
-  def taskAssigned(request: Request, task: Task)(implicit requestHeader: RequestHeader): Future[_] = {
-    task.completableByEmailsOrUrl.fold({ emails =>
+  def taskAssigned(request: Request, task: Task, program: Program)(implicit requestHeader: RequestHeader): Future[_] = {
+    task.completableByEmailsOrUrl(program).fold({ emails =>
       val url = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL()
 
-      val subject = s"OSS Request - ${request.name} - Task Assigned - ${task.prototype.label}"
+      val subject = s"OSS Request - ${request.name} - Task Assigned - ${task.prototype(program).label}"
       val message =
         s"""
-           |You have been assigned an OSS Request task '${task.prototype.label}'
+           |You have been assigned an OSS Request task '${task.prototype(program).label}'
            |To complete or followup on this task, see: $url
         """.stripMargin
 
@@ -96,11 +96,11 @@ class Notifier @Inject()(notifyProvider: NotifyProvider)(implicit ec: ExecutionC
     })
   }
 
-  def taskComment(request: Request, task: Task, comment: Comment)(implicit requestHeader: RequestHeader): Future[_] = {
-    val emails = task.completableByEmailsOrUrl.left.getOrElse(Set.empty[String]) + request.creatorEmail - comment.creatorEmail
+  def taskComment(request: Request, task: Task, comment: Comment, program: Program)(implicit requestHeader: RequestHeader): Future[_] = {
+    val emails = task.completableByEmailsOrUrl(program).left.getOrElse(Set.empty[String]) + request.creatorEmail - comment.creatorEmail
     val url = controllers.routes.Application.task(request.slug, task.id).absoluteURL()
 
-    val subject = s"Comment on OSS Request Task - ${request.name} - ${task.prototype.label}"
+    val subject = s"Comment on OSS Request Task - ${request.name} - ${task.prototype(program).label}"
     val message = s"""
          |${comment.creatorEmail} said:
          |${comment.contents}

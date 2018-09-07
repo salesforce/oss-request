@@ -5,7 +5,7 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 
-package utils.dev
+package services.dev
 
 import javax.inject.{Inject, Singleton}
 import play.api.{Environment, Mode}

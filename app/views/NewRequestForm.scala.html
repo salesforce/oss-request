@@ -5,9 +5,9 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  *@
 
-@this(mainView: Main, taskEditView: utils.TaskEdit)
+@this(mainView: Main, taskEditView: partials.TaskEdit)
 
-@(programKey: String, projectName: String, taskKey: String, taskPrototype: models.Task.Prototype, userInfo: _root_.utils.UserInfo, similarRequests: Seq[RequestWithTasks])(implicit request: RequestHeader, metadata: _root_.utils.Metadata)
+@(programKey: String, projectName: String, taskKey: String, taskPrototype: models.Task.Prototype, userInfo: controllers.UserInfo, similarRequests: Seq[RequestWithTasksAndProgram])(implicit request: RequestHeader, metadata: models.Metadata)
 
 @mainView(Some(userInfo))("New Request") {
 
@@ -29,7 +29,7 @@
             <h3 class="panel-title">New Request - @projectName</h3>
         </div>
 
-        @taskEditView(Left((programKey, projectName, taskKey, taskPrototype, Set(userInfo.email))))
+        @taskEditView(Left((programKey, projectName, taskKey, Set(userInfo.email))), taskPrototype)
     </div>
 
 }

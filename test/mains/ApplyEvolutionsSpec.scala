@@ -5,7 +5,7 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 
-package utils
+package mains
 
 import com.github.mauricio.async.db.RowData
 import com.github.mauricio.async.db.postgresql.exceptions.GenericDatabaseException
@@ -13,9 +13,12 @@ import modules.{DAO, DAOMock, DatabaseWithCtx}
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.db.evolutions.{EvolutionsApi, EvolutionsReader}
+import play.api.libs.json.Json
 import play.api.test.Helpers._
+import services.GitMetadata
 
 import scala.concurrent.ExecutionContext
+import scala.util.{Random, Try}
 
 class ApplyEvolutionsSpec extends PlaySpec with GuiceOneAppPerTest {
 
@@ -28,7 +31,6 @@ class ApplyEvolutionsSpec extends PlaySpec with GuiceOneAppPerTest {
     "work" in {
       val databaseWithCtx = app.injector.instanceOf[DatabaseWithCtx]
       val evolutionsApi = app.injector.instanceOf[EvolutionsApi]
-      val evolutionsReader = app.injector.instanceOf[EvolutionsReader]
 
       val scripts = evolutionsApi.resetScripts("default", "")
       evolutionsApi.evolve("default", scripts, true, "")
@@ -56,10 +58,17 @@ class ApplyEvolutionsSpec extends PlaySpec with GuiceOneAppPerTest {
       val createRequest = databaseWithCtx.ctx.executeAction("INSERT INTO request (slug, name, create_date, creator_email, state) VALUES ('test', 'test', current_timestamp, 'asdf@asdf.com', 'IN_PROGRESS')")
       await(createRequest) must equal (1)
 
-      val createTask1 = databaseWithCtx.ctx.executeAction("""INSERT INTO task (request_slug, state, completable_by_type, completable_by_value, prototype) VALUES ('test', 'IN_PROGRESS', 'EMAIL', 'asdf@asdf.com', '{"label": "task1", "type": "INPUT", "info": "test"}')""")
+      val gitMetadata = app.injector.instanceOf[GitMetadata]
+      val versions = await(gitMetadata.allVersions)
+
+      val oldestVersion = versions.filter(_.id.isDefined).flatMap(metadataVersion => Try(metadataVersion -> await(gitMetadata.fetchMetadata(metadataVersion.id))).toOption).minBy(_._1.date.toEpochSecond)
+      val taskPrototype1 = oldestVersion._2.programs.head._2.tasks.head._2
+      val taskPrototype2 = oldestVersion._2.programs.head._2.tasks.last._2
+
+      val createTask1 = databaseWithCtx.ctx.executeAction(s"""INSERT INTO task (request_slug, state, completable_by_type, completable_by_value, prototype) VALUES ('test', 'IN_PROGRESS', 'EMAIL', 'asdf@asdf.com', '${Json.toJson(taskPrototype1)}')""")
       await(createTask1) must equal (1)
 
-      val createTask2 = databaseWithCtx.ctx.executeAction("""INSERT INTO task (request_slug, state, completable_by_type, completable_by_value, prototype) VALUES ('test', 'IN_PROGRESS', 'GROUP', 'admin', '{"label": "task2", "type": "INPUT", "info": "test"}')""")
+      val createTask2 = databaseWithCtx.ctx.executeAction(s"""INSERT INTO task (request_slug, state, completable_by_type, completable_by_value, prototype) VALUES ('test', 'IN_PROGRESS', 'GROUP', 'admin', '${Json.toJson(taskPrototype2)}')""")
       await(createTask2) must equal (1)
     }
     "run the other migrations and validate change" in {

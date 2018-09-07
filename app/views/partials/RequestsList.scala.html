@@ -5,13 +5,12 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  *@
 
-@(requests: Seq[RequestWithTasks])
+@(requests: Seq[RequestWithTasksAndProgram])
+
+@import core.Extensions._
 
 @stateClass(state: models.State.State, conditions: Seq[_]) = {
     @state match {
-        case models.State.OnHold => {
-            list-group-item-warning
-        }
         case models.State.Denied => {
             list-group-item-danger
         }
@@ -32,24 +31,25 @@
 
 @if(requests.nonEmpty) {
     <div class="list-group">
-    @for(requestWithTasks <- requests) {
-        @defining(Tasks.conditionalApprovals(requestWithTasks.tasks).map(_._2) ++ requestWithTasks.request.completionMessage) { conditions =>
-            <a href="@routes.Application.request(requestWithTasks.request.slug)" class="list-group-item @stateClass(requestWithTasks.request.state, conditions)">
-                <span class="badge" style="margin-top: 25px;">@requestWithTasks.completedTasks.size of @requestWithTasks.tasks.size tasks completed</span>
-                <h4>@requestWithTasks.request.name</h4>
+    @for(requestWithTasksAndProgram <- requests) {
+
+        @defining(Tasks.conditionalApprovals(requestWithTasksAndProgram.program, requestWithTasksAndProgram.tasks).map(_._2) ++ requestWithTasksAndProgram.request.completionMessage) { conditions =>
+            <a href="@routes.Application.request(requestWithTasksAndProgram.request.slug)" class="list-group-item @stateClass(requestWithTasksAndProgram.request.state, conditions)">
+                <span class="badge" style="margin-top: 25px;">@requestWithTasksAndProgram.completedTasks.size of @requestWithTasksAndProgram.tasks.size tasks completed</span>
+                <h4>@requestWithTasksAndProgram.request.name</h4>
                 <p>
-                    @(requestWithTasks.request.state, requestWithTasks.request.completedDate) match {
+                    @(requestWithTasksAndProgram.request.state, requestWithTasksAndProgram.request.completedDate) match {
                         case (State.Completed, Some(completedDate)) if conditions.nonEmpty => {
-                            Conditionally approved on @views.utils.DateTime.date(completedDate)
+                            Conditionally approved on @completedDate.monthDayYear
                         }
                         case (State.InProgress, _) => {
-                            Created on @views.utils.DateTime.date(requestWithTasks.request.createDate) by @requestWithTasks.request.creatorEmail
+                            Created on @requestWithTasksAndProgram.request.createDate.monthDayYear by @requestWithTasksAndProgram.request.creatorEmail
                         }
                         case (_, Some(completedDate)) => {
-                            @requestWithTasks.request.stateToHuman.capitalize on @views.utils.DateTime.date(completedDate)
+                            @requestWithTasksAndProgram.request.stateToHuman.capitalize on @completedDate.monthDayYear
                         }
                         case _ => {
-                            @requestWithTasks.request.stateToHuman.capitalize
+                            @requestWithTasksAndProgram.request.stateToHuman.capitalize
                         }
                     }
 
