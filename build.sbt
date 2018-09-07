@@ -16,7 +16,6 @@ libraryDependencies ++= Seq(
   filters,
   jdbc,
   evolutions,
-  ehcache,
 
   "org.slf4j"              %  "log4j-over-slf4j"                   % "1.7.25",
   "io.airbrake"            %  "javabrake"                          % "0.1.6",

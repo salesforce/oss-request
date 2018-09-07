@@ -59,7 +59,7 @@ class ApplyEvolutionsSpec extends PlaySpec with GuiceOneAppPerTest {
       await(createRequest) must equal (1)
 
       val gitMetadata = app.injector.instanceOf[GitMetadata]
-      val versions = await(gitMetadata.withGitRepo(gitMetadata.versions))
+      val versions = await(gitMetadata.allVersions)
 
       val oldestVersion = versions.filter(_.id.isDefined).flatMap(metadataVersion => Try(metadataVersion -> await(gitMetadata.fetchMetadata(metadataVersion.id))).toOption).minBy(_._1.date.toEpochSecond)
       val taskPrototype1 = oldestVersion._2.programs.head._2.tasks.head._2

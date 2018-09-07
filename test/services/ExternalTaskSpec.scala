@@ -24,7 +24,7 @@ class ExternalTaskSpec extends MixedPlaySpec {
 
   def externalTask(implicit app: Application) = app.injector.instanceOf[ExternalTask]
   def gitMetadata(implicit app: Application) = app.injector.instanceOf[GitMetadata]
-  def program(implicit app: Application) = await(gitMetadata.latestMetadata)._2.programs("two")
+  def program(implicit app: Application) = await(gitMetadata.latestVersion)._2.programs("two")
   implicit val fakeRequest: RequestHeader = FakeRequest()
 
   def updateTaskState(task: Task)(state: State.State, maybeUrl: Option[String], maybeData: Option[JsObject], maybeCompletionMessage: Option[String]): Future[Task] = {

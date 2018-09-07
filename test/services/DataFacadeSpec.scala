@@ -89,7 +89,7 @@ class DataFacadeSpec extends MixedPlaySpec {
       assume(GitMetadataSpec.gitConfig.get("metadata-git-uri").isDefined)
 
       val gitMetadata = app.injector.instanceOf[GitMetadata]
-      val (version, _) = await(gitMetadata.latestMetadata)
+      val (version, _) = await(gitMetadata.latestVersion)
 
       version must be (defined)
 

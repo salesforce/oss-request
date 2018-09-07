@@ -9,9 +9,9 @@
         </encoder>
     </appender>
 
-    <appender name="ASYNCSTDOUT" class="ch.qos.logback.classic.AsyncAppender">
+    <appender name="ASYNCSTDOUT" class="ch.qos.logback.classic.AsyncAppender" >
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>INFO</level>
+            <level>OFF</level>
         </filter>
         <appender-ref ref="STDOUT" />
     </appender>
@@ -20,7 +20,7 @@
     <logger name="akka.actor" level="ERROR" />
     <logger name="com.zaxxer.hikari" level="ERROR" />
     <logger name="akka.event.slf4j" level="ERROR" />
-    <logger name="com.github.mauricio.async.db" level="OFF" />
+    <logger name="com.github.mauricio.async.db" level="ERROR" />
     <logger name="application" level="ERROR" />
 
     <root>

@@ -64,7 +64,7 @@ class ApplyEvolutions(app: Application) {
   case class Migration(after: Int, migrator: () => Unit)
 
   val migration2 = () => {
-    val (_, metadata) = Await.result(gitMetadata.latestMetadata, Duration.Inf)
+    val (_, metadata) = Await.result(gitMetadata.latestVersion, Duration.Inf)
 
     val databaseWithCtx = app.injector.instanceOf[DatabaseWithCtx]
     import databaseWithCtx.ctx._
@@ -118,12 +118,11 @@ class ApplyEvolutions(app: Application) {
     import daoWithCtx._
 
     // migrate from embedded prototype to taskKey
-    val future = gitMetadata.withGitRepo { gitRepo =>
-      val metadataVersions = gitMetadata.versions(gitRepo)
+      val metadataVersions = Await.result(gitMetadata.allVersions, Duration.Inf)
       val allMetadata = metadataVersions.flatMap { metadataVersion =>
         // ignore unparseable metadata
         Try {
-          metadataVersion -> Await.result(gitMetadata.fetchMetadata(gitRepo, metadataVersion.id), Duration.Inf)
+          metadataVersion -> Await.result(gitMetadata.fetchMetadata(metadataVersion.id), Duration.Inf)
         }.toOption
       }.toMap
 
@@ -179,9 +178,6 @@ class ApplyEvolutions(app: Application) {
           Await.result(updateRequest, Duration.Inf)
         }
       }
-    }
-
-    Await.result(future, Duration.Inf)
   }
 
 }

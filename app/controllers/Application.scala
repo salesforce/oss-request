@@ -58,7 +58,7 @@ class Application @Inject()
 
   def openUserTasks = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.withLatestMetadataF { implicit metadata =>
+      gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
         dataFacade.tasksForUser(userInfo.email, State.InProgress).map { tasks =>
           val tasksWithProgram = tasks.flatMap { case (task, numComments, request) =>
             for {
@@ -81,7 +81,7 @@ class Application @Inject()
 
   def requests(program: Option[String]) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.withLatestMetadataF { implicit metadata =>
+      gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
 
         val (maybeTitle, requestsFuture) = program.map { programKey =>
           metadata.programs.get(programKey).map(_.name) -> dataFacade.programRequests(programKey)
@@ -104,7 +104,7 @@ class Application @Inject()
 
   def search(program: Option[String], state: Option[models.State.State], data: Option[String]) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.withLatestMetadataF { implicit metadata =>
+      gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
         val maybeData = data.flatMap(Json.parse(_).asOpt[JsObject])
         dataFacade.search(program, state, maybeData, None).map { requests =>
           Ok(searchView(requests, userInfo))
@@ -115,7 +115,7 @@ class Application @Inject()
 
   def report(programKey: String, reportKey: String) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.withLatestMetadataF { implicit metadata =>
+      gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
         metadata.programs.get(programKey).fold(Future.successful(NotFound(errorView("Program Not Found", userInfo)))) { program =>
           program.reports.get(reportKey).fold(Future.successful(NotFound(errorView("Report Not Found", userInfo)))) { report =>
             dataFacade.search(Some(programKey), report.query.state, report.query.data, report.query.dataIn).map { requests =>
@@ -129,7 +129,7 @@ class Application @Inject()
 
   def newRequest(maybeName: Option[String], maybeProgramKey: Option[String], maybeStartTask: Option[String]) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.withLatestMetadataF { implicit metadata =>
+      gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
         val nonEmptyMaybeName = maybeName.filter(_.nonEmpty)
         val nonEmptyMaybeProgramKey = maybeProgramKey.filter(_.nonEmpty)
         val nonEmptyMaybeStartTask = maybeStartTask.filter(_.nonEmpty)
@@ -153,7 +153,7 @@ class Application @Inject()
 
   def createRequest(name: String, programKey: String, startTask: String) = userAction.async(parse.json) { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.latestMetadata.flatMap { case (metadataVersion, metadata) =>
+      gitMetadata.latestVersion.flatMap { case (metadataVersion, metadata) =>
         metadata.program(programKey).flatMap { programMetadata =>
           programMetadata.tasks.get(startTask).fold(Future.successful(InternalServerError(s"Could not find task named '$startTask'"))) { metaTask =>
             dataFacade.createRequest(metadataVersion, programKey, name, userInfo.email).flatMap { request =>
@@ -183,7 +183,7 @@ class Application @Inject()
         }
       } recoverWith {
         case rnf: DB.RequestNotFound =>
-          gitMetadata.withLatestMetadata { implicit metadata =>
+          gitMetadata.latestVersion.map(_._2).map { implicit metadata =>
             NotFound(errorView(rnf.getMessage, userInfo))
           }
       }
@@ -347,7 +347,7 @@ class Application @Inject()
 
   def formTest = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.withLatestMetadata { implicit metadata =>
+      gitMetadata.latestVersion.map(_._2).map { implicit metadata =>
         Ok(formTestView(userInfo))
       }
     }
@@ -355,7 +355,7 @@ class Application @Inject()
 
   def notifyTest = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.withLatestMetadata { implicit metadata =>
+      gitMetadata.latestVersion.map(_._2).map { implicit metadata =>
         Ok(notifyTestView(userInfo))
       }
     }
@@ -363,7 +363,7 @@ class Application @Inject()
 
   def notifyTestSend = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.withLatestMetadataF { implicit metadata =>
+      gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
         val maybeInfo = for {
           form <- userRequest.body.asFormUrlEncoded
 
@@ -395,14 +395,14 @@ class Application @Inject()
 
   private def login(state: Option[String])(emails: Set[String])(implicit request: RequestHeader): Future[Result] = {
     if (emails.size > 1) {
-      gitMetadata.withLatestMetadata { implicit  metadata =>
+      gitMetadata.latestVersion.map(_._2).map { implicit  metadata =>
         Ok(pickEmailView(emails, state)).withSession("emails" -> emails.mkString(","))
       }
     }
     else if (emails.size == 1) {
       val email = emails.head
 
-      gitMetadata.withLatestMetadata { metadata =>
+      gitMetadata.latestVersion.map(_._2).map { metadata =>
         val url = state.getOrElse(controllers.routes.Application.openUserTasks().url)
 
         // todo: putting this info in the session means we can't easily invalidate it later
@@ -438,7 +438,7 @@ class Application @Inject()
 
   def logout() = Action.async { implicit request =>
     auth.authUrl.flatMap { authUrl =>
-      gitMetadata.withLatestMetadata { implicit metadata =>
+      gitMetadata.latestVersion.map(_._2).map { implicit metadata =>
         Ok(loginView()).withNewSession
       }
     }
