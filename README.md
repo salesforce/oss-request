@@ -6,7 +6,7 @@ This is a flexible system that enables users to submit OSS requests, then assign
 Metadata Schema
 ---------------
 
-The request system is driven by a metadata definition which includes system groups and the prototypes for tasks.  [Check out an example](examples/metadata.json).  For production use set the `METADATA_URL` and `METADATA_TOKEN` env vars so the metadata can be externalized from this source.  Here the properties that need to be defined in the metadata file:
+The request system is driven by a metadata definition which includes system groups and the prototypes for tasks.  [Check out an example](examples/metadata.json).  For production use set the `METADATA_GIT_URI` and `METADATA_GIT_SSH_KEY` env vars so the metadata can be externalized from this source.  Here the properties that need to be defined in the metadata file:
 
 - `name` (string) The name of the program
 - `description` (string) Description of the program
@@ -209,7 +209,7 @@ export SPARKPOST_DOMAIN=<YOUR SPARKPOST DOMAIN>
 To test external Metadata, create a metadata file on GitHub, create a public/private key pair, and add a read-only deploy key to the repo.  Set env vars, like:
 
 ```
-export TEST_METADATA_GIT_URL='git@github.com:foo/oss-request-test.git'
+export TEST_METADATA_GIT_URI='git@github.com:foo/oss-request-test.git'
 export TEST_METADATA_GIT_FILE=metadata.json
 export TEST_METADATA_GIT_SSH_KEY=$(< id_rsa)
 ```

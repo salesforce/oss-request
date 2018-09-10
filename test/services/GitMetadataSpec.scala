@@ -7,7 +7,9 @@
 
 package services
 
+import java.io.File
 import java.net.URI
+import java.nio.file.Files
 
 import modules.DAOMock
 import org.scalatestplus.play._
@@ -46,6 +48,10 @@ class GitMetadataSpec extends MixedPlaySpec {
       assume(GitMetadataSpec.gitConfig.get("metadata-git-file").isDefined)
       assume(GitMetadataSpec.gitConfig.get("metadata-git-ssh-key").isDefined)
 
+      val gitMetadata = app.injector.instanceOf[GitMetadata]
+      noException must be thrownBy await(gitMetadata.allVersions)
+    }
+    "work in dev mode when the project dir is not a git project" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev, GitMetadataSpec.nongitConfig).build()) {
       val gitMetadata = app.injector.instanceOf[GitMetadata]
       noException must be thrownBy await(gitMetadata.allVersions)
     }
@@ -120,6 +126,16 @@ object GitMetadataSpec {
     "metadata-git-ssh-key" -> sys.env.get("TEST_METADATA_GIT_SSH_KEY")
   ).collect {
     case (k, Some(v)) => k -> v
+  }
+
+  def nongitConfig = {
+    val dir = Files.createTempDirectory("ossrequest").toFile
+    Files.createFile(new File(dir, "metadata.json").toPath)
+
+    Map(
+      "metadata-git-uri" -> dir.toURI.toString,
+      "metadata-git-file" -> "metadata.json"
+    )
   }
 
   def gitBranchConfig = Map(

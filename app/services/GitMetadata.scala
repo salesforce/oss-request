@@ -20,6 +20,7 @@ import javax.inject.{Inject, Singleton}
 import models.{Metadata, MetadataVersion, Program}
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.ResetCommand.ResetType
+import org.eclipse.jgit.api.errors.NoHeadException
 import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.transport.{JschConfigSessionFactory, OpenSshConfig, SshTransport}
 import org.eclipse.jgit.util.FS
@@ -107,20 +108,27 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
       metadataGitUri -> "master"
     }
 
-    val baseClone = Git.cloneRepository()
-      .setURI(gitUri.toString)
-      .setDirectory(cacheDir)
-      .setBranchesToClone(Seq(s"refs/heads/$branch").asJava)
-      .setBranch(s"refs/heads/$branch")
+    val dotGit = new File(new File(metadataGitUri), ".git")
 
-    val clone = maybeSshSessionFactory.fold(baseClone) { sshSessionFactory =>
-      baseClone.setTransportConfigCallback { transport =>
-        val sshTransport = transport.asInstanceOf[SshTransport]
-        sshTransport.setSshSessionFactory(sshSessionFactory)
-      }
+    if (metadataGitUri.getScheme == "file" && !dotGit.exists()) {
+      Git.init().setDirectory(cacheDir).call()
     }
+    else {
+      val baseClone = Git.cloneRepository()
+        .setURI(gitUri.toString)
+        .setDirectory(cacheDir)
+        .setBranchesToClone(Seq(s"refs/heads/$branch").asJava)
+        .setBranch(s"refs/heads/$branch")
 
-    clone.call()
+      val clone = maybeSshSessionFactory.fold(baseClone) { sshSessionFactory =>
+        baseClone.setTransportConfigCallback { transport =>
+          val sshTransport = transport.asInstanceOf[SshTransport]
+          sshTransport.setSshSessionFactory(sshSessionFactory)
+        }
+      }
+
+      clone.call()
+    }
 
     if (metadataGitUri.getScheme == "file") {
       // copy the local working metadata file
@@ -146,10 +154,14 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
   }
 
   def versions: Set[MetadataVersion] = {
-    val versions = gitRepo.log().all().addPath(metadataGitFile).call().asScala.map { revCommit =>
-      val datetime = ZonedDateTime.ofInstant(Instant.ofEpochSecond(revCommit.getCommitTime), revCommit.getAuthorIdent.getTimeZone.toZoneId)
-      MetadataVersion(Some(revCommit.getId), datetime)
-    }.toSet
+    val versions = Try {
+      gitRepo.log().all().addPath(metadataGitFile).call().asScala.map { revCommit =>
+        val datetime = ZonedDateTime.ofInstant(Instant.ofEpochSecond(revCommit.getCommitTime), revCommit.getAuthorIdent.getTimeZone.toZoneId)
+        MetadataVersion(Some(revCommit.getId), datetime)
+      }.toSet
+    } getOrElse {
+      Set.empty[MetadataVersion]
+    }
 
     if (metadataGitUri.getScheme == "file") {
       // there may be local changes to the metadata
