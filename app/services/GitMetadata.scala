@@ -13,7 +13,7 @@ import java.nio.file.{Files, StandardCopyOption}
 import java.time.{Instant, ZonedDateTime}
 
 import akka.actor.{Actor, ActorSystem, Props}
-import akka.pattern.ask
+import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import com.jcraft.jsch.{JSch, Session}
 import javax.inject.{Inject, Singleton}
@@ -29,6 +29,7 @@ import play.api.{Configuration, Environment, Mode}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 @Singleton
 class GitMetadata @Inject()(configuration: Configuration, environment: Environment, actorSystem: ActorSystem)(implicit ec: ExecutionContext) {
@@ -179,8 +180,8 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
   }
 
   override def receive: Receive = {
-    case GitMetadata.GetVersion(maybeVersion) => sender ! fetchMetadata(maybeVersion)
-    case GitMetadata.GetAllVersions => sender ! versions
+    case GitMetadata.GetVersion(maybeVersion) => Future.fromTry(Try(fetchMetadata(maybeVersion))).pipeTo(sender)
+    case GitMetadata.GetAllVersions => Future.fromTry(Try(versions)).pipeTo(sender)
   }
 
   override def postStop(): Unit = {
