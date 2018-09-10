@@ -17,7 +17,7 @@ import scala.util.Try
 
 class TaskEventHandler @Inject()(implicit ec: ExecutionContext) {
 
-  def process(program: Program, request: Request, eventType: TaskEvent.EventType.EventType, task: Task, createTask: (String, String, Seq[String]) => Future[Task], updateRequestState: (State.State, Option[String]) => Future[Request]): Future[Seq[_]] = {
+  def process(program: Program, request: Request, tasks: Seq[Task], eventType: TaskEvent.EventType.EventType, task: Task, createTask: (String, String, Seq[String]) => Future[Task], updateRequestState: (State.State, Option[String]) => Future[Request]): Future[Seq[_]] = {
     program.tasks.get(task.taskKey).fold(Future.failed[Seq[_]](new Exception(s"Task not found: ${task.taskKey}"))) { taskPrototype =>
       Future.sequence {
         taskPrototype.taskEvents.filter { taskEvent =>
@@ -42,7 +42,10 @@ class TaskEventHandler @Inject()(implicit ec: ExecutionContext) {
 
                   completableBy.value.orElse(maybeCompletableByOverride).fold(Future.failed[Task](new Exception("Could not create task because it does not have a completable_by value"))) { completableByValue =>
                     program.completableBy(completableBy.`type`, completableByValue).fold(Future.failed[Task](new Exception("Could not create task because it can't be assigned to anyone"))) { emails =>
-                      createTask(request.slug, newTaskKey, emails.toSeq)
+                      createTask(request.slug, newTaskKey, emails.toSeq).recoverWith {
+                        case _: DataFacade.DuplicateTaskException =>
+                          tasks.find(_.taskKey == newTaskKey).fold(Future.failed[Task](new Exception(s"Could not find the task: $newTaskKey")))(Future.successful)
+                      }
                     }
                   }
                 }

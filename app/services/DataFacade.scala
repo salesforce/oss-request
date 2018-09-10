@@ -35,27 +35,23 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
 
   def createTask(requestSlug: String, taskKey: String, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress)(implicit requestHeader: RequestHeader): Future[Task] = {
     for {
-      request <- dao.request(requestSlug)
+      RequestWithTasks(request, tasks) <- dao.requestWithTasks(requestSlug)
 
       program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
 
-      existingTasksWithComments <- dao.requestTasks(requestSlug)
-
-      existingTasks = existingTasksWithComments.map(_._1)
-
-      _ <- if (existingTasks.exists(_.taskKey == taskKey)) Future.failed(DataFacade.DuplicateTaskException()) else Future.unit
+      _ <- if (tasks.exists(_.taskKey == taskKey)) Future.failed(DataFacade.DuplicateTaskException()) else Future.unit
 
       prototype <- program.tasks.get(taskKey).fold(Future.failed[Task.Prototype](new Exception("Task prototype not found")))(Future.successful)
 
-      _ <- if (prototype.dependencies.subsetOf(existingTasks.filter(_.state == State.Completed).map(_.taskKey).toSet)) Future.unit else Future.failed(DataFacade.MissingTaskDependencyException())
+      _ <- if (prototype.dependencies.subsetOf(tasks.filter(_.state == State.Completed).map(_.taskKey).toSet)) Future.unit else Future.failed(DataFacade.MissingTaskDependencyException())
 
       task <- dao.createTask(requestSlug, taskKey, completableBy, maybeCompletedBy, maybeData, state)
 
       url = controllers.routes.Application.task(requestSlug, task.id).absoluteURL()
 
-      updatedTask <- taskService.taskCreated(program, request, task, existingTasks, url, updateTaskState(request.creatorEmail, task.id, _, _, _, _, true))
+      updatedTask <- taskService.taskCreated(program, request, task, tasks, url, updateTaskState(request.creatorEmail, task.id, _, _, _, _, true))
 
-      _ <- taskEventHandler.process(program, request, TaskEvent.EventType.StateChange, updatedTask, createTask(_, _, _), updateRequest(request.creatorEmail, task.requestSlug, _, _, true))
+      _ <- taskEventHandler.process(program, request, tasks, TaskEvent.EventType.StateChange, updatedTask, createTask(_, _, _), updateRequest(request.creatorEmail, task.requestSlug, _, _, true))
 
       _ <- if (state == State.InProgress) notifier.taskAssigned(request, updatedTask, program) else Future.unit
     } yield updatedTask
@@ -99,13 +95,12 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
   def updateTaskState(email: String, taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], completionMessage: Option[String], securityBypass: Boolean = false)(implicit requestHeader: RequestHeader): Future[Task] = {
     for {
       currentTask <- dao.taskById(taskId)
-      request <- dao.request(currentTask.requestSlug)
-      program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
+      requestWithTasks <- dao.requestWithTasks(currentTask.requestSlug)
+      program <- gitMetadata.fetchProgram(requestWithTasks.request.metadataVersion, requestWithTasks.request.program)
       _ <- checkAccess(securityBypass || program.isAdmin(email) || currentTask.completableBy.contains(email))
       task <- dao.updateTaskState(taskId, state, maybeCompletedBy, maybeData, completionMessage)
-      requestWithTasks <- dao.requestWithTasks(task.requestSlug)
       _ <- notifier.taskStateChanged(requestWithTasks.request, task, program)
-      _ <- taskEventHandler.process(program, requestWithTasks.request, TaskEvent.EventType.StateChange, task, createTask(_, _, _), updateRequest(email, task.requestSlug, _, _, securityBypass))
+      _ <- taskEventHandler.process(program, requestWithTasks.request, requestWithTasks.tasks, TaskEvent.EventType.StateChange, task, createTask(_, _, _), updateRequest(email, task.requestSlug, _, _, securityBypass))
       _ <- if (requestWithTasks.completedTasks.size == requestWithTasks.tasks.size) notifier.allTasksCompleted(requestWithTasks.request, program.admins) else Future.unit
     } yield task
   }
