@@ -234,6 +234,20 @@ class DataFacadeSpec extends MixedPlaySpec {
         a[DataFacade.NotAllowed] must be thrownBy await(dataFacade.updateTaskState("asdf@asdf.com", task.id, State.Completed, Some("asdf@asdf.com"), None, None))
       }
     }
+    "not notify anyone when the status hasn't changed" in new App(withDb) {
+      Evolutions.withEvolutions(database) {
+        val notifyMock = app.injector.instanceOf[NotifyMock]
+
+        val request = await(dataFacade.createRequest(None, "test", "foo", "foo@bar.com"))
+        val task = await(dataFacade.createTask(request.slug, "one", Seq("foo@foo.com")))
+
+        notifyMock.notifications.clear()
+
+        await(dataFacade.updateTaskState("foo@bar.com", task.id, task.state, None, None, None))
+
+        notifyMock.notifications must be (empty)
+      }
+    }
   }
 
 }

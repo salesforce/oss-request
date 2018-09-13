@@ -93,16 +93,22 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
   }
 
   def updateTaskState(email: String, taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], completionMessage: Option[String], securityBypass: Boolean = false)(implicit requestHeader: RequestHeader): Future[Task] = {
-    for {
-      currentTask <- dao.taskById(taskId)
-      requestWithTasks <- dao.requestWithTasks(currentTask.requestSlug)
-      program <- gitMetadata.fetchProgram(requestWithTasks.request.metadataVersion, requestWithTasks.request.program)
-      _ <- checkAccess(securityBypass || program.isAdmin(email) || currentTask.completableBy.contains(email))
-      task <- dao.updateTaskState(taskId, state, maybeCompletedBy, maybeData, completionMessage)
-      _ <- notifier.taskStateChanged(requestWithTasks.request, task, program)
-      _ <- taskEventHandler.process(program, requestWithTasks.request, requestWithTasks.tasks, TaskEvent.EventType.StateChange, task, createTask(_, _, _), updateRequest(email, task.requestSlug, _, _, securityBypass))
-      _ <- if (requestWithTasks.completedTasks.size == requestWithTasks.tasks.size) notifier.allTasksCompleted(requestWithTasks.request, program.admins) else Future.unit
-    } yield task
+    dao.taskById(taskId).flatMap { currentTask =>
+      if (currentTask.state == state && currentTask.completedBy == maybeCompletedBy) {
+        Future.successful(currentTask)
+      }
+      else {
+        for {
+          requestWithTasks <- dao.requestWithTasks(currentTask.requestSlug)
+          program <- gitMetadata.fetchProgram(requestWithTasks.request.metadataVersion, requestWithTasks.request.program)
+          _ <- checkAccess(securityBypass || program.isAdmin(email) || currentTask.completableBy.contains(email))
+          task <- dao.updateTaskState(taskId, state, maybeCompletedBy, maybeData, completionMessage)
+          _ <- notifier.taskStateChanged(requestWithTasks.request, task, program)
+          _ <- taskEventHandler.process(program, requestWithTasks.request, requestWithTasks.tasks, TaskEvent.EventType.StateChange, task, createTask(_, _, _), updateRequest(email, task.requestSlug, _, _, securityBypass))
+          _ <- if (requestWithTasks.completedTasks.size == requestWithTasks.tasks.size) notifier.allTasksCompleted(requestWithTasks.request, program.admins) else Future.unit
+        } yield task
+      }
+    }
   }
 
   def assignTask(email: String, taskId: Int, emails: Seq[String])(implicit requestHeader: RequestHeader): Future[Task] = {
