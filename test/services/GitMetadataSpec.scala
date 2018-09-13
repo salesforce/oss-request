@@ -40,7 +40,7 @@ class GitMetadataSpec extends MixedPlaySpec {
     }
     "fail in prod mode without a value" in new App(DAOMock.noDatabaseAppBuilder(Mode.Prod, GitMetadataSpec.prodConfig).build()) {
       val config = app.injector.instanceOf[Configuration]
-      assume(config.getOptional[String]("metadata-git-file").isEmpty)
+      assume(config.getOptional[String]("metadata-git-uri").isEmpty)
       an[Exception] should be thrownBy await(app.injector.instanceOf[GitMetadata].allVersions)
     }
     "work with an external ssh metadata file that requires auth" in new App(DAOMock.noDatabaseAppBuilder(Mode.Prod, GitMetadataSpec.gitConfig).build()) {
