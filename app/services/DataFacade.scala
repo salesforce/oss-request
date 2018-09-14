@@ -8,7 +8,7 @@
 package services
 
 import javax.inject.Inject
-import models.{Comment, DataIn, Program, Request, RequestWithTasks, RequestWithTasksAndProgram, State, Task, TaskEvent}
+import models.{Comment, DataIn, Metadata, Program, Request, RequestWithTasks, RequestWithTasksAndProgram, State, Task, TaskEvent}
 import modules.{DAO, Notifier}
 import org.eclipse.jgit.lib.ObjectId
 import play.api.libs.json.JsObject
@@ -83,8 +83,59 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
       currentRequest <- dao.request(requestSlug)
       program <- gitMetadata.fetchProgram(currentRequest.metadataVersion, currentRequest.program)
       _ <- checkAccess(securityBypass || program.isAdmin(email))
-      updatedRequest <- dao.updateRequest(requestSlug, state, message)
+      updatedRequest <- dao.updateRequestState(requestSlug, state, message)
       _ <- notifier.requestStatusChange(updatedRequest)
+    } yield updatedRequest
+  }
+
+  def requestMetadataMigrationConflicts(requestSlug: String, version: Option[ObjectId]): Future[Set[Metadata.MigrationConflict]] = {
+    for {
+      requestWithTasks <- dao.requestWithTasks(requestSlug)
+      currentProgram <- gitMetadata.fetchProgram(requestWithTasks.request.metadataVersion, requestWithTasks.request.program)
+      newProgram <- gitMetadata.fetchProgram(version, requestWithTasks.request.program)
+    } yield requestWithTasks.tasks.flatMap(_.migrationConflict(currentProgram, newProgram)).toSet
+  }
+
+  private def resolveConflict(email: String, program: Program, request: Request, task: Task, resolutionType: Metadata.MigrationConflictResolution.Type)(implicit requestHeader: RequestHeader): Future[Option[Task]] = {
+    resolutionType match {
+      case Metadata.MigrationConflictResolution.NewTaskKey(newTaskKey) =>
+        updateTaskKey(email, task.id, newTaskKey).map(Some(_))
+
+      case Metadata.MigrationConflictResolution.Reassign(maybeCompletableByValue) =>
+        program.task(task.taskKey).flatMap { prototype =>
+          val maybeCompletableBy = Task.completableByWithDefaults(prototype.completableBy, Some(request.creatorEmail), maybeCompletableByValue)
+
+          maybeCompletableBy.flatMap(program.completableBy).fold(Future.failed[Option[Task]](new Exception("Could not determine who can complete the task"))) { emails =>
+            assignTask(email, task.id, emails.toSeq).map(Some(_))
+          }
+        }
+
+      case Metadata.MigrationConflictResolution.Remove =>
+        deleteTask(email, task.id).map(_ => None)
+
+      case Metadata.MigrationConflictResolution.Reopen =>
+        updateTaskState(email, task.id, State.InProgress, None, task.data, None).map(Some(_))
+
+      case Metadata.MigrationConflictResolution.DoNothing =>
+        Future.successful(Some(task))
+    }
+  }
+
+  def updateRequestMetadata(email: String, requestSlug: String, version: Option[ObjectId], conflictResolutions: Set[Metadata.MigrationConflictResolution])(implicit requestHeader: RequestHeader): Future[Request] = {
+    for {
+      requestWithTasks <- dao.requestWithTasks(requestSlug)
+      currentProgram <- gitMetadata.fetchProgram(requestWithTasks.request.metadataVersion, requestWithTasks.request.program)
+      _ <- checkAccess(currentProgram.isAdmin(email))
+      newProgram <- gitMetadata.fetchProgram(version, requestWithTasks.request.program)
+      _ <- Future.sequence {
+        conflictResolutions.map { migrationConflictResolution =>
+          requestWithTasks.tasks.find(_.id == migrationConflictResolution.taskId).fold(Future.failed[Option[Task]](new Exception(s"Task not found: ${migrationConflictResolution.taskId}"))) { task =>
+            resolveConflict(email, newProgram, requestWithTasks.request, task, migrationConflictResolution.resolution)
+          }
+        }
+      }
+
+      updatedRequest <- dao.updateRequestMetadata(requestSlug, version)
     } yield updatedRequest
   }
 
@@ -109,6 +160,10 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
         } yield task
       }
     }
+  }
+
+  def updateTaskKey(email: String, taskId: Int, taskKey: String)(implicit requestHeader: RequestHeader): Future[Task] = {
+    dao.updateTaskKey(taskId, taskKey)
   }
 
   def assignTask(email: String, taskId: Int, emails: Seq[String])(implicit requestHeader: RequestHeader): Future[Task] = {
@@ -187,7 +242,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
   }
 
   def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject], maybeDataIn: Option[DataIn]): Future[Seq[RequestWithTasksAndProgram]] = {
-    dao.search(maybeProgram, maybeState, maybeData, maybeDataIn).flatMap(withProgram)
+    dao.searchRequests(maybeProgram, maybeState, maybeData, maybeDataIn).flatMap(withProgram)
   }
 
 }

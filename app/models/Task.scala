@@ -61,6 +61,25 @@ case class Task(id: Int, taskKey: String, createDate: ZonedDateTime, completable
       }
   }
 
+  def migrationConflict(currentProgram: Program, newProgram: Program): Option[Metadata.MigrationConflict] = {
+    Try(prototype(currentProgram)).toOption.flatMap { currentPrototype =>
+      val maybeNewPrototype = Try(prototype(newProgram)).toOption
+
+      val maybeConflictType = maybeNewPrototype match {
+        case Some(newPrototype) if currentPrototype.form != newPrototype.form & this.state != State.InProgress =>
+          Some(Metadata.MigrationConflict.CompletedFormChanged)
+        case Some(newPrototype) if currentPrototype.completableBy != newPrototype.completableBy & this.completedBy.isEmpty =>
+          Some(Metadata.MigrationConflict.CompletableByChanged)
+        case None =>
+          Some(Metadata.MigrationConflict.TaskRemoved)
+        case _ =>
+          None
+      }
+
+      maybeConflictType.map(Metadata.MigrationConflict(_, this, currentPrototype, maybeNewPrototype))
+    }
+  }
+
 }
 
 object Task {
@@ -133,6 +152,15 @@ object Task {
 
   implicit val jsonReads = Json.reads[Task]
   implicit val jsonWrites = Json.writes[Task]
+
+  def completableByWithDefaults(maybeCompletableBy: Option[Task.CompletableBy], maybeRequestOwner: Option[String], maybeProvidedValue: Option[String]): Option[(CompletableByType.CompletableByType, String)] = {
+    (maybeCompletableBy, maybeRequestOwner, maybeProvidedValue) match {
+      case (Some(Task.CompletableBy(completableByType, Some(completableByValue))), _, _) => Some(completableByType -> completableByValue)
+      case (Some(Task.CompletableBy(completableByType, None)), _, Some(providedValue)) => Some(completableByType -> providedValue)
+      case (None, Some(requestOwner), _) => Some(CompletableByType.Email -> requestOwner)
+      case _ => None
+    }
+  }
 
 }
 

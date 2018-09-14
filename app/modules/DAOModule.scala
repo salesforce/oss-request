@@ -41,9 +41,11 @@ trait DAO {
   def userRequests(email: String): Future[Seq[RequestWithTasks]]
   def request(requestSlug: String): Future[Request]
   def requestWithTasks(requestSlug: String): Future[RequestWithTasks]
-  def updateRequest(requestSlug: String, state: State.State, message: Option[String]): Future[Request]
+  def updateRequestState(requestSlug: String, state: State.State, message: Option[String]): Future[Request]
+  def updateRequestMetadata(requestSlug: String, version: Option[ObjectId]): Future[Request]
   def createTask(requestSlug: String, taskKey: String, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress): Future[Task]
   def updateTaskState(taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], maybeCompletionMessage: Option[String]): Future[Task]
+  def updateTaskKey(taskId: Int, taskKey: String): Future[Task]
   def deleteTask(taskId: Int): Future[Unit]
   def assignTask(taskId: Int, emails: Seq[String]): Future[Task]
   def taskById(taskId: Int): Future[Task]
@@ -51,7 +53,7 @@ trait DAO {
   def commentOnTask(taskId: Int, email: String, contents: String): Future[Comment]
   def commentsOnTask(taskId: Int): Future[Seq[Comment]]
   def tasksForUser(email: String, state: State.State): Future[Seq[(Task, DAO.NumComments, Request)]]
-  def search(maybeProgram: Option[String], maybeState: Option[State.State], data: Option[JsObject], dataIn: Option[DataIn]): Future[Seq[RequestWithTasks]]
+  def searchRequests(maybeProgram: Option[String], maybeState: Option[State.State], data: Option[JsObject], dataIn: Option[DataIn]): Future[Seq[RequestWithTasks]]
 }
 
 object DAO {
@@ -130,7 +132,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }.map(joinedRequestTasksToRequests)
   }
 
-  override def updateRequest(requestSlug: String, state: State.State, message: Option[String]): Future[Request] = {
+  override def updateRequestState(requestSlug: String, state: State.State, message: Option[String]): Future[Request] = {
     val maybeCompletedDate = if (state != State.InProgress) Some(ZonedDateTime.now()) else None
 
     val updateFuture = run {
@@ -143,6 +145,14 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
       }
     }
     updateFuture.flatMap(_ => request(requestSlug))
+  }
+
+  override def updateRequestMetadata(requestSlug: String, version: Option[ObjectId]): Future[Request] = {
+    run {
+      quote {
+        query[Request].filter(_.slug == lift(requestSlug)).update(_.metadataVersion -> lift(version))
+      }
+    }.flatMap(_ => request(requestSlug))
   }
 
   override def request(slug: String): Future[Request] = {
@@ -219,6 +229,14 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
       }
       updateFuture.flatMap(_ => taskById(taskId))
     }
+  }
+
+  override def updateTaskKey(taskId: Int, taskKey: String): Future[Task] = {
+    run {
+      quote {
+        query[Task].filter(_.id == lift(taskId)).update(_.taskKey -> lift(taskKey))
+      }
+    }.flatMap(_ => taskById(taskId))
   }
 
   override def deleteTask(taskId: Index): Future[Unit] = {
@@ -306,7 +324,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject], maybeDataIn: Option[DataIn]): Future[Seq[RequestWithTasks]] = {
+  override def searchRequests(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject], maybeDataIn: Option[DataIn]): Future[Seq[RequestWithTasks]] = {
 
     case class QueryBuilder[T](query: Quoted[Query[T]]) {
       def ifDefined[U: Encoder](value: Option[U])(f: Quoted[(Query[T], U) => Query[T]]): QueryBuilder[T] =

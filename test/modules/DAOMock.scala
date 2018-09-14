@@ -76,6 +76,17 @@ class DAOMock extends DAO {
     }
   }
 
+  override def updateTaskKey(taskId: Int, taskKey: String): Future[Task] = {
+    tasks.find(_.id == taskId).fold(Future.failed[Task](new Exception("Task not found"))) { task =>
+      val updatedTask = task.copy(taskKey = taskKey)
+
+      tasks -= task
+      tasks += updatedTask
+
+      Future.successful(updatedTask)
+    }
+  }
+
   override def deleteTask(taskId: Int): Future[Unit] = {
     tasks.find(_.id == taskId).fold(Future.failed[Unit](new Exception("Task not found"))) { task =>
       tasks -= task
@@ -108,10 +119,19 @@ class DAOMock extends DAO {
     }
   }
 
-  override def updateRequest(requestSlug: String, state: State.State, message: Option[String]): Future[Request] = {
+  override def updateRequestState(requestSlug: String, state: State.State, message: Option[String]): Future[Request] = {
     request(requestSlug).map { request =>
       val maybeCompletedDate = if (state != State.InProgress) Some(ZonedDateTime.now()) else None
       val updatedRequest = request.copy(state = state, completedDate = maybeCompletedDate, completionMessage = message)
+      requests -= request
+      requests += updatedRequest
+      updatedRequest
+    }
+  }
+
+  override def updateRequestMetadata(requestSlug: String, version: Option[ObjectId]): Future[Request] = {
+    request(requestSlug).map { request =>
+      val updatedRequest = request.copy(metadataVersion = version)
       requests -= request
       requests += updatedRequest
       updatedRequest
@@ -175,7 +195,7 @@ class DAOMock extends DAO {
     }.map(_.toSeq)
   }
 
-  def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject], maybeDataIn: Option[DataIn]): Future[Seq[RequestWithTasks]] = {
+  def searchRequests(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject], maybeDataIn: Option[DataIn]): Future[Seq[RequestWithTasks]] = {
     allRequests().map { requestsWithTasks =>
       requestsWithTasks.filter { requestWithTasks =>
         maybeProgram.forall(_ == requestWithTasks.request.program) &&

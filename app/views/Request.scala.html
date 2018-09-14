@@ -5,11 +5,12 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  *@
 
+@import org.eclipse.jgit.lib.ObjectId
+@import core.Extensions._
+
 @this(mainView: Main, taskView: partials.TaskEditOrShow)
 
-@(program: models.Program, request: models.Request, tasks: Seq[(models.Task, models.Task.Prototype, modules.DAO.NumComments)], userInfo: controllers.UserInfo)(implicit requestHeader: RequestHeader, metadata: models.Metadata)
-
-@import core.Extensions._
+@(program: models.Program, latestVersion: Option[ObjectId], request: models.Request, tasks: Seq[(models.Task, models.Task.Prototype, modules.DAO.NumComments)], userInfo: controllers.UserInfo)(implicit requestHeader: RequestHeader, metadata: models.Metadata)
 
 @tasksWithState(state: State.State) = @{
     tasks.filter(_._1.state == state)
@@ -21,6 +22,15 @@
     }
     else {
         completedTasks.size * 100 / tasks.size
+    }
+}
+
+@metadataOutOfDate = @{
+    (request.metadataVersion, latestVersion) match {
+        case (Some(r), Some(l)) => r != l
+        case (Some(r), None) => true
+        case (None, Some(l)) => false
+        case (None, None) => false
     }
 }
 
@@ -55,6 +65,13 @@
                     @if(program.isAdmin(userInfo.email) || request.creatorEmail == userInfo.email) {
                         <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Cancelled))" method="post" class="btn-group">
                             <button type="submit" class="btn btn-warning">Cancel Request</button>
+                        </form>
+                    }
+
+                    @if(program.isAdmin(userInfo.email) && metadataOutOfDate) {
+                        <form action="@helper.CSRF(routes.Application.metadataMigrate(request.slug))" method="post" class="btn-group">
+                            <input type="hidden" name="version" value="@latestVersion.map(_.name()).getOrElse("")">
+                            <button type="submit" class="btn btn-default" title="Request = @request.metadataVersion.abbreviate &amp; Latest = @latestVersion.abbreviate">Update Metadata</button>
                         </form>
                     }
                 </div>

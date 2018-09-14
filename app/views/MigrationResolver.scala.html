@@ -1,0 +1,153 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@import org.eclipse.jgit.lib.ObjectId
+@import core.Extensions._
+
+@this(main: Main, taskShowView: partials.TaskShow)
+
+@(userInfo: controllers.UserInfo, request: models.Request, maybeNewVersion: Option[ObjectId], currentProgram: Program, newProgram: Program, migrationConflicts: Set[Metadata.MigrationConflict])(implicit requestHeader: RequestHeader, metadata: models.Metadata)
+
+@main(Some(userInfo))("Migration Conflict Resolver") {
+
+    <h2>Conflicts While Migrating Request <a href="@routes.Application.request(request.slug)">@request.name</a> to Version @maybeNewVersion.abbreviate</h2>
+
+    <form action="@helper.CSRF(routes.Application.metadataMigrate(request.slug))" method="post">
+        <input type="hidden" name="version" value="@maybeNewVersion.map(_.name()).getOrElse("")">
+
+        @for(migrationConflict <- migrationConflicts) {
+            <div class="panel panel-default">
+                <div class="panel-heading clearfix">
+                    <h3 class="panel-title pull-left"><a href="@routes.Application.task(request.slug, migrationConflict.task.id)">@migrationConflict.task.prototype(currentProgram).label</a> - @migrationConflict.task.stateToHuman(currentProgram).capitalize</h3>
+                </div>
+                <div class="panel-body">
+                    <h4>
+                        @migrationConflict.conflictType match {
+                            case Metadata.MigrationConflict.TaskRemoved => {
+                                Task Was Removed
+                            }
+                            case Metadata.MigrationConflict.CompletedFormChanged => {
+                                The Form Changed
+                            }
+                            case Metadata.MigrationConflict.CompletableByChanged => {
+                                Task Assignment Changed
+                            }
+                        }
+                    </h4>
+
+                    <hr/>
+
+                    Current:
+                    @migrationConflict.conflictType match {
+                        case Metadata.MigrationConflict.TaskRemoved | Metadata.MigrationConflict.CompletedFormChanged => {
+                            @taskShowView(migrationConflict.task, migrationConflict.currentTaskPrototype)
+
+                            @for(newTaskPrototype <- migrationConflict.maybeNewTaskPrototype) {
+                                New:
+                                @taskShowView(migrationConflict.task, newTaskPrototype)
+                            }
+                        }
+                        case Metadata.MigrationConflict.CompletableByChanged => {
+                            <p>
+                                @partials.AssignedTo(migrationConflict.task, currentProgram)
+                            </p>
+                        }
+                    }
+                </div>
+                <div class="panel-footer">
+                    @migrationConflict.conflictType match {
+                        case Metadata.MigrationConflict.TaskRemoved => {
+                            <div class="input-group">
+                                <span class="input-group-addon">
+                                    <label class="radio-inline">
+                                        <input type="radio" name="task-@migrationConflict.task.id" value="remove"> Remove Task
+                                    </label>
+                                </span>
+                                <span class="input-group-addon">
+                                    <label class="radio-inline">
+                                        <input type="radio" name="task-@migrationConflict.task.id" value="new-task-key"> Change to:
+                                    </label>
+                                </span>
+                                <select name="task-@migrationConflict.task.id-newtaskkey" class="form-control">
+                                    @for(task <- newProgram.tasks) {
+                                        <option value="@task._1">@task._2.label</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+
+                        case Metadata.MigrationConflict.CompletedFormChanged => {
+                            <label class="radio-inline">
+                                <input type="radio" name="task-@migrationConflict.task.id" value="do-nothing"> Leave As-Is
+                            </label>
+                            <label class="radio-inline">
+                                <input type="radio" name="task-@migrationConflict.task.id" value="reopen"> Reopen Task
+                            </label>
+                        }
+
+                        case Metadata.MigrationConflict.CompletableByChanged => {
+                            <div class="input-group">
+                                <span class="input-group-addon">
+                                    <label class="radio-inline">
+                                        <input type="radio" name="task-@migrationConflict.task.id" value="do-nothing"> Leave As-Is
+                                    </label>
+                                </span>
+
+                                @migrationConflict.task.prototype(newProgram).completableBy match {
+                                    case None => {
+                                        <span class="input-group-addon">
+                                            <label class="radio-inline">
+                                                <input type="radio" name="task-@migrationConflict.task.id" value="reassign"> Reassign to Request Owner (@request.creatorEmail)
+                                            </label>
+                                        </span>
+                                    }
+                                    case Some(completableBy) if (completableBy.`type`) == Task.CompletableByType.Service & completableBy.value.isDefined => {
+                                        <span class="input-group-addon">
+                                            <label class="radio-inline">
+                                                <input type="radio" name="task-@migrationConflict.task.id" value="reassign"> Reassign to Service (@completableBy.value.get)
+                                            </label>
+                                        </span>
+                                    }
+                                    case Some(completableBy) if (completableBy.`type`) == Task.CompletableByType.Group => {
+                                        <span class="input-group-addon">
+                                            <label class="radio-inline">
+                                                <input type="radio" name="task-@migrationConflict.task.id" value="reassign"> Reassign to Group @for(group <- completableBy.value) { (@group) }
+                                            </label>
+                                        </span>
+
+                                        @if(completableBy.value.isEmpty) {
+                                            <select name="task-@migrationConflict.task.id-completableby" class="form-control">
+                                                @for(group <- newProgram.groups) {
+                                                    <option value="@group._1">@group._1</option>
+                                                }
+                                            </select>
+                                        }
+                                    }
+                                    case Some(completableBy) if (completableBy.`type`) == Task.CompletableByType.Email => {
+                                        <span class="input-group-addon">
+                                            <label class="radio-inline">
+                                                <input type="radio" name="task-@migrationConflict.task.id" value="reassign"> Reassign to Email @for(email <- completableBy.value) { (@email) }
+                                            </label>
+                                        </span>
+
+                                        @if(completableBy.value.isEmpty) {
+                                            <input name="task-@migrationConflict.task.id-completableby" class="form-control" type="email">
+                                        }
+                                    }
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        }
+
+        <button type="submit" class="btn btn-default">Resolve Conflicts</button>
+    </form>
+
+
+}

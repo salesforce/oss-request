@@ -34,6 +34,29 @@ object Metadata {
   }
 
   implicit val jsonReads: Reads[Metadata] = multiprogramReads.orElse(singleprogramReads)
+
+  case class MigrationConflict(conflictType: MigrationConflict.Type, task: Task, currentTaskPrototype: Task.Prototype, maybeNewTaskPrototype: Option[Task.Prototype])
+
+  object MigrationConflict {
+    sealed trait Type
+
+    case object TaskRemoved extends Type
+    case object CompletedFormChanged extends Type
+    case object CompletableByChanged extends Type
+  }
+
+  case class MigrationConflictResolution(resolution: MigrationConflictResolution.Type, taskId: Int)
+
+  object MigrationConflictResolution {
+    sealed trait Type
+
+    case class NewTaskKey(newTaskKey: String) extends Type
+    case object Remove extends Type
+    case class Reassign(maybeCompletableByValue: Option[String]) extends Type
+    case object Reopen extends Type
+    case object DoNothing extends Type
+  }
+
 }
 
 case class Program(name: String, description: Option[String], startTasks: Set[String], groups: Map[String, Set[String]], services: Map[String, String], tasks: Map[String, Task.Prototype], reports: Map[String, Report]) {
