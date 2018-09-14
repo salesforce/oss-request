@@ -176,6 +176,15 @@
           "value": "admin"
         },
         "info": "A GitHub repo needs to be created."
+      },
+      "a_new_task": {
+        "label": "A New Task",
+        "type": "ACTION",
+        "completable_by": {
+          "type": "GROUP",
+          "value": "admin"
+        },
+        "info": "A GitHub repo needs to be created."
       }
     }
   },
