@@ -13,6 +13,7 @@ import java.time.format.DateTimeFormatter
 import laika.api.Transform
 import laika.parse.markdown.Markdown
 import laika.render.HTML
+import org.eclipse.jgit.lib.ObjectId
 
 object Extensions {
 
@@ -23,6 +24,12 @@ object Extensions {
   implicit class RichString(val s: String) extends AnyVal {
     // todo: server-side url to link
     def markdown: String = Transform.from(Markdown).to(HTML).fromString(s).toString()
+  }
+
+  implicit class RichOptionObjectId(val maybeObjectId: Option[ObjectId]) extends AnyVal {
+    def abbreviate: String = {
+      maybeObjectId.map(_.abbreviate(8).name()).getOrElse("none")
+    }
   }
 
 }

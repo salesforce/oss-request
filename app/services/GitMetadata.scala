@@ -153,9 +153,14 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
 
   def versions: Set[MetadataVersion] = {
     val versions = Try {
-      gitRepo.log().all().addPath(metadataGitFile).call().asScala.map { revCommit =>
+      gitRepo.log().all().addPath(metadataGitFile).call().asScala.flatMap { revCommit =>
+        val version = Some(revCommit.getId)
         val datetime = ZonedDateTime.ofInstant(Instant.ofEpochSecond(revCommit.getCommitTime), revCommit.getAuthorIdent.getTimeZone.toZoneId)
-        MetadataVersion(Some(revCommit.getId), datetime)
+        Try {
+          // make sure the version works before we include it in the list
+          fetchMetadata(version)
+          MetadataVersion(version, datetime)
+        }.toOption
       }.toSet
     } getOrElse {
       Set.empty[MetadataVersion]

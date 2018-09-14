@@ -7,7 +7,7 @@
 
 package services
 
-import models.{DataIn, State, Task}
+import models.{DataIn, Metadata, State, Task}
 import modules.{DAOMock, NotifyMock, NotifyProvider}
 import org.scalatestplus.play.MixedPlaySpec
 import play.api.Mode
@@ -19,12 +19,15 @@ import play.api.mvc.RequestHeader
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
 
+import scala.util.Try
+
 class DataFacadeSpec extends MixedPlaySpec {
 
   def withDb = DAOMock.databaseAppBuilder().overrides(bind[NotifyProvider].to[NotifyMock]).build()
 
   def database(implicit app: play.api.Application) = app.injector.instanceOf[Database]
-  def defaultProgram(implicit app: play.api.Application) = await(app.injector.instanceOf[GitMetadata].fetchProgram(None, "default"))
+  def gitMetadata(implicit app: play.api.Application) = app.injector.instanceOf[GitMetadata]
+  def defaultProgram(implicit app: play.api.Application) = await(gitMetadata.fetchProgram(None, "default"))
   def dataFacade(implicit app: play.api.Application) = app.injector.instanceOf[DataFacade]
 
   implicit val fakeRequest: RequestHeader = FakeRequest()
@@ -117,6 +120,60 @@ class DataFacadeSpec extends MixedPlaySpec {
         a[DataFacade.NotAllowed] must be thrownBy await(dataFacade.updateRequest("baz@baz.com", request.slug, State.Completed, None))
 
         await(dataFacade.request("foo@foo.com", request.slug)).state must not equal State.Completed
+      }
+    }
+  }
+
+  "requestMetadataMigrationConflicts" must {
+    "produce no conflicts when tasks are the same" in new App(withDb) {
+      Evolutions.withEvolutions(database) {
+        val request = await(dataFacade.createRequest(None, "default", "foo", "foo@foo.com"))
+        await(dataFacade.requestMetadataMigrationConflicts(request.slug, None)) must be (empty)
+      }
+    }
+    "produce conflicts when tasks change" in new App(withDb) {
+      Evolutions.withEvolutions(database) {
+        val allVersions = await(gitMetadata.allVersions)
+
+        val (latestVersion, latestMetadata) = await(gitMetadata.latestVersion)
+
+        val latestDefault = await(latestMetadata.program("default"))
+
+        val request = await(dataFacade.createRequest(latestVersion, "default", "foo", "foo@foo.com"))
+        val task = await(dataFacade.createTask(request.slug, latestDefault.tasks.last._1, Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
+        val taskPrototype = await(latestDefault.task(task.taskKey))
+
+        val conflictingVersion = allVersions.find { version =>
+          val metadata = await(gitMetadata.fetchMetadata(version.id))
+
+          val default = await(metadata.program("default"))
+
+          // find a version that doesn't have the task or has a different form
+          Try(await(default.task(task.taskKey))).filter(_.form == taskPrototype.form).isFailure
+        }.flatMap(_.id)
+
+        assume(conflictingVersion != latestVersion)
+
+        await(dataFacade.requestMetadataMigrationConflicts(request.slug, conflictingVersion)) must not be empty
+      }
+    }
+  }
+
+  "updateRequestMetadata" must {
+    "work" in new App(withDb) {
+      Evolutions.withEvolutions(database) {
+        val Seq(latestVersion, previousVersion) = await(gitMetadata.allVersions).toSeq.take(2).map(_.id)
+
+        val request = await(dataFacade.createRequest(previousVersion, "default", "foo", "foo@foo.com"))
+        val task = await(dataFacade.createTask(request.slug, "start", Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
+
+        val conflictResolutions = Set(Metadata.MigrationConflictResolution(Metadata.MigrationConflictResolution.Reopen, task.id))
+
+        await(dataFacade.updateRequestMetadata("foo@bar.com", request.slug, latestVersion, conflictResolutions))
+
+        val updatedTask = await(dataFacade.taskById(task.id))
+
+        updatedTask.state must equal (State.InProgress)
       }
     }
   }

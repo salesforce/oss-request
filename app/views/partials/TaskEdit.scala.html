@@ -28,7 +28,15 @@
                     <div id="@formid"></div>
                     <script>
                         (function() {
-                            const form = @Html(form.toString());
+                            const form = @Html(form.toString);
+
+                            @newOrExistingTask match {
+                                case Right(task) => {
+                                    @for(data <- task.data) {
+                                        form.data = @Html(data.toString);
+                                    }
+                                }
+                            }
 
                             if (form.options === undefined) {
                               form.options = {};
@@ -73,12 +81,7 @@
             }
         </div>
     }
-    case models.Task.TaskType.Action => {
-        <div class="panel-body">
-            <p>@Html(taskPrototype.infoMarkdownToHtml)</p>
-        </div>
-    }
-    case models.Task.TaskType.Approval => {
+    case _ => {
         <div class="panel-body">
             <p>@Html(taskPrototype.infoMarkdownToHtml)</p>
         </div>
