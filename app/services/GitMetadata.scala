@@ -108,11 +108,8 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
       metadataGitUri -> "master"
     }
 
-    if (metadataGitUri.getScheme == "file") {
-      val dotGit = new File(new File(metadataGitUri), ".git")
-      if (!dotGit.exists()) {
-        Git.init().setDirectory(cacheDir).call()
-      }
+    if (metadataGitUri.getScheme == "file" && !new File(new File(metadataGitUri), ".git").exists()) {
+      Git.init().setDirectory(cacheDir).call()
     }
     else {
       val baseClone = Git.cloneRepository()
