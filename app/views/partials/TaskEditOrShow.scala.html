@@ -63,13 +63,29 @@
 
 <div class="panel @panelType">
     <div class="panel-heading clearfix">
-        <h3 class="panel-title pull-left"><a href="@routes.Application.task(task.requestSlug, task.id)">@taskPrototype.label</a></h3>
         <div class="pull-right">
-            <div class="row">
+                @if(isAdmin) {
+                    <div style="display: inline-block">
+                        @if(task.state != State.InProgress) {
+                            <form action="@helper.CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, State.InProgress, None))" method="post">
+                                <button class="btn btn-warning btn-sm pull-right" title="Reopen" type="submit">
+                                    <span class="glyphicon glyphicon-pencil"></span>
+                                </button>
+                            </form>
+                        }
+                    </div>
+
+                    <div style="display: inline-block">
+                        <button class="btn btn-danger btn-sm pull-right" data-toggle="modal" data-target="#confirmModal" data-action="delete" data-url="@helper.CSRF(routes.Application.deleteTask(task.requestSlug, task.id))">
+                            <span class="glyphicon glyphicon-trash"></span>
+                        </button>
+                    </div>
+                }
+
                 @commentCountOrComments match {
                     case Left(commentCount) => {
-                        <div class="col-md-9">
-                            <button type="button" class="btn btn-default btn-sm pull-right" data-toggle="modal" data-target="#commentsModal" data-requestslug="@task.requestSlug" data-taskid="@task.id">
+                        <div style="display: inline-block">
+                            <button class="btn btn-default btn-sm pull-right" data-toggle="modal" data-target="#commentsModal" data-requestslug="@task.requestSlug" data-taskid="@task.id">
                                 <span class="glyphicon glyphicon-comment"></span>
                                 @commentCount Comments
                             </button>
@@ -77,15 +93,8 @@
                     }
                     case _ => {}
                 }
-                @if(isAdmin) {
-                    <div class="col-md-3">
-                        <button type="button" class="btn btn-danger btn-sm pull-right" data-toggle="modal" data-target="#confirmModal" data-action="delete" data-url="@helper.CSRF(routes.Application.deleteTask(task.requestSlug, task.id))">
-                            <span class="glyphicon glyphicon-remove"></span>
-                        </button>
-                    </div>
-                }
-            </div>
         </div>
+        <h3 class="panel-title"><a href="@routes.Application.task(task.requestSlug, task.id)">@taskPrototype.label</a></h3>
     </div>
 
     @task.state match {

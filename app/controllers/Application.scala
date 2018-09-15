@@ -322,10 +322,12 @@ class Application @Inject()
 
   def updateTaskState(requestSlug: String, taskId: Int, state: State.State, completionMessage: Option[String]) = userAction.async(maybeJsObject) { implicit userRequest =>
     withUserInfo { userInfo =>
-      dataFacade.updateTaskState(userInfo.email, taskId, state, Some(userInfo.email), userRequest.body, completionMessage).map { task =>
-        render {
-          case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
-          case Accepts.Json() => Ok(Json.toJson(task))
+      userRequest.body.fold(dataFacade.taskById(taskId).map(_.data))(data => Future.successful(Some(data))).flatMap { maybeData =>
+        dataFacade.updateTaskState(userInfo.email, taskId, state, Some(userInfo.email), maybeData, completionMessage).map { task =>
+          render {
+            case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
+            case Accepts.Json() => Ok(Json.toJson(task))
+          }
         }
       }
     }
