@@ -20,7 +20,8 @@ object State extends Enumeration {
   val Completed = Value("COMPLETED")
 
   implicit val jsonReads = Reads[State] { jsValue =>
-    values.find(_.toString == jsValue.as[String]).fold[JsResult[State]](JsError("Could not find that type"))(JsSuccess(_))
+    val stateString = jsValue.as[String]
+    values.find(_.toString == stateString).fold[JsResult[State]](JsError(s"Could not find the state: $stateString"))(JsSuccess(_))
   }
 
   implicit val encodeState = MappedEncoding[State, String](_.toString)

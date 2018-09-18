@@ -107,12 +107,12 @@ class ExternalTask @Inject()(environment: Environment, configuration: Configurat
             if (environment.mode != Mode.Test) {
               Logger.error(e.body, e)
             }
-            updateTaskState(State.Cancelled, Some(wsRequest.url), None, Some(e.getMessage))
+            updateTaskState(State.Cancelled, task.completedBy, None, Some(e.getMessage))
           case e: Exception =>
             if (environment.mode != Mode.Test) {
               Logger.error("Error communicating with Service", e)
             }
-            updateTaskState(State.Cancelled, Some(wsRequest.url), None, Some(e.getMessage))
+            updateTaskState(State.Cancelled, task.completedBy, None, Some(e.getMessage))
         }
       }
     }
@@ -140,12 +140,12 @@ class ExternalTask @Inject()(environment: Environment, configuration: Configurat
             if (environment.mode != Mode.Test) {
               Logger.error(e.body, e)
             }
-            updateTaskState(State.Cancelled, Some(wsRequest.url), None, Some(e.getMessage))
+            updateTaskState(State.Cancelled, task.completedBy, None, Some(e.getMessage))
           case e: Exception =>
             if (environment.mode != Mode.Test) {
               Logger.error("Error communicating with Service", e)
             }
-            updateTaskState(State.Cancelled, Some(wsRequest.url), None, Some(e.getMessage))
+            updateTaskState(State.Cancelled, task.completedBy, None, Some(e.getMessage))
         }
       }
     }
