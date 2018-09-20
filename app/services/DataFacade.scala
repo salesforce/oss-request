@@ -49,9 +49,12 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
 
       url = controllers.routes.Application.task(requestSlug, task.id).absoluteURL()
 
-      updatedTask <- taskService.taskCreated(program, request, task, tasks, url, updateTaskState(request.creatorEmail, task.id, _, _, _, _, true))
+      // we use the dao because we don't want to send notifications and re-process the events
+      updatedTask <- taskService.taskCreated(program, request, task, tasks, url, dao.updateTaskState(task.id, _, _, _, _))
 
-      _ <- taskEventHandler.process(program, request, tasks, TaskEvent.EventType.StateChange, updatedTask, createTask(_, _, _), updateRequest(request.creatorEmail, task.requestSlug, _, _, true))
+      RequestWithTasks(_, updatedTasks) <- dao.requestWithTasks(requestSlug)
+
+      _ <- taskEventHandler.process(program, request, updatedTasks, TaskEvent.EventType.StateChange, updatedTask, createTask(_, _, _), updateRequest(request.creatorEmail, task.requestSlug, _, _, true))
 
       _ <- if (state == State.InProgress) notifier.taskAssigned(request, updatedTask, program) else Future.unit
     } yield updatedTask
@@ -154,9 +157,14 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
           program <- gitMetadata.fetchProgram(requestWithTasks.request.metadataVersion, requestWithTasks.request.program)
           _ <- checkAccess(securityBypass || program.isAdmin(email) || currentTask.completableBy.contains(email))
           task <- dao.updateTaskState(taskId, state, maybeCompletedBy, maybeData, completionMessage)
-          _ <- notifier.taskStateChanged(requestWithTasks.request, task, program)
-          _ <- taskEventHandler.process(program, requestWithTasks.request, requestWithTasks.tasks, TaskEvent.EventType.StateChange, task, createTask(_, _, _), updateRequest(email, task.requestSlug, _, _, securityBypass))
-          _ <- if (requestWithTasks.completedTasks.size == requestWithTasks.tasks.size) notifier.allTasksCompleted(requestWithTasks.request, program.admins) else Future.unit
+
+          _ <- if (task.state == State.InProgress) notifier.taskAssigned(requestWithTasks.request, task, program) else notifier.taskStateChanged(requestWithTasks.request, task, program)
+
+          updatedRequestWithTasks <- dao.requestWithTasks(currentTask.requestSlug)
+
+          _ <- taskEventHandler.process(program, updatedRequestWithTasks.request, updatedRequestWithTasks.tasks, TaskEvent.EventType.StateChange, task, createTask(_, _, _), updateRequest(email, task.requestSlug, _, _, securityBypass))
+
+          _ <- if (updatedRequestWithTasks.completedTasks.size == updatedRequestWithTasks.tasks.size) notifier.allTasksCompleted(updatedRequestWithTasks.request, program.admins) else Future.unit
         } yield task
       }
     }
