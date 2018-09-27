@@ -6,7 +6,7 @@ lazy val root = project.in(file(".")).enablePlugins(PlayScala, AutomateHeaderPlu
 
 name := "oss-request"
 
-scalaVersion := "2.12.6"
+scalaVersion := "2.12.7"
 
 resolvers += Resolver.mavenLocal
 
