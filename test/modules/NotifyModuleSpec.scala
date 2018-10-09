@@ -46,18 +46,20 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
     "work" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest(None, "default", "asdf", "asdf@asdf.com"))
       val task = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
+      val commentsOnTask = await(dao.commentsOnTask(task.id))
       val comment = await(dao.commentOnTask(task.id, "bar@bar.com", "bar"))
 
-      await(notifier.taskComment(request, task, comment, defaultProgram))
+      await(notifier.taskComment(request, task, commentsOnTask, comment, defaultProgram))
 
       notifyMock.notifications.map(_._1) must contain (Set("asdf@asdf.com", "foo@foo.com"))
     }
     "not send notifications when the commenter, task assignee, and request owner are the same" in Evolutions.withEvolutions(database) {
       val request = await(dao.createRequest(None, "default", "foo", "foo@foo.com"))
       val task = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
+      val commentsOnTask = await(dao.commentsOnTask(task.id))
       val comment = await(dao.commentOnTask(task.id, "foo@foo.com", "foo"))
 
-      await(notifier.taskComment(request, task, comment, defaultProgram))
+      await(notifier.taskComment(request, task, commentsOnTask, comment, defaultProgram))
 
       notifyMock.notifications must be (empty)
     }

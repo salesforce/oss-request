@@ -96,8 +96,9 @@ class Notifier @Inject()(notifyProvider: NotifyProvider)(implicit ec: ExecutionC
     })
   }
 
-  def taskComment(request: Request, task: Task, comment: Comment, program: Program)(implicit requestHeader: RequestHeader): Future[_] = {
-    val emails = task.completableByEmailsOrUrl(program).left.getOrElse(Set.empty[String]) + request.creatorEmail - comment.creatorEmail
+  def taskComment(request: Request, task: Task, commentsOnTask: Seq[Comment], comment: Comment, program: Program)(implicit requestHeader: RequestHeader): Future[_] = {
+    val previousCommentors = commentsOnTask.map(_.creatorEmail).toSet
+    val emails = task.completableByEmailsOrUrl(program).left.getOrElse(Set.empty[String]) + request.creatorEmail ++ previousCommentors - comment.creatorEmail
     val url = controllers.routes.Application.task(request.slug, task.id).absoluteURL()
 
     val subject = s"Comment on OSS Request Task - ${request.name} - ${task.prototype(program).label}"

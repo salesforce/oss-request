@@ -234,9 +234,10 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     for {
       comment <- dao.commentOnTask(taskId, email, contents)
       task <- dao.taskById(taskId)
+      commentsOnTask <- dao.commentsOnTask(taskId)
       request <- dao.request(requestSlug)
       program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
-      _ <- notifier.taskComment(request, task, comment, program)
+      _ <- notifier.taskComment(request, task, commentsOnTask, comment, program)
     } yield comment
   }
 
