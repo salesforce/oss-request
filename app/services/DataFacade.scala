@@ -91,6 +91,16 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     } yield updatedRequest
   }
 
+  def deleteRequest(email: String, requestSlug: String)(implicit requestHeader: RequestHeader): Future[Unit] = {
+    for {
+      RequestWithTasks(request, tasks) <- dao.requestWithTasks(requestSlug)
+      program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
+      _ <- checkAccess(program.isAdmin(email))
+      _ <- Future.sequence(tasks.map(task => deleteTask(email, task.id)))
+      _ <- dao.deleteRequest(requestSlug)
+    } yield Unit
+  }
+
   def requestMetadataMigrationConflicts(requestSlug: String, version: Option[ObjectId]): Future[Set[Metadata.MigrationConflict]] = {
     for {
       requestWithTasks <- dao.requestWithTasks(requestSlug)

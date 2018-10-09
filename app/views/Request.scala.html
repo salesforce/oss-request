@@ -74,6 +74,14 @@
                             <button type="submit" class="btn btn-default" title="Request = @request.metadataVersion.abbreviate &amp; Latest = @latestVersion.abbreviate">Update Metadata</button>
                         </form>
                     }
+
+                    @if(program.isAdmin(userInfo.email)) {
+                        <div class="btn-group">
+                            <button class="btn btn-danger btn-sm pull-right" data-toggle="modal" data-target="#confirmModal" data-action="delete" data-url="@helper.CSRF(routes.Application.deleteRequest(request.slug))" data-redirect="@routes.Application.index()">
+                                <span class="glyphicon glyphicon-trash"></span>
+                            </button>
+                        </div>
+                    }
                 </div>
 
                 <div class="row">
@@ -174,6 +182,14 @@
 
         case models.State.Cancelled => {
             Request Cancelled
+
+            @if(program.isAdmin(userInfo.email)) {
+                <div class="btn-group">
+                    <button class="btn btn-danger btn-sm pull-right" data-toggle="modal" data-target="#confirmModal" data-action="delete" data-url="@helper.CSRF(routes.Application.deleteRequest(request.slug))" data-redirect="@routes.Application.index()">
+                        <span class="glyphicon glyphicon-trash"></span>
+                    </button>
+                </div>
+            }
         }
 
         case _ => {

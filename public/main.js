@@ -31,13 +31,20 @@ $(function () {
 
     const action = button.data('action');
     const url = button.data('url');
+    const redirect = button.data('redirect');
 
     $('#confirmButton').click(function () {
       $.ajax({
         url: url,
         type: action,
+        dataType: 'json',
         success: function() {
-          location.reload();
+          if (redirect !== undefined) {
+            location.replace(redirect);
+          }
+          else {
+            location.reload();
+          }
         },
         error: function (error) {
           const body = $('.modal-body').html(error.responseText);

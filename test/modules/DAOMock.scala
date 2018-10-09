@@ -138,6 +138,13 @@ class DAOMock extends DAO {
     }
   }
 
+  override def deleteRequest(requestSlug: String): Future[Unit] = {
+    request(requestSlug).map { request =>
+      requests -= request
+      Unit
+    }
+  }
+
   override def createTask(requestSlug: String, taskKey: String, completableBy: Seq[String], maybeCompletedBy: Option[String], maybeData: Option[JsObject], state: State.State): Future[Task] = {
     Future.successful {
       val id = Try(tasks.map(_.id).max).getOrElse(0) + 1

@@ -43,6 +43,7 @@ trait DAO {
   def requestWithTasks(requestSlug: String): Future[RequestWithTasks]
   def updateRequestState(requestSlug: String, state: State.State, message: Option[String]): Future[Request]
   def updateRequestMetadata(requestSlug: String, version: Option[ObjectId]): Future[Request]
+  def deleteRequest(requestSlug: String): Future[Unit]
   def createTask(requestSlug: String, taskKey: String, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress): Future[Task]
   def updateTaskState(taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], maybeCompletionMessage: Option[String]): Future[Task]
   def updateTaskKey(taskId: Int, taskKey: String): Future[Task]
@@ -153,6 +154,16 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
         query[Request].filter(_.slug == lift(requestSlug)).update(_.metadataVersion -> lift(version))
       }
     }.flatMap(_ => request(requestSlug))
+  }
+
+  override def deleteRequest(requestSlug: String): Future[Unit] = {
+    run {
+      quote {
+        query[Request].filter(_.slug == lift(requestSlug)).delete
+      }
+    } map { _ =>
+      Unit
+    }
   }
 
   override def request(slug: String): Future[Request] = {

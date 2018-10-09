@@ -196,6 +196,14 @@ class Application @Inject()
     }
   }
 
+  def deleteRequest(requestSlug: String) = userAction.async { implicit userRequest =>
+    withUserInfo { userInfo =>
+      dataFacade.deleteRequest(userInfo.email, requestSlug).map { request =>
+        NoContent
+      }
+    }
+  }
+
   def metadataMigrate(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
     withUserInfo { userInfo =>
       val maybeVersion = userRequest.body.get("version").flatMap(_.headOption).flatMap { version =>
@@ -364,7 +372,7 @@ class Application @Inject()
       dataFacade.deleteTask(userInfo.email, taskId).map { _ =>
         render {
           case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
-          case Accepts.Json() => Ok
+          case Accepts.Json() => NoContent
         }
       }
     }
