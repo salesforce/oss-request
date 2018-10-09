@@ -10,10 +10,15 @@
 @(task: models.Task, taskPrototype: models.Task.Prototype)
 
 @import play.api.libs.json._
+@import play.twirl.api.HtmlFormat
 
 @formWithData(form: JsObject) = @{
-    val dataBody = task.data.getOrElse(Json.obj())
-    val data = Json.obj("data" -> dataBody)
+    val dataBodyMap = task.data.getOrElse(Json.obj()).value
+    val escapedDataBody = dataBodyMap.mapValues {
+        case JsString(value) => JsString(HtmlFormat.escape(value).body)
+        case other => other
+    }
+    val data = Json.obj("data" -> escapedDataBody)
     val view = Json.obj("view" -> "bootstrap-display")
     form ++ data ++ view
 }

@@ -63,6 +63,10 @@
               "patentable": {
                 "type": "boolean",
                 "enum": [true, false]
+              },
+              "info": {
+                "title": "Info",
+                "type": "string"
               }
             }
           },
@@ -78,6 +82,9 @@
                 "label": "Is this patentable?",
                 "removeDefaultNone": true,
                 "optionLabels": ["Yes", "No"]
+              },
+              "info": {
+                "type": "textarea"
               }
             }
           }
