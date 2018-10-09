@@ -559,6 +559,19 @@ class Application @Inject()
     }
   }
 
+  def deleteDemoRepo(url: String) = Action { implicit request =>
+    val allowed = demoRepoAllowed(request)
+
+    env.mode match {
+      case Mode.Prod =>
+        NotFound
+      case _ if !allowed =>
+        Unauthorized
+      case _ =>
+        NoContent
+    }
+  }
+
   private[controllers] def svgSymbol(path: String, symbol: String): Node = {
     webJarsUtil.locate(path).path.flatMap { filePath =>
       val maybeInputStream = env.resourceAsStream(WebJarAssetLocator.WEBJARS_PATH_PREFIX + "/" + filePath)

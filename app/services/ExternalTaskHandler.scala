@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 // todo: make auth pluggable
-class ExternalTask @Inject()(environment: Environment, configuration: Configuration, wsClient: WSClient)(implicit ec: ExecutionContext) {
+class ExternalTaskHandler @Inject()(environment: Environment, configuration: Configuration, wsClient: WSClient)(implicit ec: ExecutionContext) {
 
   case class ServiceResponse(state: State.State, url: URL, maybeData: Option[JsObject])
 
@@ -151,6 +151,26 @@ class ExternalTask @Inject()(environment: Environment, configuration: Configurat
     }
     else {
       Future.successful(task)
+    }
+  }
+
+  def deleteTask(task: Task, program: Program): Future[Unit] = {
+    if (task.prototype(program).completableBy.exists(_.`type` == CompletableByType.Service)) {
+      wsRequest(task, program).flatMap { wsRequest =>
+        task.completedBy.fold(Future.failed[Unit](new Exception("Could not determine url to call"))) { url =>
+          wsRequest.withQueryStringParameters("url" -> url).delete().flatMap { response =>
+            response.status match {
+              case Status.NO_CONTENT =>
+                Future.unit
+              case _ =>
+                Future.failed(UnexpectedResponse(response.statusText, response.body))
+            }
+          }
+        }
+      }
+    }
+    else {
+      Future.unit
     }
   }
 

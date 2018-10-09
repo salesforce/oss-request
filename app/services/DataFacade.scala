@@ -16,7 +16,7 @@ import play.api.mvc.RequestHeader
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskService: ExternalTask, notifier: Notifier, gitMetadata: GitMetadata)(implicit ec: ExecutionContext) {
+class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externalTaskHandler: ExternalTaskHandler, notifier: Notifier, gitMetadata: GitMetadata)(implicit ec: ExecutionContext) {
 
   private def checkAccess(check: => Boolean): Future[Unit] = {
     if (check) {
@@ -50,7 +50,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
       url = controllers.routes.Application.task(requestSlug, task.id).absoluteURL()
 
       // we use the dao because we don't want to send notifications and re-process the events
-      updatedTask <- taskService.taskCreated(program, request, task, tasks, url, dao.updateTaskState(task.id, _, _, _, _))
+      updatedTask <- externalTaskHandler.taskCreated(program, request, task, tasks, url, dao.updateTaskState(task.id, _, _, _, _))
 
       RequestWithTasks(_, updatedTasks) <- dao.requestWithTasks(requestSlug)
 
@@ -191,6 +191,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
       request <- dao.request(currentTask.requestSlug)
       program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
       _ <- checkAccess(program.isAdmin(email))
+      _ <- externalTaskHandler.deleteTask(currentTask, program)
       result <- dao.deleteTask(taskId)
     } yield result
   }
@@ -200,7 +201,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
       task <- dao.taskById(taskId)
       request <- dao.request(task.requestSlug)
       program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
-      updatedTask <- taskService.taskStatus(task, program, updateTaskState(request.creatorEmail, task.id, _, _, _, _, true))
+      updatedTask <- externalTaskHandler.taskStatus(task, program, updateTaskState(request.creatorEmail, task.id, _, _, _, _, true))
     } yield updatedTask
   }
 
@@ -208,7 +209,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, taskSer
     def updateTasks(request: Request, program: Program, tasks: Seq[(Task, DAO.NumComments)]): Future[Seq[(Task, DAO.NumComments)]] = {
       Future.sequence {
         tasks.map { case (task, numComments) =>
-          taskService.taskStatus(task, program, updateTaskState(request.creatorEmail, task.id, _, _, _, _, true)).map { updatedTask =>
+          externalTaskHandler.taskStatus(task, program, updateTaskState(request.creatorEmail, task.id, _, _, _, _, true)).map { updatedTask =>
             updatedTask -> numComments
           }
         }

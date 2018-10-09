@@ -20,9 +20,9 @@ import play.api.test.Helpers._
 
 import scala.concurrent.Future
 
-class ExternalTaskSpec extends MixedPlaySpec {
+class ExternalTaskHandlerSpec extends MixedPlaySpec {
 
-  def externalTask(implicit app: Application) = app.injector.instanceOf[ExternalTask]
+  def externalTaskHandler(implicit app: Application) = app.injector.instanceOf[ExternalTaskHandler]
   def gitMetadata(implicit app: Application) = app.injector.instanceOf[GitMetadata]
   def program(implicit app: Application) = await(gitMetadata.latestVersion)._2.programs("two")
   implicit val fakeRequest: RequestHeader = FakeRequest()
@@ -38,14 +38,14 @@ class ExternalTaskSpec extends MixedPlaySpec {
       val request = Request(None, "two", "asdf", "asdf", ZonedDateTime.now(), "asdf@asdf.com", State.InProgress, None, None)
       val taskPrototype = program.tasks("oss_request_info")
       val task = Task(1, "oss_request_info", ZonedDateTime.now(), Seq("asdf@asdf.com"), None, None, None, State.InProgress, None, request.slug)
-      val updatedTask = await(externalTask.taskCreated(program, request, task, Seq.empty[Task], "http://asdf.com", updateTaskState(task)))
+      val updatedTask = await(externalTaskHandler.taskCreated(program, request, task, Seq.empty[Task], "http://asdf.com", updateTaskState(task)))
       updatedTask must equal (task)
     }
     "set the task to cancelled if it is assigned to a service that is unreachable" in new App(DAOMock.noDatabaseAppBuilder().build()) {
       val request = Request(None, "two", "asdf", "asdf", ZonedDateTime.now(), "asdf@asdf.com", State.InProgress, None, None)
       val taskPrototype = program.tasks("create_repo")
       val task = Task(1, "create_repo", ZonedDateTime.now(), Seq("http://localhost:12345/"), None, None, None, State.InProgress, None, request.slug)
-      val updatedTask = await(externalTask.taskCreated(program, request, task, Seq.empty[Task], "http://asdf.com", updateTaskState(task)))
+      val updatedTask = await(externalTaskHandler.taskCreated(program, request, task, Seq.empty[Task], "http://asdf.com", updateTaskState(task)))
       updatedTask.state must equal (State.Cancelled)
     }
     "set the task to cancelled if the service does not respond with the correct json" in new App(DAOMock.noDatabaseAppBuilder().build()) {
@@ -53,7 +53,7 @@ class ExternalTaskSpec extends MixedPlaySpec {
       val taskPrototype = program.tasks("create_repo")
       val url = "https://echo-webhook.herokuapp.com/asdf"
       val task = Task(1, "create_repo", ZonedDateTime.now(), Seq(url), None, None, None, State.InProgress, None, request.slug)
-      val updatedTask = await(externalTask.taskCreated(program, request, task, Seq.empty[Task], "http://asdf.com", updateTaskState(task)))
+      val updatedTask = await(externalTaskHandler.taskCreated(program, request, task, Seq.empty[Task], "http://asdf.com", updateTaskState(task)))
       updatedTask.state must equal (State.Cancelled)
 
     }
@@ -62,7 +62,7 @@ class ExternalTaskSpec extends MixedPlaySpec {
       val taskPrototype = program.tasks("create_repo")
       val url = controllers.routes.Application.createDemoRepo().absoluteURL(false, s"localhost:$port")
       val task = Task(1, "create_repo", ZonedDateTime.now(), Seq(url), None, None, None, State.InProgress, None, request.slug)
-      val updatedTask = await(externalTask.taskCreated(program, request, task, Seq.empty[Task], "http://asdf.com", updateTaskState(task)))
+      val updatedTask = await(externalTaskHandler.taskCreated(program, request, task, Seq.empty[Task], "http://asdf.com", updateTaskState(task)))
       updatedTask.completedBy must equal (Some("http://asdf.com"))
     }
   }
@@ -71,13 +71,13 @@ class ExternalTaskSpec extends MixedPlaySpec {
     "set the task to be cancelled when the external url is not set" in new App(DAOMock.noDatabaseAppBuilder().build()) {
       val taskPrototype = program.tasks("create_repo")
       val task = Task(1, "create_repo", ZonedDateTime.now(), Seq("http://localhost:12345/"), None, None, None, State.InProgress, None, "asdf")
-      val updatedTask = await(externalTask.taskStatus(task, program, updateTaskState(task)))
+      val updatedTask = await(externalTaskHandler.taskStatus(task, program, updateTaskState(task)))
       updatedTask.state must equal (State.Cancelled)
     }
     "set the task to cancelled when the service is unreachable" in new App(DAOMock.noDatabaseAppBuilder().build()) {
       val taskPrototype = program.tasks("create_repo")
       val task = Task(1, "create_repo", ZonedDateTime.now(), Seq("http://localhost:12345/"), Some("http://asdf.com"), None, None, State.InProgress, None, "asdf")
-      val updatedTask = await(externalTask.taskStatus(task, program, updateTaskState(task)))
+      val updatedTask = await(externalTaskHandler.taskStatus(task, program, updateTaskState(task)))
       updatedTask.state must equal (State.Cancelled)
     }
     "work when the task exists" in new Server(DAOMock.noDatabaseAppBuilder().build()) {
@@ -85,7 +85,7 @@ class ExternalTaskSpec extends MixedPlaySpec {
       val dao = app.injector.instanceOf[DAO]
       val url = controllers.routes.Application.createDemoRepo().absoluteURL(false, s"localhost:$port")
       val task = await(dao.createTask("asdf", "create_repo", Seq(url), Some("http://asdf.com/asdf")))
-      val updatedTask = await(externalTask.taskStatus(task, program, updateTaskState(task)))
+      val updatedTask = await(externalTaskHandler.taskStatus(task, program, updateTaskState(task)))
       updatedTask.completedBy must equal (Some("http://asdf.com"))
     }
   }
