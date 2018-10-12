@@ -8,7 +8,7 @@
 package controllers
 
 import javax.inject.Inject
-import models.{Metadata, RequestWithTasks, State, Task}
+import models.{Metadata, State, Task}
 import models.Task.CompletableByType
 import modules.{Auth, DAO, DB, NotifyProvider}
 import org.eclipse.jgit.lib.ObjectId
@@ -403,19 +403,25 @@ class Application @Inject()
 
   def emailReply = Action.async(parse.form(notifyProvider.form)) { implicit request =>
 
-    val maybeRequestSlugAndCommentId = for {
-      requestSlug <- (request.body.data \ "request-slug").asOpt[String]
-      taskId <- (request.body.data \ "task-id").asOpt[Int]
-    } yield (requestSlug, taskId)
-
-    maybeRequestSlugAndCommentId.fold {
+    def sendUnknownResponse = {
       val emailBody = "Sorry, but we couldn't figure out what to do with your email:\n\n" + request.body.body
-      notifyProvider.sendMessage(Set(request.body.sender), "OSS Request Email Not Handled", emailBody).map { _ =>
-        NotAcceptable
-      }
-    } { case (requestSlug, taskId) =>
-      dataFacade.commentOnTask(requestSlug, taskId, request.body.sender, request.body.body).map { _ =>
-        Ok
+      notifyProvider.sendMessage(Set(request.body.sender), "OSS Request Email Not Handled", emailBody)
+    }
+
+    request.body.inReplyTo.fold(sendUnknownResponse.map(_ => NotAcceptable)) { inReplyTo =>
+      notifyProvider.getRootMessageDataFromId(inReplyTo).flatMap { rootMessageData =>
+
+        val maybeData = for {
+          taskIdString <- (rootMessageData \ "task-id").asOpt[String]
+          taskId <- Try(taskIdString.toInt).toOption
+          requestSlug <- (rootMessageData \ "request-slug").asOpt[String]
+        } yield taskId -> requestSlug
+
+        maybeData.fold(sendUnknownResponse.map(_ => NotAcceptable)) { case (taskId, requestSlug) =>
+          dataFacade.commentOnTask(requestSlug, taskId, request.body.sender, request.body.body).map { _ =>
+            Ok
+          }
+        }
       }
     }
   }

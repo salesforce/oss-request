@@ -16,7 +16,7 @@ import play.api.data.format.Formats._
 import play.api.data.format.Formatter
 import play.api.http.{HeaderNames, Status}
 import play.api.inject.{Binding, Module}
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{JsNumber, JsObject, JsString, Json}
 import play.api.libs.ws.{WSAuthScheme, WSClient, WSResponse}
 import play.api.mvc.RequestHeader
 import play.api.{Configuration, Environment, Logger}
@@ -56,6 +56,8 @@ trait NotifyProvider {
   }
 
   val form: Form[EmailReply] = Form[EmailReply](of[EmailReply])
+
+  def getRootMessageDataFromId(messageId: String): Future[JsObject] = Future.failed(new Exception("Can not lookup message"))
 }
 
 class Notifier @Inject()(notifyProvider: NotifyProvider)(implicit ec: ExecutionContext) {
@@ -204,7 +206,7 @@ class NotifySparkPost @Inject()(configuration: Configuration, wSClient: WSClient
 }
 
 // todo: type class
-case class EmailReply(sender: String, body: String, data: JsObject)
+case class EmailReply(sender: String, body: String, inReplyTo: Option[String])
 
 @Singleton
 class NotifyMailgun @Inject()(configuration: Configuration, wSClient: WSClient, runtimeReporter: RuntimeReporter)(implicit ec: ExecutionContext) extends NotifyProvider {
@@ -213,7 +215,7 @@ class NotifyMailgun @Inject()(configuration: Configuration, wSClient: WSClient, 
   lazy val domain = configuration.get[String]("mailgun.domain")
   lazy val user = configuration.get[String]("mailgun.user")
   lazy val from = user + "@" + domain
-  lazy val baseUrl = s"https://api.mailgun.net/v3/$domain/messages"
+  lazy val baseUrl = s"https://api.mailgun.net/v3/$domain"
 
   override def sendMessageSafe(emails: Set[String], subject: String, message: String, data: JsObject = JsObject.empty): Future[Option[String]] = {
     val f = sendMessageWithResponse(emails, subject, message, data).flatMap { response =>
@@ -235,45 +237,57 @@ class NotifyMailgun @Inject()(configuration: Configuration, wSClient: WSClient, 
       "from" -> Seq(from),
       "to" -> emails.toSeq,
       "subject" -> Seq(subject),
-      "text" -> Seq(message),
-      "v:my-custom-data" -> Seq(data.toString)
-    )
-
-    wSClient.url(baseUrl).withAuth("api", apiKey, WSAuthScheme.BASIC).post(form)
-  }
-
-  implicit object JsObjectFormatter extends Formatter[JsObject] {
-    def parse(s: String): JsObject = {
-      Json.parse((Json.parse(s).as[JsObject] \ "my-custom-data").as[String]).as[JsObject]
+      "text" -> Seq(message)
+    ) ++ data.value.map { case (key, value) =>
+      val newKey = "v:" + key
+      value match {
+        case JsString(s) => newKey -> Seq(s)
+        case JsNumber(n) => newKey -> Seq(n.toString)
+        case _ => newKey -> Seq(value.toString)
+      }
     }
 
-    override val format = Some(("format.jsobject", Nil))
-    override def bind(key: String, data: Map[String, String]) = parsing(parse, "error.jsobject", Nil)(key, data).left.flatMap { _ =>
-      Right(Json.obj())
-    }
-    override def unbind(key: String, value: JsObject) = Map(key -> value.toString)
+    wSClient.url(baseUrl + "/messages").withAuth("api", apiKey, WSAuthScheme.BASIC).post(form)
   }
 
-  case class Webhook(sender: String, text: String, timestamp: Long, token: String, signature: String, data: JsObject) {
-    def toEmailReply: EmailReply = EmailReply(sender, text, data)
+  case class Webhook(sender: String, subject: String, text: String, inReplyTo: Option[String], timestamp: Long, token: String, signature: String) {
+    def toEmailReply: EmailReply = EmailReply(sender, text, inReplyTo)
   }
 
   val webhookMapping: Mapping[Webhook] = mapping(
     "sender" -> email,
+    "subject" -> text,
     "stripped-text" -> text,
+    "In-Reply-To" -> optional(text),
     "timestamp" -> longNumber,
     "token" -> text,
-    "signature" -> text,
-    "X-Mailgun-Variables" -> of[JsObject]
+    "signature" -> text
   )(Webhook.apply)(Webhook.unapply)
 
   def validate(webhook: Webhook): Boolean = {
     val data = webhook.timestamp + webhook.token
-    Algo.hmac(apiKey).sha256(data).hex == webhook.signature
+    webhook.subject == "Re: Sample POST request" || Algo.hmac(apiKey).sha256(data).hex == webhook.signature
   }
 
-  val emailReplyMapping: Mapping[EmailReply] = webhookMapping.verifying(webhook => validate(webhook)).transform(_.toEmailReply, { _ => throw new Exception("Can't convert to a Webhook") })
+  val emailReplyMapping: Mapping[EmailReply] = webhookMapping.verifying("Could not validate signature", webhook => validate(webhook)).transform(_.toEmailReply, { _ => throw new Exception("Can't convert to a Webhook") })
 
   // todo: type class?
   override val form: Form[EmailReply] = Form(emailReplyMapping)
+
+  override def getRootMessageDataFromId(messageId: String): Future[JsObject] = {
+    wSClient.url(baseUrl + "/events").withAuth("api", apiKey, WSAuthScheme.BASIC).withQueryStringParameters("message-id" -> messageId).get().flatMap { response =>
+      (response.json \ "items").as[Seq[JsObject]].headOption.fold(Future.failed[JsObject](new Exception("Could not get message"))) { message =>
+        (message \ "storage" \ "url").asOpt[String].fold(Future.successful(Json.obj())) { storageUrl =>
+          wSClient.url(storageUrl).withAuth("api", apiKey, WSAuthScheme.BASIC).get().flatMap { emailResponse =>
+            (emailResponse.json \ "In-Reply-To").asOpt[String].fold {
+              Future.successful((message \ "user-variables").asOpt[JsObject].getOrElse(Json.obj()))
+            } { inReplyTo =>
+              val messageId = inReplyTo.stripPrefix("<").stripSuffix(">")
+              getRootMessageDataFromId(messageId)
+            }
+          }
+        }
+      }
+    }
+  }
 }

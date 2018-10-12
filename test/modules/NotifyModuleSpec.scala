@@ -126,7 +126,6 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       form.value must be (defined)
       form.value.get.sender must equal (sender)
       form.value.get.body must equal (text)
-      form.value.get.data must equal (Json.obj())
     }
     "work with json message headers" in {
       assume(Try(notifyMailgun.apiKey).isSuccess)
@@ -142,12 +141,11 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
         "timestamp" -> timestamp.toString,
         "token" -> token,
         "signature" -> signature,
-        "X-Mailgun-Variables" -> Json.obj(
-          "my-custom-data" -> json.toString()
-        ).toString()
+        "X-Mailgun-Variables" -> json.toString()
       )
 
-      notifyMailgun.form.bind(data).get.data must equal (json)
+      // todo: better testing for getRootMessageDataFromId
+      noException must be thrownBy notifyMailgun.form.bind(data).get
     }
     "not work with invalid signature" in {
       assume(Try(notifyMailgun.apiKey).isSuccess)
