@@ -170,11 +170,15 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
 
           _ <- if (task.state == State.InProgress) notifier.taskAssigned(requestWithTasks.request, task, program) else notifier.taskStateChanged(requestWithTasks.request, task, program)
 
-          updatedRequestWithTasks <- dao.requestWithTasks(currentTask.requestSlug)
+          _ <- for {
+            updatedRequestWithTasks <- dao.requestWithTasks(currentTask.requestSlug)
+            _ <- taskEventHandler.process(program, updatedRequestWithTasks.request, updatedRequestWithTasks.tasks, TaskEvent.EventType.StateChange, task, createTask(_, _, _), updateRequest(email, task.requestSlug, _, _, securityBypass))
+          } yield Unit
 
-          _ <- taskEventHandler.process(program, updatedRequestWithTasks.request, updatedRequestWithTasks.tasks, TaskEvent.EventType.StateChange, task, createTask(_, _, _), updateRequest(email, task.requestSlug, _, _, securityBypass))
-
-          _ <- if (updatedRequestWithTasks.completedTasks.size == updatedRequestWithTasks.tasks.size) notifier.allTasksCompleted(updatedRequestWithTasks.request, program.admins) else Future.unit
+          _ <- for {
+            updatedRequestWithTasks <- dao.requestWithTasks(currentTask.requestSlug)
+            _ <- if (updatedRequestWithTasks.completedTasks.size == updatedRequestWithTasks.tasks.size) notifier.allTasksCompleted(updatedRequestWithTasks.request, program.admins) else Future.unit
+          } yield Unit
         } yield task
       }
     }
