@@ -330,12 +330,20 @@ class Application @Inject()
 
   def updateTaskState(requestSlug: String, taskId: Int, state: State.State, completionMessage: Option[String]) = userAction.async(maybeJsObject) { implicit userRequest =>
     withUserInfo { userInfo =>
-      userRequest.body.fold(dataFacade.taskById(taskId).map(_.data))(data => Future.successful(Some(data))).flatMap { maybeData =>
-        dataFacade.updateTaskState(userInfo.email, taskId, state, Some(userInfo.email), maybeData, completionMessage).map { task =>
-          render {
-            case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
-            case Accepts.Json() => Ok(Json.toJson(task))
-          }
+      for {
+        task <- dataFacade.taskById(taskId)
+        request <- dataFacade.request(userInfo.email, task.requestSlug)
+        program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
+        prototype <- program.task(task.taskKey)
+
+        maybeData = userRequest.body.orElse(task.data)
+        maybeCompletedBy = if (task.isCompletableByService(prototype)) task.completedBy else Some(userInfo.email)
+
+        _ <- dataFacade.updateTaskState(userInfo.email, taskId, state, maybeCompletedBy, maybeData, completionMessage)
+      } yield {
+        render {
+          case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
+          case Accepts.Json() => Ok(Json.toJson(task))
         }
       }
     }

@@ -23,17 +23,21 @@ case class Task(id: Int, taskKey: String, createDate: ZonedDateTime, completable
     program.tasks.getOrElse(taskKey, throw new Exception(s"Could not get task $taskKey for $id on request $requestSlug"))
   }
 
+  def isCompletableByService(prototype: Task.Prototype): Boolean = {
+    prototype.completableBy.exists(_.`type` == Task.CompletableByType.Service)
+  }
+
   def completableByEmailsOrUrl(program:Program): Either[Set[String], URL] = {
-    require(completableBy.nonEmpty)
-    if (!prototype(program).completableBy.exists(_.`type` == Task.CompletableByType.Service)) {
+    val taskPrototype = prototype(program)
+
+    if (!isCompletableByService(taskPrototype)) {
       Left(completableBy.toSet)
     }
     else {
-      val urlTry = Try {
-        new URL(completableBy.head)
+      Right {
+        val service = taskPrototype.completableBy.get.value.get
+        new URL(program.services(service))
       }
-
-      urlTry.toEither.left.map(_ => completableBy.toSet)
     }
   }
 

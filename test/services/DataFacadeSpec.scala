@@ -23,6 +23,8 @@ import scala.util.Try
 
 class DataFacadeSpec extends MixedPlaySpec {
 
+
+
   def withDb = DAOMock.databaseAppBuilder().overrides(bind[NotifyProvider].to[NotifyMock]).build()
 
   def database(implicit app: play.api.Application) = app.injector.instanceOf[Database]
@@ -73,18 +75,17 @@ class DataFacadeSpec extends MixedPlaySpec {
         a[DataFacade.MissingTaskDependencyException] must be thrownBy await(dataFacade.createTask(request.slug, "six", Seq("foo@foo.com")))
       }
     }
-    "work with services" in new Server(withDb) {
+    // the example metadata points to a service on port 9000 so we use it here, which isn't ideal but we don't have a good way to override that currently
+    "work with services" in new Server(withDb, 9000) {
       Evolutions.withEvolutions(database) {
-        val gitMetadata = app.injector.instanceOf[GitMetadata]
-        val program = await(gitMetadata.fetchProgram(None, "two"))
         val request = await(dataFacade.createRequest(None, "two", "foo", "foo@bar.com"))
         val ossRequestJson = Json.obj(
           "org" -> "asdf",
           "name" -> "asdf"
         )
         await(dataFacade.createTask(request.slug, "repo_info", Seq("foo@bar.com"), Some("foo@bar.com"), Some(ossRequestJson), State.Completed))
-        val url = controllers.routes.Application.createDemoRepo().absoluteURL(false, s"localhost:$testServerPort")
-        val task = await(dataFacade.createTask(request.slug, "create_repo", Seq(url)))
+        val task = await(dataFacade.createTask(request.slug, "create_repo", Seq.empty))
+        task.state must equal (State.InProgress)
         task.completedBy must equal (Some("http://asdf.com"))
       }
     }

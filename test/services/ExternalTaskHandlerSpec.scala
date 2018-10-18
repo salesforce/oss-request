@@ -44,16 +44,18 @@ class ExternalTaskHandlerSpec extends MixedPlaySpec {
     "set the task to cancelled if it is assigned to a service that is unreachable" in new App(DAOMock.noDatabaseAppBuilder().build()) {
       val request = Request(None, "two", "asdf", "asdf", ZonedDateTime.now(), "asdf@asdf.com", State.InProgress, None, None)
       val taskPrototype = program.tasks("create_repo")
-      val task = Task(1, "create_repo", ZonedDateTime.now(), Seq("http://localhost:12345/"), None, None, None, State.InProgress, None, request.slug)
-      val updatedTask = await(externalTaskHandler.taskCreated(program, request, task, Seq.empty[Task], "http://asdf.com", updateTaskState(task)))
+      val task = Task(1, "create_repo", ZonedDateTime.now(), Seq.empty, None, None, None, State.InProgress, None, request.slug)
+      val programWithRightUrl = program.copy(services = program.services.updated("repo_creator", "http://localhost:12345/"))
+      val updatedTask = await(externalTaskHandler.taskCreated(programWithRightUrl, request, task, Seq.empty, "http://asdf.com", updateTaskState(task)))
       updatedTask.state must equal (State.Cancelled)
     }
     "set the task to cancelled if the service does not respond with the correct json" in new App(DAOMock.noDatabaseAppBuilder().build()) {
       val request = Request(None, "two", "asdf", "asdf", ZonedDateTime.now(), "asdf@asdf.com", State.InProgress, None, None)
       val taskPrototype = program.tasks("create_repo")
       val url = "https://echo-webhook.herokuapp.com/asdf"
-      val task = Task(1, "create_repo", ZonedDateTime.now(), Seq(url), None, None, None, State.InProgress, None, request.slug)
-      val updatedTask = await(externalTaskHandler.taskCreated(program, request, task, Seq.empty[Task], "http://asdf.com", updateTaskState(task)))
+      val programWithRightUrl = program.copy(services = program.services.updated("repo_creator", url))
+      val task = Task(1, "create_repo", ZonedDateTime.now(), Seq.empty, None, None, None, State.InProgress, None, request.slug)
+      val updatedTask = await(externalTaskHandler.taskCreated(programWithRightUrl, request, task, Seq.empty, "http://asdf.com", updateTaskState(task)))
       updatedTask.state must equal (State.Cancelled)
 
     }
@@ -61,8 +63,10 @@ class ExternalTaskHandlerSpec extends MixedPlaySpec {
       val request = Request(None, "two", "asdf", "asdf", ZonedDateTime.now(), "asdf@asdf.com", State.InProgress, None, None)
       val taskPrototype = program.tasks("create_repo")
       val url = controllers.routes.Application.createDemoRepo().absoluteURL(false, s"localhost:$port")
-      val task = Task(1, "create_repo", ZonedDateTime.now(), Seq(url), None, None, None, State.InProgress, None, request.slug)
-      val updatedTask = await(externalTaskHandler.taskCreated(program, request, task, Seq.empty[Task], "http://asdf.com", updateTaskState(task)))
+      val programWithRightUrl = program.copy(services = program.services.updated("repo_creator", url))
+      val task = Task(1, "create_repo", ZonedDateTime.now(), Seq.empty, None, None, None, State.InProgress, None, request.slug)
+      val taskUrl = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL()
+      val updatedTask = await(externalTaskHandler.taskCreated(programWithRightUrl, request, task, Seq.empty, taskUrl, updateTaskState(task)))
       updatedTask.completedBy must equal (Some("http://asdf.com"))
     }
   }
@@ -83,10 +87,9 @@ class ExternalTaskHandlerSpec extends MixedPlaySpec {
     "work when the task exists" in new Server(DAOMock.noDatabaseAppBuilder().build()) {
       val taskPrototype = program.tasks("create_repo")
       val dao = app.injector.instanceOf[DAO]
-      val url = controllers.routes.Application.createDemoRepo().absoluteURL(false, s"localhost:$port")
-      val task = await(dao.createTask("asdf", "create_repo", Seq(url), Some("http://asdf.com/asdf")))
+      val task = await(dao.createTask("asdf", "create_repo", Seq.empty, Some("http://asdf.com/asdf")))
       val updatedTask = await(externalTaskHandler.taskStatus(task, program, updateTaskState(task)))
-      updatedTask.completedBy must equal (Some("http://asdf.com"))
+      updatedTask.completedBy must equal (Some("http://asdf.com/asdf"))
     }
   }
 

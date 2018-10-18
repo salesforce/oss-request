@@ -166,6 +166,9 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
           requestWithTasks <- dao.requestWithTasks(currentTask.requestSlug)
           program <- gitMetadata.fetchProgram(requestWithTasks.request.metadataVersion, requestWithTasks.request.program)
           _ <- checkAccess(securityBypass || program.isAdmin(email) || currentTask.completableBy.contains(email))
+
+
+
           task <- dao.updateTaskState(taskId, state, maybeCompletedBy, maybeData, completionMessage)
 
           _ <- if (task.state == State.InProgress) notifier.taskAssigned(requestWithTasks.request, task, program) else notifier.taskStateChanged(requestWithTasks.request, task, program)
