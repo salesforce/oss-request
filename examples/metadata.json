@@ -267,6 +267,9 @@
         "type": "ACTION",
         "info": "This creates the repo",
         "dependencies": ["repo_info"],
+        "form": {
+          "foo": "bar"
+        },
         "completable_by": {
           "type": "SERVICE",
           "value": "repo_creator"

@@ -88,6 +88,7 @@ class ExternalTaskHandler @Inject()(environment: Environment, configuration: Con
           "label" -> task.prototype(program).label,
           "url" -> taskUrl,
           "data" -> task.data,
+          "form" -> task.prototype(program).form,
           "dependencies" -> dependenciesData
         )
       )
