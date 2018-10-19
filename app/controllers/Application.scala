@@ -7,6 +7,7 @@
 
 package controllers
 
+import akka.stream.scaladsl.StreamConverters
 import javax.inject.Inject
 import models.{Metadata, State, Task}
 import models.Task.CompletableByType
@@ -15,6 +16,7 @@ import org.eclipse.jgit.lib.ObjectId
 import org.webjars.WebJarAssetLocator
 import org.webjars.play.WebJarsUtil
 import play.api.libs.json.{JsObject, Json}
+import play.api.libs.ws.WSClient
 import play.api.mvc._
 import play.api.{Configuration, Environment, Logger, Mode}
 import play.twirl.api.Html
@@ -26,7 +28,7 @@ import scala.xml.{Comment, Node}
 
 
 class Application @Inject()
-  (env: Environment, dataFacade: DataFacade, userAction: UserAction, auth: Auth, gitMetadata: GitMetadata, configuration: Configuration, webJarsUtil: WebJarsUtil, notifyProvider: NotifyProvider, runtimeReporter: RuntimeReporter, dao: DAO)
+  (env: Environment, dataFacade: DataFacade, userAction: UserAction, auth: Auth, gitMetadata: GitMetadata, configuration: Configuration, webJarsUtil: WebJarsUtil, notifyProvider: NotifyProvider, runtimeReporter: RuntimeReporter, dao: DAO, wsClient: WSClient)
   (requestsView: views.html.Requests, newRequestView: views.html.NewRequest, newRequestFormView: views.html.NewRequestForm, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest, notifyTestView: views.html.NotifyTest, loginView: views.html.Login, pickEmailView: views.html.PickEmail, errorView: views.html.Error, openUserTasksView: views.html.OpenUserTasks, taskView: views.html.Task, searchView: views.html.Search, migratorView: views.html.Migrator, migrationResolverView: views.html.MigrationResolver)
   (implicit ec: ExecutionContext)
   extends InjectedController {
@@ -529,6 +531,23 @@ class Application @Inject()
     auth.authUrl.flatMap { authUrl =>
       gitMetadata.latestVersion.map(_._2).map { implicit metadata =>
         Ok(loginView()).withNewSession
+      }
+    }
+  }
+
+  def favicon() = Action.async {
+    configuration.getOptional[String]("resources.url").fold {
+      Future.successful {
+        env.resourceAsStream("/public/images/favicon.ico").fold {
+          NotFound("favicon.ico not found")
+        } { inputStream =>
+          Ok.chunked(StreamConverters.fromInputStream(() => inputStream))
+        }
+      }
+    } { resourcesUrl =>
+      val faviconUrl = resourcesUrl.stripSuffix("/") + "/favicon.ico"
+      wsClient.url(faviconUrl).get().map { response =>
+        Ok(response.bodyAsBytes)
       }
     }
   }
