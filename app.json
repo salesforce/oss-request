@@ -53,7 +53,7 @@
       ],
       "scripts": {
         "test-setup": "npm install -g snyk",
-        "test": "snyk test --file=build.sbt; sbt test; snyk monitor --file=build.sbt --org=salesforce --project-name=\"salesforce/oss-request#$HEROKU_TEST_RUN_BRANCH\""
+        "test": "scripts/test.sh"
       },
       "env": {
         "APPLICATION_SECRET": {
