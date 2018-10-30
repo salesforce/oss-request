@@ -43,6 +43,18 @@
   ],
   "environments": {
     "test": {
+      "buildpacks": [
+        {
+          "url": "heroku/scala"
+        },
+        {
+          "url": "heroku/nodejs"
+        }
+      ],
+      "scripts": {
+        "test-setup": "npm install -g snyk",
+        "test": "snyk test; sbt test; snyk monitor --org=salesforce --project-name=\"salesforce/oss-request#$HEROKU_TEST_RUN_BRANCH\""
+      },
       "env": {
         "APPLICATION_SECRET": {
           "generator": "secret"
