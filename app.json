@@ -43,6 +43,18 @@
   ],
   "environments": {
     "test": {
+      "buildpacks": [
+        {
+          "url": "heroku/scala"
+        },
+        {
+          "url": "heroku/nodejs"
+        }
+      ],
+      "scripts": {
+        "test-setup": "npm install -g snyk",
+        "test": "scripts/test.sh"
+      },
       "env": {
         "APPLICATION_SECRET": {
           "generator": "secret"

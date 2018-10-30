@@ -17,6 +17,13 @@ libraryDependencies ++= Seq(
   jdbc,
   evolutions,
 
+  "com.fasterxml.jackson.core" % "jackson-core"                    % "2.9.7",
+  "com.fasterxml.jackson.core" % "jackson-annotations"             % "2.9.7",
+  "com.fasterxml.jackson.core" % "jackson-databind"                % "2.9.7",
+
+  "org.apache.commons"     %  "commons-compress"                   % "1.18",
+  "com.google.guava"       %  "guava"                              % "27.0-jre",
+
   "org.slf4j"              %  "log4j-over-slf4j"                   % "1.7.25",
   "io.airbrake"            %  "javabrake"                          % "0.1.6",
 
@@ -47,6 +54,7 @@ libraryDependencies ++= Seq(
 pipelineStages := Seq(digest, gzip)
 
 WebKeys.webJars in Assets := Seq.empty[File]
+
 
 // license header stuff
 
