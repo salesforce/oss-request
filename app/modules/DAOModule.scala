@@ -221,25 +221,19 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
   }
 
   override def updateTaskState(taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], maybeCompletionMessages: Option[String]): Future[Task] = {
-    // todo: move this to a validation module via the DAO
-    if (state != State.InProgress && maybeCompletedBy.isEmpty) {
-      Future.failed(new Exception("maybeCompletedBy was not specified"))
-    }
-    else {
-      val maybeCompletedDate = if (state != State.InProgress) Some(ZonedDateTime.now()) else None
-      val updateFuture = run {
-        quote {
-          query[Task].filter(_.id == lift(taskId)).update(
-            _.completedBy -> lift(maybeCompletedBy),
-            _.state -> lift(state),
-            _.completedDate -> lift(maybeCompletedDate),
-            _.data -> lift(maybeData),
-            _.completionMessage -> lift(maybeCompletionMessages)
-          )
-        }
+    val maybeCompletedDate = if (state != State.InProgress) Some(ZonedDateTime.now()) else None
+    val updateFuture = run {
+      quote {
+        query[Task].filter(_.id == lift(taskId)).update(
+          _.completedBy -> lift(maybeCompletedBy),
+          _.state -> lift(state),
+          _.completedDate -> lift(maybeCompletedDate),
+          _.data -> lift(maybeData),
+          _.completionMessage -> lift(maybeCompletionMessages)
+        )
       }
-      updateFuture.flatMap(_ => taskById(taskId))
     }
+    updateFuture.flatMap(_ => taskById(taskId))
   }
 
   override def updateTaskKey(taskId: Int, taskKey: String): Future[Task] = {

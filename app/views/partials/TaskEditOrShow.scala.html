@@ -41,19 +41,20 @@
 @completed = {
     <div class="panel-footer">
         @for(completedDate <- task.completedDate) {
-            @for(completedBy <- task.completedBy) {
-                @(task.completableByEmailsOrUrl(program), task.completionMessage, taskPrototype.`type`) match {
-                    case (Left(_), Some(completionMessage), Task.TaskType.Approval) => {
-                        Conditionally approved on @completedDate.monthDayYear by @completedBy provided @completionMessage
+            @(task.completableByEmailsOrUrl(program), task.completionMessage, taskPrototype.`type`, task.completedBy) match {
+                case (Left(_), Some(completionMessage), Task.TaskType.Approval, Some(completedBy)) => {
+                    Conditionally approved on @completedDate.monthDayYear by @completedBy provided @completionMessage
+                }
+                case (Left(_), _, _, Some(completedBy)) => {
+                    @task.stateToHuman(program).capitalize on @completedDate.monthDayYear by @completedBy
+                }
+                case (Right(url), maybeCompletionMessage, _, maybeCompletedBy) => {
+                    @task.stateToHuman(program).capitalize on @completedDate.monthDayYear
+                    @for(completedBy <- maybeCompletedBy) {
+                        by <a href="@completedBy">@completedBy</a>
                     }
-                    case (Left(_), _, _) => {
-                        @task.stateToHuman(program).capitalize on @completedDate.monthDayYear by @completedBy
-                    }
-                    case (Right(url), maybeCompletionMessage, _) => {
-                        @task.stateToHuman(program).capitalize on @completedDate.monthDayYear by <a href="@completedBy">@completedBy</a>
-                        @for(completionMessage <- maybeCompletionMessage) {
-                            with message: <code>@completionMessage</code>
-                        }
+                    @for(completionMessage <- maybeCompletionMessage) {
+                        with message: <code>@completionMessage</code>
                     }
                 }
             }

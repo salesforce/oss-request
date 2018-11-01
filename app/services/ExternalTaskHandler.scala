@@ -108,12 +108,12 @@ class ExternalTaskHandler @Inject()(environment: Environment, configuration: Con
             if (environment.mode != Mode.Test) {
               Logger.error(e.body, e)
             }
-            updateTaskState(State.Cancelled, Some(wsRequest.url), None, Some(e.getMessage))
+            updateTaskState(State.Cancelled, None, None, Some(e.body))
           case e: Exception =>
             if (environment.mode != Mode.Test) {
               Logger.error("Error communicating with Service", e)
             }
-            updateTaskState(State.Cancelled, Some(wsRequest.url), None, Some(e.getMessage))
+            updateTaskState(State.Cancelled, None, None, Some(e.getMessage))
         }
       }
     }
@@ -125,7 +125,7 @@ class ExternalTaskHandler @Inject()(environment: Environment, configuration: Con
   def taskStatus(task: Task, program: Program, updateTaskState: (State.State, Option[String], Option[JsObject], Option[String]) => Future[Task]): Future[Task] = {
     if (task.prototype(program).completableBy.exists(_.`type` == CompletableByType.Service) && task.state == State.InProgress) {
       wsRequest(task, program).flatMap { wsRequest =>
-        task.completedBy.fold(updateTaskState(State.Cancelled, Some(wsRequest.url), None, Some("Could not determine URL to call"))) { url =>
+        task.completedBy.fold(updateTaskState(State.Cancelled, None, None, Some("Could not determine URL to call"))) { url =>
           wsRequest.withQueryStringParameters("url" -> url).get().flatMap { response =>
             response.status match {
               case Status.OK =>
@@ -141,7 +141,7 @@ class ExternalTaskHandler @Inject()(environment: Environment, configuration: Con
             if (environment.mode != Mode.Test) {
               Logger.error(e.body, e)
             }
-            updateTaskState(State.Cancelled, task.completedBy, None, Some(e.getMessage))
+            updateTaskState(State.Cancelled, task.completedBy, None, Some(e.body))
           case e: Exception =>
             if (environment.mode != Mode.Test) {
               Logger.error("Error communicating with Service", e)
@@ -158,7 +158,7 @@ class ExternalTaskHandler @Inject()(environment: Environment, configuration: Con
   def deleteTask(task: Task, program: Program): Future[Unit] = {
     if (task.prototype(program).completableBy.exists(_.`type` == CompletableByType.Service)) {
       wsRequest(task, program).flatMap { wsRequest =>
-        task.completedBy.fold(Future.failed[Unit](new Exception("Could not determine url to call"))) { url =>
+        task.completedBy.fold(Future.unit) { url =>
           wsRequest.withQueryStringParameters("url" -> url).delete().flatMap { response =>
             response.status match {
               case Status.NO_CONTENT =>
