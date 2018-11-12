@@ -53,7 +53,7 @@
       ],
       "scripts": {
         "test-setup": "npm install -g snyk",
-        "test": "scripts/test.sh"
+        "test": ".bin/test.sh"
       },
       "env": {
         "APPLICATION_SECRET": {
