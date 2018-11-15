@@ -120,11 +120,6 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       val updatedTask = await(dao.updateTaskState(task.id, State.Completed, Some("foo@foo.com"), None, None))
       updatedTask.completedDate must be (defined)
     }
-    "fail to complete without a completedByEmail" in Evolutions.withEvolutions(database) {
-      val request = await(dao.createRequest(None, "foo", "foo@bar.com"))
-      val task = await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
-      an [Exception] must be thrownBy await(dao.updateTaskState(task.id, State.Completed, None, None, None))
-    }
   }
 
   "deleteTask" must {
