@@ -48,6 +48,9 @@
                 case (Left(_), _, _, Some(completedBy)) => {
                     @task.stateToHuman(program).capitalize on @completedDate.monthDayYear by @completedBy
                 }
+                case (Left(_), _, _, None) => {
+                    @task.stateToHuman(program).capitalize on @completedDate.monthDayYear
+                }
                 case (Right(url), maybeCompletionMessage, _, maybeCompletedBy) => {
                     @task.stateToHuman(program).capitalize on @completedDate.monthDayYear
                     @for(completedBy <- maybeCompletedBy) {

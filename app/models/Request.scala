@@ -10,7 +10,8 @@ package models
 import java.time.ZonedDateTime
 
 import org.eclipse.jgit.lib.ObjectId
-import play.api.libs.json.{JsString, Json, Writes}
+import play.api.libs.json.JsonNaming.SnakeCase
+import play.api.libs.json.{JsString, Json, JsonConfiguration, Writes}
 
 case class Request(metadataVersion: Option[ObjectId], program: String, slug: String, name: String, createDate: ZonedDateTime, creatorEmail: String, state: State.State, completedDate: Option[ZonedDateTime], completionMessage: Option[String]) {
 
@@ -44,5 +45,6 @@ object Request {
     def writes(objectId: ObjectId) = JsString(objectId.getName)
   }
 
+  implicit val config = JsonConfiguration(SnakeCase)
   implicit val jsonWrites: Writes[Request] = Json.writes[Request]
 }

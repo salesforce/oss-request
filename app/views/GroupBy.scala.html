@@ -1,0 +1,27 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@this(main: Main)
+
+@(requests: Map[Option[String], Seq[RequestWithTasksAndProgram]], report: models.Report, groupBy: models.GroupBy, userInfo: controllers.UserInfo)(implicit request: RequestHeader, metadata: models.Metadata)
+
+@main(Some(userInfo))("OSS Requests") {
+
+    <h2>@report.title</h2>
+
+    @for(group <- requests) {
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h3 class="panel-title">@group._1.getOrElse("No " + groupBy.title) <span class="badge">@group._2.size</span></h3>
+            </div>
+            <div class="panel-body">
+                @partials.RequestsList(group._2)
+            </div>
+        </div>
+    }
+
+}

@@ -45,6 +45,7 @@ GET         /logout                                            controllers.Appli
 POST        /_demo_repo                                        controllers.Application.createDemoRepo()
 GET         /_demo_repo                                        controllers.Application.demoRepo(url: String)
 DELETE      /_demo_repo                                        controllers.Application.deleteDemoRepo(url: String)
+GET         /_demo_team                                        controllers.Application.demoTeam()
 
 # Map static resources from the /public folder to the /assets URL path
 GET         /assets/*file                                      controllers.Assets.versioned(path="/public", file: Asset)

@@ -23,13 +23,13 @@ import play.twirl.api.Html
 import services.{DataFacade, GitMetadata, RuntimeReporter}
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Random, Success, Try}
 import scala.xml.{Comment, Node}
 
 
 class Application @Inject()
   (env: Environment, dataFacade: DataFacade, userAction: UserAction, auth: Auth, gitMetadata: GitMetadata, configuration: Configuration, webJarsUtil: WebJarsUtil, notifyProvider: NotifyProvider, runtimeReporter: RuntimeReporter, dao: DAO, wsClient: WSClient)
-  (requestsView: views.html.Requests, newRequestView: views.html.NewRequest, newRequestFormView: views.html.NewRequestForm, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest, notifyTestView: views.html.NotifyTest, loginView: views.html.Login, pickEmailView: views.html.PickEmail, errorView: views.html.Error, openUserTasksView: views.html.OpenUserTasks, taskView: views.html.Task, searchView: views.html.Search, migratorView: views.html.Migrator, migrationResolverView: views.html.MigrationResolver)
+  (requestsView: views.html.Requests, newRequestView: views.html.NewRequest, newRequestFormView: views.html.NewRequestForm, requestView: views.html.Request, commentsView: views.html.partials.Comments, formTestView: views.html.FormTest, notifyTestView: views.html.NotifyTest, loginView: views.html.Login, pickEmailView: views.html.PickEmail, errorView: views.html.Error, openUserTasksView: views.html.OpenUserTasks, taskView: views.html.Task, searchView: views.html.Search, groupedView: views.html.GroupBy, migratorView: views.html.Migrator, migrationResolverView: views.html.MigrationResolver)
   (implicit ec: ExecutionContext)
   extends InjectedController {
 
@@ -117,8 +117,12 @@ class Application @Inject()
       gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
         metadata.programs.get(programKey).fold(Future.successful(NotFound(errorView("Program Not Found", userInfo)))) { program =>
           program.reports.get(reportKey).fold(Future.successful(NotFound(errorView("Report Not Found", userInfo)))) { report =>
-            dataFacade.search(Some(programKey), report.query.state, report.query.data, report.query.dataIn).map { requests =>
-              Ok(searchView(requests, userInfo))
+            dataFacade.search(Some(programKey), report.query.state, report.query.data, report.query.dataIn).flatMap { requests =>
+              report.groupBy.fold(Future.successful(Ok(searchView(requests, userInfo)))) { groupBy =>
+                dataFacade.groupBy(requests, groupBy).map { grouped =>
+                  Ok(groupedView(grouped, report, groupBy, userInfo))
+                }
+              }
             }
           }
         }
@@ -610,6 +614,19 @@ class Application @Inject()
         Unauthorized
       case _ =>
         NoContent
+    }
+  }
+
+  def demoTeam() = Action { request =>
+    val allowed = demoRepoAllowed(request)
+
+    env.mode match {
+      case Mode.Prod =>
+        NotFound
+      case _ if !allowed =>
+        Unauthorized
+      case _ =>
+        Ok(Random.shuffle(Set("Team Blue", "Team Red", "Team Green")).head)
     }
   }
 

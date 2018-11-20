@@ -7,6 +7,7 @@
 
 package models
 
+import java.net.URL
 import java.time.ZonedDateTime
 
 import models.Task.CompletableByType
@@ -14,8 +15,10 @@ import org.eclipse.jgit.lib.ObjectId
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 import core.Extensions._
+import play.api.libs.json.JsonNaming.SnakeCase
 
 import scala.concurrent.Future
+import scala.util.Try
 
 case class MetadataVersion(id: Option[ObjectId], date: ZonedDateTime)
 
@@ -111,9 +114,19 @@ object ReportQuery {
   )(ReportQuery.apply _)
 }
 
+case class GroupBy(service: URL, title: String)
 
-case class Report(title: String, query: ReportQuery)
+object GroupBy {
+  implicit val jsonReads: Reads[GroupBy] = (
+    (__ \ "service").read[URL] ~
+    (__ \ "title").read[String]
+  )(GroupBy.apply _)
+}
+
+
+case class Report(title: String, query: ReportQuery, groupBy: Option[GroupBy])
 
 object Report {
+  implicit val config = JsonConfiguration(SnakeCase)
   implicit val jsonReads: Reads[Report] = Json.reads[Report]
 }

@@ -9,11 +9,12 @@ package services
 
 import java.net.URL
 
+import core.Extensions._
 import javax.inject.Inject
 import models.Task.CompletableByType
 import models.{Program, Request, State, Task}
 import play.api.http.{HeaderNames, Status}
-import play.api.libs.json.{JsError, JsObject, JsPath, JsResult, JsString, JsSuccess, JsValue, Json, JsonValidationError, Reads}
+import play.api.libs.json.{JsObject, Json}
 import play.api.libs.ws.{WSClient, WSRequest}
 import play.api.{Configuration, Environment, Logger, Mode}
 
@@ -24,20 +25,6 @@ import scala.util.Try
 class ExternalTaskHandler @Inject()(environment: Environment, configuration: Configuration, wsClient: WSClient)(implicit ec: ExecutionContext) {
 
   case class ServiceResponse(state: State.State, url: URL, maybeData: Option[JsObject])
-
-  implicit object URLJsonReads extends Reads[URL] {
-    def reads(json: JsValue): JsResult[URL] = json match {
-      case JsString(s) =>
-        Try(new URL(s)).fold[JsResult[URL]]({ t =>
-            JsError(JsPath -> JsonValidationError(t.getMessage))
-          }, { url =>
-            JsSuccess(url)
-          }
-        )
-      case _ =>
-        JsError(JsPath -> JsonValidationError("error.expected.jsstring"))
-    }
-  }
 
   def parseResponse(body: String): Future[ServiceResponse] = {
     Future.fromTry {
@@ -57,18 +44,19 @@ class ExternalTaskHandler @Inject()(environment: Environment, configuration: Con
     sys.env.get("PSK_" + url.toString.map(_.toHexString).mkString.toUpperCase)
   }
 
-  def wsRequest(task: Task, program: Program): Future[WSRequest] = {
-    task.completableByEmailsOrUrl(program).fold({ _ =>
-      Future.failed[WSRequest](new Exception("Task was not assigned a to a valid URL"))
-    }, { url =>
-      val baseRequest = wsClient.url(url.toString)
+  def wsRequest(url: URL): WSRequest = {
+    val baseRequest = wsClient.url(url.toString)
 
-      Future.successful {
-        psk(url).fold(baseRequest) { psk =>
-          baseRequest.withHttpHeaders(HeaderNames.AUTHORIZATION -> s"psk $psk")
-        }
-      }
-    })
+    psk(url).fold(baseRequest) { psk =>
+      baseRequest.withHttpHeaders(HeaderNames.AUTHORIZATION -> s"psk $psk")
+    }
+  }
+
+  def wsRequest(task: Task, program: Program): Future[WSRequest] = {
+    task.completableByEmailsOrUrl(program).fold(
+      { _ => Future.failed[WSRequest](new Exception("Task was not assigned a to a valid URL")) },
+      { url => Future.successful(wsRequest(url)) }
+    )
   }
 
   def taskCreated(program: Program, request: Request, task: Task, existingTasks: Seq[Task], taskUrl: String, updateTaskState: (State.State, Option[String], Option[JsObject], Option[String]) => Future[Task]): Future[Task] = {
@@ -172,6 +160,17 @@ class ExternalTaskHandler @Inject()(environment: Environment, configuration: Con
     }
     else {
       Future.unit
+    }
+  }
+
+  def requestToGroup(request: Request, url: URL): Future[String] = {
+    wsRequest(url).withBody(Json.toJson(request)).get().flatMap { response =>
+      response.status match {
+        case Status.OK =>
+          Future.successful(response.body)
+        case _ =>
+          Future.failed(new Exception("Could not determine group"))
+      }
     }
   }
 

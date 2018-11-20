@@ -34,6 +34,16 @@
         "query": {
           "state": "IN_PROGRESS"
         }
+      },
+      "completed_with_group_by": {
+        "title": "Completed By Team",
+        "query": {
+          "state": "COMPLETED"
+        },
+        "group_by": {
+          "title": "Team",
+          "service": "http://localhost:9000/_demo_team"
+        }
       }
     },
     "tasks": {

@@ -8,7 +8,7 @@
 package services
 
 import javax.inject.Inject
-import models.{Comment, DataIn, Metadata, Program, Request, RequestWithTasks, RequestWithTasksAndProgram, State, Task, TaskEvent}
+import models.{Comment, DataIn, GroupBy, Metadata, Program, Request, RequestWithTasks, RequestWithTasksAndProgram, State, Task, TaskEvent}
 import modules.{DAO, Notifier}
 import org.eclipse.jgit.lib.ObjectId
 import play.api.libs.json.JsObject
@@ -270,6 +270,18 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
 
   def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject], maybeDataIn: Option[DataIn]): Future[Seq[RequestWithTasksAndProgram]] = {
     dao.searchRequests(maybeProgram, maybeState, maybeData, maybeDataIn).flatMap(withProgram)
+  }
+
+  def groupBy(requestsWithTasksAndProgram: Seq[RequestWithTasksAndProgram], groupBy: GroupBy): Future[Map[Option[String], Seq[RequestWithTasksAndProgram]]] = {
+    Future.traverse(requestsWithTasksAndProgram) { requestWithTasksAndProgram =>
+      externalTaskHandler.requestToGroup(requestWithTasksAndProgram.request, groupBy.service).map[(Option[String], RequestWithTasksAndProgram)] { group =>
+        Some(group) -> requestWithTasksAndProgram
+      } recover {
+        case _ => None -> requestWithTasksAndProgram
+      }
+    } map { groups =>
+      groups.groupBy(_._1).mapValues(_.map(_._2))
+    }
   }
 
 }
