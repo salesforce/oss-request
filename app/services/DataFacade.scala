@@ -202,7 +202,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     } yield updatedTask
   }
 
-  def deleteTask(email: String, taskId: Int): Future[Unit] = {
+  def deleteTask(email: String, taskId: Int)(implicit requestHeader: RequestHeader): Future[Unit] = {
     for {
       currentTask <- dao.taskById(taskId)
       request <- dao.request(currentTask.requestSlug)
@@ -210,6 +210,11 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
       _ <- checkAccess(program.isAdmin(email))
       _ <- externalTaskHandler.deleteTask(currentTask, program)
       result <- dao.deleteTask(taskId)
+
+      _ <- for {
+        updatedRequestWithTasks <- dao.requestWithTasks(currentTask.requestSlug)
+        _ <- if (updatedRequestWithTasks.completedTasks.size == updatedRequestWithTasks.tasks.size) notifier.allTasksCompleted(updatedRequestWithTasks.request, program.admins) else Future.unit
+      } yield Unit
     } yield result
   }
 
