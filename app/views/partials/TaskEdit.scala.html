@@ -59,7 +59,7 @@
                                                     contentType: "application/json"
                                                 };
                                                 this.ajaxSubmit(config).done(function(data) {
-                                                    if (data.requestSlug !== undefined) {
+                                                    if (data.request_slug !== undefined) {
                                                         // the updateTask call returns a task json
                                                         window.location = "/request/" + data.request_slug;
                                                     }
