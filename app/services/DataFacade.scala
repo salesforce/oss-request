@@ -91,6 +91,15 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     } yield updatedRequest
   }
 
+  def renameRequest(email: String, requestSlug: String, newName: String): Future[Request] = {
+    for {
+      currentRequest <- dao.request(requestSlug)
+      program <- gitMetadata.fetchProgram(currentRequest.metadataVersion, currentRequest.program)
+      _ <- checkAccess(currentRequest.creatorEmail == email || program.isAdmin(email))
+      updatedRequest <- dao.renameRequest(requestSlug, newName)
+    } yield updatedRequest
+  }
+
   def deleteRequest(email: String, requestSlug: String)(implicit requestHeader: RequestHeader): Future[Unit] = {
     for {
       RequestWithTasks(request, tasks) <- dao.requestWithTasks(requestSlug)

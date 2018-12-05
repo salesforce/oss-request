@@ -173,4 +173,30 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
     }
   }
 
+  "renameRequest" must {
+    "work" in Evolutions.withEvolutions(database) {
+      val request = await(dao.createRequest(None, "foo", "foo@bar.com"))
+      await(dao.createTask(request.slug, "start", Seq("foo@foo.com")))
+
+      val updatedRequest = await(dao.renameRequest(request.slug, "Bar"))
+      updatedRequest.slug must equal ("bar")
+      updatedRequest.name must equal ("Bar")
+
+      val viaPrevious = await(dao.previousSlug(request.slug))
+      viaPrevious must equal (updatedRequest.slug)
+
+      val tasks = await(dao.requestTasks(updatedRequest.slug))
+      tasks must have size 1
+    }
+  }
+
+  "withSlug" must {
+    "work with previous slugs" in Evolutions.withEvolutions(database) {
+      val request1 = await(dao.createRequest(None, "foo", "foo@bar.com"))
+      val updatedRequest1 = await(dao.renameRequest(request1.slug, "Bar"))
+      val request2 = await(dao.createRequest(None, "foo", "foo@bar.com"))
+      request2.slug must not equal request1.slug
+    }
+  }
+
 }

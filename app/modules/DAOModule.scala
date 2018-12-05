@@ -16,7 +16,7 @@ import com.github.mauricio.async.db.postgresql.pool.PostgreSQLConnectionFactory
 import com.github.mauricio.async.db.postgresql.util.URLParser
 import io.getquill.{PostgresAsyncContext, SnakeCase}
 import javax.inject.{Inject, Singleton}
-import models.{Comment, DataIn, Request, RequestWithTasks, State, Task}
+import models.{Comment, DataIn, PreviousSlug, Request, RequestWithTasks, State, Task}
 import org.eclipse.jgit.lib.ObjectId
 import play.api.inject.{ApplicationLifecycle, Binding, Module}
 import play.api.libs.json.{JsObject, Json}
@@ -55,6 +55,8 @@ trait DAO {
   def commentsOnTask(taskId: Int): Future[Seq[Comment]]
   def tasksForUser(email: String, state: State.State): Future[Seq[(Task, DAO.NumComments, Request)]]
   def searchRequests(maybeProgram: Option[String], maybeState: Option[State.State], data: Option[JsObject], dataIn: Option[DataIn]): Future[Seq[RequestWithTasks]]
+  def renameRequest(requestSlug: String, newName: String): Future[Request]
+  def previousSlug(slug: String): Future[String]
 }
 
 object DAO {
@@ -70,18 +72,24 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
   implicit val objectIdDecoder = MappedEncoding[Array[Byte], ObjectId](ObjectId.fromString(_, 0))
   implicit val objectIdEncoder = MappedEncoding[ObjectId, Array[Byte]](_.name().getBytes)
 
-  override def createRequest(metadataVersion: Option[ObjectId], programKey: String, name: String, creatorEmail: String): Future[Request] = {
-    // todo: slug choice in transaction with create
-
+  def withSlug(name: String)(f: String => Future[Request]): Future[Request] = {
     // figure out slug
     val defaultSlug = DB.slug(name)
     val takenSlugsFuture = run {
       quote {
-        query[Request].map(_.slug).filter(_.startsWith(lift(defaultSlug)))
+        query[PreviousSlug].map(_.previous).filter(_.startsWith(lift(defaultSlug))).union {
+          query[Request].map(_.slug).filter(_.startsWith(lift(defaultSlug)))
+        }
       }
     }
 
-    takenSlugsFuture.map(DB.nextSlug(defaultSlug)).flatMap { slug =>
+    takenSlugsFuture.map(DB.nextSlug(defaultSlug)).flatMap(f)
+  }
+
+  override def createRequest(metadataVersion: Option[ObjectId], programKey: String, name: String, creatorEmail: String): Future[Request] = {
+    // todo: slug choice in transaction with create
+
+    withSlug(name) { slug =>
       val state = State.InProgress
       val createDate = ZonedDateTime.now()
 
@@ -391,6 +399,26 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }.map(joinedRequestTasksToRequests)
   }
 
+  override def renameRequest(requestSlug: String, newName: String): Future[Request] = {
+    withSlug(newName) { newSlug =>
+      val rename = for {
+        _ <- runIO(query[Request].filter(_.slug == lift(requestSlug)).update(_.slug -> lift(newSlug), _.name -> lift(newName)))
+        _ <- runIO(query[PreviousSlug].insert(_.previous -> lift(requestSlug), _.current -> lift(newSlug)))
+      } yield ()
+
+      performIO(rename.transactional).flatMap(_ => request(newSlug))
+    }
+  }
+
+  override def previousSlug(slug: String): Future[String] = {
+    run {
+      quote {
+        query[PreviousSlug].filter(_.previous == lift(slug)).map(_.current)
+      }
+    }.flatMap { rows =>
+      rows.headOption.fold(Future.failed[String](DB.RequestNotFound(slug)))(Future.successful)
+    }
+  }
 }
 
 object DB {

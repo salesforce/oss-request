@@ -11,7 +11,7 @@ import java.time.ZonedDateTime
 import java.util.concurrent.ConcurrentHashMap
 
 import javax.inject.Singleton
-import models.{Comment, DataIn, Request, RequestWithTasks, State, Task}
+import models.{Comment, DataIn, PreviousSlug, Request, RequestWithTasks, State, Task}
 import org.eclipse.jgit.lib.ObjectId
 import play.api.Mode
 import play.api.db.evolutions.EvolutionsModule
@@ -28,6 +28,7 @@ import scala.util.Try
 @Singleton
 class DAOMock extends DAO {
   val requests = ConcurrentHashMap.newKeySet[Request].asScala
+  val previousSlugs = ConcurrentHashMap.newKeySet[PreviousSlug].asScala
   val tasks = ConcurrentHashMap.newKeySet[Task].asScala
   val comments = ConcurrentHashMap.newKeySet[Comment].asScala
 
@@ -218,6 +219,36 @@ class DAOMock extends DAO {
         // todo: maybeDataIn
       }.toSeq
     }
+  }
+
+  override def renameRequest(requestSlug: String, newName: String): Future[Request] = {
+    request(requestSlug).map { request =>
+      val newSlug = DB.slug(newName)
+
+      val updatedRequest = request.copy(slug = newSlug, name = newName)
+      requests -= request
+      requests += updatedRequest
+
+      tasks.filter(_.requestSlug == requestSlug).foreach { task =>
+        val updatedTask = task.copy(requestSlug = newSlug)
+        tasks -= task
+        tasks += updatedTask
+      }
+
+      previousSlugs += PreviousSlug(requestSlug, newSlug)
+
+      previousSlugs.filter(_.current == requestSlug).foreach { previousSlug =>
+        val updatedPreviousSlug = previousSlug.copy(current = newSlug)
+        previousSlugs -= previousSlug
+        previousSlugs += updatedPreviousSlug
+      }
+
+      updatedRequest
+    }
+  }
+
+  override def previousSlug(slug: String): Future[String] = {
+    previousSlugs.find(_.previous == slug).fold(Future.failed[String](new Exception(slug + " not found")))(ps => Future.successful(ps.current))
   }
 
 }

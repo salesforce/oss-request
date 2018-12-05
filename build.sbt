@@ -44,6 +44,7 @@ libraryDependencies ++= Seq(
   "org.webjars"            %  "handlebars"                         % "4.0.11-1",
   "org.webjars"            %  "alpaca"                             % "1.5.23",
   "org.webjars"            %  "Eonasdan-bootstrap-datetimepicker"  % "4.17.47",
+  "org.webjars"            %  "x-editable-bootstrap3"              % "1.5.1-1",
   "org.webjars.npm"        %  "jsoneditor"                         % "5.17.1",
   "org.webjars.npm"        %  "github-com-alexcorvi-anchorme-js"   % "1.1.2",
   "org.planet42"           %% "laika-core"                         % "0.7.5",

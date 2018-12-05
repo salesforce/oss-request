@@ -201,7 +201,25 @@
 @mainView(Some(userInfo))("Request") {
 
     <div class="jumbotron">
-        <h1>@request.name</h1>
+        @if(program.isAdmin(userInfo.email) || request.creatorEmail == userInfo.email) {
+            <h1><a href="#" id="requestName" data-type="text" data-pk="@request.slug" data-url="@helper.CSRF(routes.Application.renameRequest(request.slug))" data-mode="inline">@request.name</a></h1>
+            <script>
+                $(document).ready(function() {
+                    $('#requestName').editable({
+                        success: function(response) {
+                            if(response.slug === undefined) {
+                                return response;
+                            }
+                            else {
+                                location.replace("/request/" + response.slug);
+                            }
+                        }
+                    });
+                });
+            </script>
+        } else {
+            <h1>@request.name</h1>
+        }
         <p>Created by @request.creatorEmail on @request.createDate.monthDayYear</p>
         <div>@state</div>
     </div>

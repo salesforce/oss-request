@@ -24,6 +24,8 @@ case class Request(metadataVersion: Option[ObjectId], program: String, slug: Str
 
 }
 
+case class PreviousSlug(previous: String, current: String)
+
 trait TaskFilters {
   val tasks: Seq[Task]
 

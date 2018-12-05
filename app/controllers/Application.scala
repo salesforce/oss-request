@@ -186,8 +186,13 @@ class Application @Inject()
         }
       } recoverWith {
         case rnf: DB.RequestNotFound =>
-          gitMetadata.latestVersion.map(_._2).map { implicit metadata =>
-            NotFound(errorView(rnf.getMessage, userInfo))
+          dao.previousSlug(requestSlug).map { newSlug =>
+            Redirect(routes.Application.request(newSlug))
+          } recoverWith {
+            case _: DB.RequestNotFound =>
+              gitMetadata.latestVersion.map(_._2).map { implicit metadata =>
+                NotFound(errorView(rnf.getMessage, userInfo))
+              }
           }
       }
     }
@@ -206,6 +211,17 @@ class Application @Inject()
     withUserInfo { userInfo =>
       dataFacade.deleteRequest(userInfo.email, requestSlug).map { request =>
         NoContent
+      }
+    }
+  }
+
+  def renameRequest(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
+    withUserInfo { userInfo =>
+      val maybeNewName = userRequest.body.get("value").flatMap(_.headOption).filter(_.nonEmpty)
+      maybeNewName.fold(Future.successful(BadRequest("the new name was not specified"))) { newName =>
+        dataFacade.renameRequest(userInfo.email, requestSlug, newName).map { request =>
+          Ok(Json.toJson(request))
+        }
       }
     }
   }
