@@ -59,13 +59,16 @@
                                                     contentType: "application/json"
                                                 };
                                                 this.ajaxSubmit(config).done(function(data) {
-                                                    if (data.request_slug !== undefined) {
+                                                    if (data.requestSlug !== undefined) {
                                                         // the updateTask call returns a task json
-                                                        window.location = "/request/" + data.request_slug;
+                                                        window.location = "/request/" + data.requestSlug;
                                                     }
-                                                    else {
+                                                    else if (data.slug !== undefined) {
                                                         // the createRequest call returns a request json
                                                         window.location = "/request/" + data.slug;
+                                                    }
+                                                    else {
+                                                        window.location.reload();
                                                     }
                                                 });
                                             }
