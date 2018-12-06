@@ -69,6 +69,7 @@
     <div class="panel-heading clearfix">
         <h3 class="panel-title pull-left">
             <a href="@routes.Application.task(task.requestSlug, task.id)">@taskPrototype.label</a>
+            <small>(Created on @task.createDate.monthDayYear)</small>
         </h3>
         <div class="pull-right">
             @if(isAdmin) {
