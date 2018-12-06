@@ -7,7 +7,7 @@
 
 @this(mainView: Main)
 
-@(userInfo: controllers.UserInfo, maybeName: Option[String], maybeProgramKey: Option[String], maybeStartTask: Option[String])(implicit request: RequestHeader, metadata: models.Metadata)
+@(userInfo: controllers.UserInfo, maybeName: Option[String], maybeProgramKey: Option[String], maybeStartTask: Option[String])(implicit request: RequestHeader, latestMetadata: services.GitMetadata.LatestMetadata)
 
 @mainView(Some(userInfo))("New Request") {
 
@@ -20,17 +20,17 @@
         </div>
 
         @maybeProgramKey.fold {
-            @if(metadata.programs.size == 1) {
-                <input type="hidden" name="program" value="@metadata.programs.head._1">
+            @if(latestMetadata.metadata.programs.size == 1) {
+                <input type="hidden" name="program" value="@latestMetadata.metadata.programs.head._1">
             } else {
                 <div class="form-group">
                     <label for="program" class="col-sm-2 control-label">Program</label>
 
                     <div class="col-sm-6">
-                    @for(program <- metadata.programs) {
+                    @for(program <- latestMetadata.metadata.programs) {
                         <div class="radio">
                             <label>
-                                <input type="radio" name="program" value="@program._1" @if(program == metadata.programs.head) { checked } >
+                                <input type="radio" name="program" value="@program._1" @if(program == latestMetadata.metadata.programs.head) { checked } >
                                 <em>@program._2.name</em>
                                 @for(descriptionMarkdown <- program._2.descriptionMarkdown) {
                                     - @Html(descriptionMarkdown)
@@ -47,7 +47,7 @@
 
         @maybeStartTask.fold {
             <input type="hidden" name="startTask">
-            @for(program <- metadata.programs) {
+            @for(program <- latestMetadata.metadata.programs) {
                 <div class="start-task" data-program="@program._1" style="display: none">
                     @if(program._2.startTasks.isEmpty) {
                         <input type="hidden" class="input" data-program="@program._1" value="start">

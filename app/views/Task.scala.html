@@ -5,9 +5,11 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  *@
 
+@import services.GitMetadata.LatestMetadata
+
 @this(mainView: Main, taskView: partials.TaskEditOrShow, commentsView: partials.Comments)
 
-@(request: models.Request, program: models.Program, task: models.Task, taskPrototype: models.Task.Prototype, comments: Seq[Comment], userInfo: controllers.UserInfo, isAdmin: Boolean, groups: Set[String])(implicit requestHeader: RequestHeader, metadata: models.Metadata)
+@(request: models.Request, program: models.Program, task: models.Task, taskPrototype: models.Task.Prototype, comments: Seq[Comment], userInfo: controllers.UserInfo, isAdmin: Boolean, groups: Set[String])(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata)
 
 @mainView(Some(userInfo))("Task") {
 

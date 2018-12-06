@@ -7,7 +7,7 @@
 
 @this(main: Main)
 
-@(emails: Set[String], state: Option[String])(implicit request: RequestHeader, metadata: models.Metadata)
+@(emails: Set[String], state: Option[String])(implicit request: RequestHeader, latestMetadata: services.GitMetadata.LatestMetadata)
 
 @main(None)("Select Email") {
     <h2>That account has multiple emails, pick one</h2>
@@ -15,8 +15,8 @@
         @for(email <- emails) {
             <li>
                 <a href="@routes.Application.selectEmail(email, state)">@email</a>
-                @for(program <- metadata.programs) {
-                    @if(program._2.isAdmin(email)) {
+                @for(program <- latestMetadata.metadata.programs) {
+                    @if(latestMetadata.isAdmin(email, program._1)) {
                         (admin in @program._2.name)
                     }
                 }

@@ -7,10 +7,11 @@
 
 @import org.eclipse.jgit.lib.ObjectId
 @import core.Extensions._
+@import services.GitMetadata.LatestMetadata
 
 @this(mainView: Main, taskView: partials.TaskEditOrShow)
 
-@(program: models.Program, latestVersion: Option[ObjectId], request: models.Request, tasks: Seq[(models.Task, models.Task.Prototype, modules.DAO.NumComments)], userInfo: controllers.UserInfo)(implicit requestHeader: RequestHeader, metadata: models.Metadata)
+@(program: models.Program, request: models.Request, tasks: Seq[(models.Task, models.Task.Prototype, modules.DAO.NumComments)], userInfo: controllers.UserInfo)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata)
 
 @tasksWithState(state: State.State) = @{
     tasks.filter(_._1.state == state)
@@ -26,7 +27,7 @@
 }
 
 @metadataOutOfDate = @{
-    (request.metadataVersion, latestVersion) match {
+    (request.metadataVersion, latestMetadata.maybeVersion) match {
         case (Some(r), Some(l)) => r != l
         case (Some(r), None) => true
         case (None, Some(l)) => false
@@ -50,32 +51,32 @@
                 </div>
 
                 <div style="margin-bottom: 20px;">
-                    @if(completedTasks.size == tasks.size && program.isAdmin(userInfo.email)) {
+                    @if(completedTasks.size == tasks.size && latestMetadata.isAdmin(userInfo.email, request.program)) {
                         <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Completed))" method="post" class="btn-group">
                             <button type="submit" class="btn btn-success">Approve Request</button>
                         </form>
                     }
 
-                    @if(program.isAdmin(userInfo.email)) {
+                    @if(latestMetadata.isAdmin(userInfo.email, request.program)) {
                         <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Denied))" method="post" class="btn-group">
                             <button type="submit" class="btn btn-danger">Deny Request</button>
                         </form>
                     }
 
-                    @if(program.isAdmin(userInfo.email) || request.creatorEmail == userInfo.email) {
+                    @if(latestMetadata.isAdmin(userInfo.email, request.program) || request.creatorEmail == userInfo.email) {
                         <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Cancelled))" method="post" class="btn-group">
                             <button type="submit" class="btn btn-warning">Cancel Request</button>
                         </form>
                     }
 
-                    @if(program.isAdmin(userInfo.email) && metadataOutOfDate) {
+                    @if(latestMetadata.isAdmin(userInfo.email, request.program) && metadataOutOfDate) {
                         <form action="@helper.CSRF(routes.Application.metadataMigrate(request.slug))" method="post" class="btn-group">
-                            <input type="hidden" name="version" value="@latestVersion.map(_.name()).getOrElse("")">
-                            <button type="submit" class="btn btn-default" title="Request = @request.metadataVersion.abbreviate &amp; Latest = @latestVersion.abbreviate">Update Metadata</button>
+                            <input type="hidden" name="version" value="@latestMetadata.maybeVersion.map(_.name()).getOrElse("")">
+                            <button type="submit" class="btn btn-default" title="Request = @request.metadataVersion.abbreviate &amp; Latest = @latestMetadata.maybeVersion.abbreviate">Update Metadata</button>
                         </form>
                     }
 
-                    @if(program.isAdmin(userInfo.email)) {
+                    @if(latestMetadata.isAdmin(userInfo.email, request.program)) {
                         <div class="btn-group">
                             <button class="btn btn-danger btn-sm pull-right" data-toggle="modal" data-target="#confirmModal" data-action="delete" data-url="@helper.CSRF(routes.Application.deleteRequest(request.slug))" data-redirect="@routes.Application.index()">
                                 <span class="glyphicon glyphicon-trash"></span>
@@ -85,7 +86,7 @@
                 </div>
 
                 <div class="row">
-                    @if(program.isAdmin(userInfo.email)) {
+                    @if(latestMetadata.isAdmin(userInfo.email, request.program)) {
                         <div class="col-md-12">
                             <form action="@helper.CSRF(routes.Application.addTask(request.slug))" method="post" class="form-inline">
                                 <div class="form-group">
@@ -183,7 +184,7 @@
         case models.State.Cancelled => {
             Request Cancelled
 
-            @if(program.isAdmin(userInfo.email)) {
+            @if(latestMetadata.isAdmin(userInfo.email, request.program)) {
                 <div class="btn-group">
                     <button class="btn btn-danger btn-sm pull-right" data-toggle="modal" data-target="#confirmModal" data-action="delete" data-url="@helper.CSRF(routes.Application.deleteRequest(request.slug))" data-redirect="@routes.Application.index()">
                         <span class="glyphicon glyphicon-trash"></span>
@@ -201,7 +202,7 @@
 @mainView(Some(userInfo))("Request") {
 
     <div class="jumbotron">
-        @if(program.isAdmin(userInfo.email) || request.creatorEmail == userInfo.email) {
+        @if(latestMetadata.isAdmin(userInfo.email, request.program) || request.creatorEmail == userInfo.email) {
             <h1><a href="#" id="requestName" data-type="text" data-pk="@request.slug" data-url="@helper.CSRF(routes.Application.renameRequest(request.slug))" data-mode="inline">@request.name</a></h1>
             <script>
                 $(document).ready(function() {
@@ -225,7 +226,7 @@
     </div>
 
     @for(task <- tasks) {
-        @taskView(program, task._1, task._2, Left(task._3), userInfo, program.isAdmin(userInfo.email), program.groups.keySet)
+        @taskView(program, task._1, task._2, Left(task._3), userInfo, latestMetadata.isAdmin(userInfo.email, request.program), program.groups.keySet)
     }
 
 }

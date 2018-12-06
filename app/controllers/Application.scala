@@ -52,7 +52,7 @@ class Application @Inject()
 
   def openUserTasks = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         dataFacade.tasksForUser(userInfo.email, State.InProgress).flatMap { tasks =>
 
           val tasksWithProgramFuture = Future.sequence {
@@ -80,10 +80,10 @@ class Application @Inject()
 
   def requests(program: Option[String]) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
 
         val (maybeTitle, requestsFuture) = program.map { programKey =>
-          metadata.programs.get(programKey).map(_.name) -> dataFacade.programRequests(programKey)
+          latestMetadata.metadata.programs.get(programKey).map(_.name) -> dataFacade.programRequests(programKey)
         } getOrElse {
           Some("Your Requests") -> dataFacade.userRequests(userInfo.email)
         }
@@ -103,7 +103,7 @@ class Application @Inject()
 
   def search(program: Option[String], state: Option[models.State.State], data: Option[String]) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         val maybeData = data.flatMap(Json.parse(_).asOpt[JsObject])
         dataFacade.search(program, state, maybeData, None).map { requests =>
           Ok(searchView(requests, userInfo))
@@ -114,8 +114,8 @@ class Application @Inject()
 
   def report(programKey: String, reportKey: String) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
-        metadata.programs.get(programKey).fold(Future.successful(NotFound(errorView("Program Not Found", userInfo)))) { program =>
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
+        latestMetadata.metadata.programs.get(programKey).fold(Future.successful(NotFound(errorView("Program Not Found", userInfo)))) { program =>
           program.reports.get(reportKey).fold(Future.successful(NotFound(errorView("Report Not Found", userInfo)))) { report =>
             dataFacade.search(Some(programKey), report.query.state, report.query.data, report.query.dataIn).flatMap { requests =>
               report.groupBy.fold(Future.successful(Ok(searchView(requests, userInfo)))) { groupBy =>
@@ -132,7 +132,7 @@ class Application @Inject()
 
   def newRequest(maybeName: Option[String], maybeProgramKey: Option[String], maybeStartTask: Option[String]) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         val nonEmptyMaybeName = maybeName.filter(_.nonEmpty)
         val nonEmptyMaybeProgramKey = maybeProgramKey.filter(_.nonEmpty)
         val nonEmptyMaybeStartTask = maybeStartTask.filter(_.nonEmpty)
@@ -140,7 +140,7 @@ class Application @Inject()
         val maybeTaskView = for {
           name <- nonEmptyMaybeName
           programKey <- nonEmptyMaybeProgramKey
-          programMetadata <- metadata.programs.get(programKey)
+          programMetadata <- latestMetadata.metadata.programs.get(programKey)
           startTask <- nonEmptyMaybeStartTask
           task <- programMetadata.tasks.get(startTask)
         } yield {
@@ -156,10 +156,10 @@ class Application @Inject()
 
   def createRequest(name: String, programKey: String, startTask: String) = userAction.async(parse.json) { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.latestVersion.flatMap { case (metadataVersion, metadata) =>
-        metadata.program(programKey).flatMap { programMetadata =>
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
+        latestMetadata.metadata.program(programKey).flatMap { programMetadata =>
           programMetadata.tasks.get(startTask).fold(Future.successful(InternalServerError(s"Could not find task named '$startTask'"))) { metaTask =>
-            dataFacade.createRequest(metadataVersion, programKey, name, userInfo.email).flatMap { request =>
+            dataFacade.createRequest(latestMetadata.maybeVersion, programKey, name, userInfo.email).flatMap { request =>
               Task.completableByWithDefaults(metaTask.completableBy, Some(userInfo.email), None).flatMap(programMetadata.completableBy).fold {
                 Future.successful(BadRequest("Could not determine who can complete the task"))
               } { emails =>
@@ -178,9 +178,9 @@ class Application @Inject()
     withUserInfo { userInfo =>
       dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
         gitMetadata.fetchProgram(request.metadataVersion, request.program).flatMap { program =>
-          gitMetadata.latestVersion.flatMap { case (latestVersion, latestMetadata) =>
+          gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
             dataFacade.requestTasks(userInfo.email, request.slug).map { tasks =>
-              Ok(requestView(program, latestVersion, request, tasks, userInfo)(userRequest, latestMetadata))
+              Ok(requestView(program, request, tasks, userInfo))
             }
           }
         }
@@ -190,7 +190,7 @@ class Application @Inject()
             Redirect(routes.Application.request(newSlug))
           } recoverWith {
             case _: DB.RequestNotFound =>
-              gitMetadata.latestVersion.map(_._2).map { implicit metadata =>
+              gitMetadata.latestVersion.map { implicit latestMetadata =>
                 NotFound(errorView(rnf.getMessage, userInfo))
               }
           }
@@ -200,17 +200,21 @@ class Application @Inject()
 
   def updateRequest(requestSlug: String, state: State.State) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      // todo: allow user to provide a message
-      dataFacade.updateRequest(userInfo.email, requestSlug, state, None).map { request =>
-        Redirect(routes.Application.request(request.slug))
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
+        // todo: allow user to provide a message
+        dataFacade.updateRequest(userInfo.email, requestSlug, state, None).map { request =>
+          Redirect(routes.Application.request(request.slug))
+        }
       }
     }
   }
 
   def deleteRequest(requestSlug: String) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      dataFacade.deleteRequest(userInfo.email, requestSlug).map { request =>
-        NoContent
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
+        dataFacade.deleteRequest(userInfo.email, requestSlug).map { request =>
+          NoContent
+        }
       }
     }
   }
@@ -228,54 +232,56 @@ class Application @Inject()
 
   def metadataMigrate(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
     withUserInfo { userInfo =>
-      val maybeVersion = userRequest.body.get("version").flatMap(_.headOption).flatMap { version =>
-        Try(ObjectId.fromString(version)).toOption
-      }
-
-      dataFacade.requestMetadataMigrationConflicts(requestSlug, maybeVersion).flatMap { migrationConflicts =>
-        if (migrationConflicts.isEmpty) {
-          dataFacade.updateRequestMetadata(userInfo.email, requestSlug, maybeVersion, Set.empty).map { _ =>
-            Redirect(routes.Application.request(requestSlug))
-          }
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
+        val maybeVersion = userRequest.body.get("version").flatMap(_.headOption).flatMap { version =>
+          Try(ObjectId.fromString(version)).toOption
         }
-        else {
-          val resolutions = migrationConflicts.map { migrationConflict =>
-            userRequest.body.get(s"task-${migrationConflict.task.id}").flatMap(_.headOption).flatMap {
-              case "do-nothing" =>
-                Some(Metadata.MigrationConflictResolution(Metadata.MigrationConflictResolution.DoNothing, migrationConflict.task.id))
 
-              case "reopen" =>
-                Some(Metadata.MigrationConflictResolution(Metadata.MigrationConflictResolution.Reopen, migrationConflict.task.id))
-
-              case "remove" =>
-                Some(Metadata.MigrationConflictResolution(Metadata.MigrationConflictResolution.Remove, migrationConflict.task.id))
-
-              case "new-task-key" =>
-                userRequest.body.get(s"task-${migrationConflict.task.id}-newtaskkey").flatMap(_.headOption).map { newTaskKey =>
-                  Metadata.MigrationConflictResolution(Metadata.MigrationConflictResolution.NewTaskKey(newTaskKey), migrationConflict.task.id)
-                }
-
-              case "reassign" =>
-                val maybeCompletableBy = userRequest.body.get(s"task-${migrationConflict.task.id}-completableby").flatMap(_.headOption)
-                Some(Metadata.MigrationConflictResolution(Metadata.MigrationConflictResolution.Reassign(maybeCompletableBy), migrationConflict.task.id))
+        dataFacade.requestMetadataMigrationConflicts(requestSlug, maybeVersion).flatMap { migrationConflicts =>
+          if (migrationConflicts.isEmpty) {
+            dataFacade.updateRequestMetadata(userInfo.email, requestSlug, maybeVersion, Set.empty).map { _ =>
+              Redirect(routes.Application.request(requestSlug))
             }
           }
+          else {
+            val resolutions = migrationConflicts.map { migrationConflict =>
+              userRequest.body.get(s"task-${migrationConflict.task.id}").flatMap(_.headOption).flatMap {
+                case "do-nothing" =>
+                  Some(Metadata.MigrationConflictResolution(Metadata.MigrationConflictResolution.DoNothing, migrationConflict.task.id))
 
-          if (resolutions.exists(_.isEmpty)) {
-            // todo: if missing resolutions, tell the user
-            gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
-              dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
-                gitMetadata.fetchProgram(request.metadataVersion, request.program).flatMap { currentProgram =>
-                  gitMetadata.fetchProgram(maybeVersion, request.program).map { newProgram =>
-                    Ok(migrationResolverView(userInfo, request, maybeVersion, currentProgram, newProgram, migrationConflicts))
+                case "reopen" =>
+                  Some(Metadata.MigrationConflictResolution(Metadata.MigrationConflictResolution.Reopen, migrationConflict.task.id))
+
+                case "remove" =>
+                  Some(Metadata.MigrationConflictResolution(Metadata.MigrationConflictResolution.Remove, migrationConflict.task.id))
+
+                case "new-task-key" =>
+                  userRequest.body.get(s"task-${migrationConflict.task.id}-newtaskkey").flatMap(_.headOption).map { newTaskKey =>
+                    Metadata.MigrationConflictResolution(Metadata.MigrationConflictResolution.NewTaskKey(newTaskKey), migrationConflict.task.id)
+                  }
+
+                case "reassign" =>
+                  val maybeCompletableBy = userRequest.body.get(s"task-${migrationConflict.task.id}-completableby").flatMap(_.headOption)
+                  Some(Metadata.MigrationConflictResolution(Metadata.MigrationConflictResolution.Reassign(maybeCompletableBy), migrationConflict.task.id))
+              }
+            }
+
+            if (resolutions.exists(_.isEmpty)) {
+              // todo: if missing resolutions, tell the user
+              gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
+                dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
+                  gitMetadata.fetchProgram(request.metadataVersion, request.program).flatMap { currentProgram =>
+                    gitMetadata.fetchProgram(maybeVersion, request.program).map { newProgram =>
+                      Ok(migrationResolverView(userInfo, request, maybeVersion, currentProgram, newProgram, migrationConflicts))
+                    }
                   }
                 }
               }
             }
-          }
-          else {
-            dataFacade.updateRequestMetadata(userInfo.email, requestSlug, maybeVersion, resolutions.flatten).map { _ =>
-              Redirect(routes.Application.request(requestSlug))
+            else {
+              dataFacade.updateRequestMetadata(userInfo.email, requestSlug, maybeVersion, resolutions.flatten).map { _ =>
+                Redirect(routes.Application.request(requestSlug))
+              }
             }
           }
         }
@@ -287,25 +293,25 @@ class Application @Inject()
     withUserInfo { userInfo =>
       for {
         allVersions <- gitMetadata.allVersions
-        (_, metadata) <- gitMetadata.latestVersion
-        programs = metadata.programs.filter(_._2.isAdmin(userInfo.email)).keySet
+        latestMetadata <- gitMetadata.latestVersion
+        programs = latestMetadata.metadata.programs.filterKeys(programKey => latestMetadata.isAdmin(userInfo.email, programKey)).keySet
         requests <- Future.reduceLeft(programs.map(programKey => dao.searchRequests(Some(programKey), Some(State.InProgress), None, None)))(_ ++ _)
       } yield {
-        Ok(migratorView(userInfo, allVersions.toSeq.sortBy(_.date.toEpochSecond).reverse, requests)(userRequest, metadata))
+        Ok(migratorView(userInfo, allVersions.toSeq.sortBy(_.date.toEpochSecond).reverse, requests)(userRequest, latestMetadata))
       }
     }
   }
 
   def task(requestSlug: String, taskId: Int) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         val f = for {
           request <- dataFacade.request(userInfo.email, requestSlug)
           task <- dataFacade.taskById(taskId)
           comments <- dataFacade.commentsOnTask(taskId)
           program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
           prototype <- program.task(task.taskKey)
-        } yield Ok(taskView(request, program, task, prototype, comments, userInfo, program.isAdmin(userInfo.email), program.groups.keySet))
+        } yield Ok(taskView(request, program, task, prototype, comments, userInfo, latestMetadata.isAdmin(userInfo.email, request.program), program.groups.keySet))
 
         f.recoverWith {
           case rnf: DB.RequestNotFound =>
@@ -324,7 +330,7 @@ class Application @Inject()
 
   def addTask(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         val maybeTaskPrototypeKey = userRequest.body.get("taskPrototypeKey").flatMap(_.headOption)
         val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption).filterNot(_.isEmpty)
 
@@ -359,20 +365,22 @@ class Application @Inject()
 
   def updateTaskState(requestSlug: String, taskId: Int, state: State.State, completionMessage: Option[String]) = userAction.async(maybeJsObject) { implicit userRequest =>
     withUserInfo { userInfo =>
-      for {
-        task <- dataFacade.taskById(taskId)
-        request <- dataFacade.request(userInfo.email, task.requestSlug)
-        program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
-        prototype <- program.task(task.taskKey)
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
+        for {
+          task <- dataFacade.taskById(taskId)
+          request <- dataFacade.request(userInfo.email, task.requestSlug)
+          program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
+          prototype <- program.task(task.taskKey)
 
-        maybeData = userRequest.body.orElse(task.data)
-        maybeCompletedBy = if (task.isCompletableByService(prototype)) task.completedBy else Some(userInfo.email)
+          maybeData = userRequest.body.orElse(task.data)
+          maybeCompletedBy = if (task.isCompletableByService(prototype)) task.completedBy else Some(userInfo.email)
 
-        _ <- dataFacade.updateTaskState(userInfo.email, taskId, state, maybeCompletedBy, maybeData, completionMessage)
-      } yield {
-        render {
-          case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
-          case Accepts.Json() => Ok(Json.toJson(task))
+          _ <- dataFacade.updateTaskState(userInfo.email, taskId, state, maybeCompletedBy, maybeData, completionMessage)
+        } yield {
+          render {
+            case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
+            case Accepts.Json() => Ok(Json.toJson(task))
+          }
         }
       }
     }
@@ -381,7 +389,7 @@ class Application @Inject()
   def updateTaskAssignment(requestSlug: String, taskId: Int) = userAction.async(parse.json) { implicit userRequest =>
     withUserInfo { userInfo =>
       dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
-        gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
+        gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
           gitMetadata.fetchProgram(request.metadataVersion, request.program).flatMap { program =>
             val maybeCompletableBy = (userRequest.body \ "email").asOpt[String].map { email =>
               CompletableByType.Email -> email
@@ -406,10 +414,12 @@ class Application @Inject()
 
   def deleteTask(requestSlug: String, taskId: Int) = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      dataFacade.deleteTask(userInfo.email, taskId).map { _ =>
-        render {
-          case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
-          case Accepts.Json() => NoContent
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
+        dataFacade.deleteTask(userInfo.email, taskId).map { _ =>
+          render {
+            case Accepts.Html() => Redirect(routes.Application.request(requestSlug))
+            case Accepts.Json() => NoContent
+          }
         }
       }
     }
@@ -465,7 +475,7 @@ class Application @Inject()
 
   def formTest = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.latestVersion.map(_._2).map { implicit metadata =>
+      gitMetadata.latestVersion.map { implicit latestMetadata =>
         Ok(formTestView(userInfo))
       }
     }
@@ -473,7 +483,7 @@ class Application @Inject()
 
   def notifyTest = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.latestVersion.map(_._2).map { implicit metadata =>
+      gitMetadata.latestVersion.map { implicit latestMetadata =>
         Ok(notifyTestView(userInfo))
       }
     }
@@ -481,7 +491,7 @@ class Application @Inject()
 
   def notifyTestSend = userAction.async { implicit userRequest =>
     withUserInfo { userInfo =>
-      gitMetadata.latestVersion.map(_._2).flatMap { implicit metadata =>
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         val maybeInfo = for {
           form <- userRequest.body.asFormUrlEncoded
 
@@ -513,14 +523,14 @@ class Application @Inject()
 
   private def login(state: Option[String])(emails: Set[String])(implicit request: RequestHeader): Future[Result] = {
     if (emails.size > 1) {
-      gitMetadata.latestVersion.map(_._2).map { implicit  metadata =>
+      gitMetadata.latestVersion.map { implicit latestMetadata =>
         Ok(pickEmailView(emails, state)).withSession("emails" -> emails.mkString(","))
       }
     }
     else if (emails.size == 1) {
       val email = emails.head
 
-      gitMetadata.latestVersion.map(_._2).map { metadata =>
+      gitMetadata.latestVersion.map { latestMetadata =>
         val url = state.getOrElse(controllers.routes.Application.openUserTasks().url)
 
         // todo: putting this info in the session means we can't easily invalidate it later
@@ -556,7 +566,7 @@ class Application @Inject()
 
   def logout() = Action.async { implicit request =>
     auth.authUrl.flatMap { authUrl =>
-      gitMetadata.latestVersion.map(_._2).map { implicit metadata =>
+      gitMetadata.latestVersion.map { implicit latestMetadata =>
         Ok(loginView()).withNewSession
       }
     }

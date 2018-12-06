@@ -7,7 +7,7 @@
 
 @this(mainView: Main, webJarsUtil: org.webjars.play.WebJarsUtil)
 
-@(userInfo: controllers.UserInfo)(implicit request: RequestHeader, metadata: models.Metadata)
+@(userInfo: controllers.UserInfo)(implicit request: RequestHeader, latestMetadata: services.GitMetadata.LatestMetadata)
 
 @extraHead() =  {
     @webJarsUtil.locate("jsoneditor.min.css").css()
@@ -21,7 +21,7 @@
             <label for="programSelect">Program</label>
             <select id="programSelect" class="form-control input-small">
                 <option disabled selected>Select a Program</option>
-                @for(program <- metadata.programs) {
+                @for(program <- latestMetadata.metadata.programs) {
                     <option value="@program._1">@program._2.name</option>
                 }
             </select>
@@ -30,7 +30,7 @@
             <label for="formSelect">Form to Test</label>
             <select id="formSelect" class="form-control input-small" disabled>
                 <option disabled selected>Select a Form</option>
-                @for(program <- metadata.programs) {
+                @for(program <- latestMetadata.metadata.programs) {
                     @for(task <- program._2.tasks) {
                         @for(form <- task._2.form) {
                             <option value="@task._1" data-program="@program._1" data-json="@JavaScript(form.toString())" hidden>@task._2.label</option>

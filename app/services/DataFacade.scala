@@ -13,6 +13,7 @@ import modules.{DAO, Notifier}
 import org.eclipse.jgit.lib.ObjectId
 import play.api.libs.json.JsObject
 import play.api.mvc.RequestHeader
+import services.GitMetadata.LatestMetadata
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -33,7 +34,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     } yield request
   }
 
-  def createTask(requestSlug: String, taskKey: String, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress)(implicit requestHeader: RequestHeader): Future[Task] = {
+  def createTask(requestSlug: String, taskKey: String, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Task] = {
     for {
       RequestWithTasks(request, tasks) <- dao.requestWithTasks(requestSlug)
 
@@ -81,11 +82,11 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     dao.requestsSimilarToName(program, name).flatMap(withProgram)
   }
 
-  def updateRequest(email: String, requestSlug: String, state: State.State, message: Option[String], securityBypass: Boolean = false)(implicit requestHeader: RequestHeader): Future[Request] = {
+  def updateRequest(email: String, requestSlug: String, state: State.State, message: Option[String], securityBypass: Boolean = false)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Request] = {
     for {
       currentRequest <- dao.request(requestSlug)
       program <- gitMetadata.fetchProgram(currentRequest.metadataVersion, currentRequest.program)
-      _ <- checkAccess(securityBypass || program.isAdmin(email))
+      _ <- checkAccess(securityBypass || latestMetadata.isAdmin(email, currentRequest.program))
       updatedRequest <- dao.updateRequestState(requestSlug, state, message)
       _ <- notifier.requestStatusChange(updatedRequest)
     } yield updatedRequest
@@ -94,17 +95,18 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
   def renameRequest(email: String, requestSlug: String, newName: String): Future[Request] = {
     for {
       currentRequest <- dao.request(requestSlug)
+      latestMetadata <- gitMetadata.latestVersion
       program <- gitMetadata.fetchProgram(currentRequest.metadataVersion, currentRequest.program)
-      _ <- checkAccess(currentRequest.creatorEmail == email || program.isAdmin(email))
+      _ <- checkAccess(currentRequest.creatorEmail == email || latestMetadata.isAdmin(email, currentRequest.program))
       updatedRequest <- dao.renameRequest(requestSlug, newName)
     } yield updatedRequest
   }
 
-  def deleteRequest(email: String, requestSlug: String)(implicit requestHeader: RequestHeader): Future[Unit] = {
+  def deleteRequest(email: String, requestSlug: String)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Unit] = {
     for {
       RequestWithTasks(request, tasks) <- dao.requestWithTasks(requestSlug)
       program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
-      _ <- checkAccess(program.isAdmin(email))
+      _ <- checkAccess(latestMetadata.isAdmin(email, request.program))
       _ <- Future.sequence(tasks.map(task => deleteTask(email, task.id)))
       _ <- dao.deleteRequest(requestSlug)
     } yield Unit
@@ -118,7 +120,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     } yield requestWithTasks.tasks.flatMap(_.migrationConflict(currentProgram, newProgram)).toSet
   }
 
-  private def resolveConflict(email: String, program: Program, request: Request, task: Task, resolutionType: Metadata.MigrationConflictResolution.Type)(implicit requestHeader: RequestHeader): Future[Option[Task]] = {
+  private def resolveConflict(email: String, program: Program, request: Request, task: Task, resolutionType: Metadata.MigrationConflictResolution.Type)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Option[Task]] = {
     resolutionType match {
       case Metadata.MigrationConflictResolution.NewTaskKey(newTaskKey) =>
         updateTaskKey(email, task.id, newTaskKey).map(Some(_))
@@ -143,11 +145,11 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     }
   }
 
-  def updateRequestMetadata(email: String, requestSlug: String, version: Option[ObjectId], conflictResolutions: Set[Metadata.MigrationConflictResolution])(implicit requestHeader: RequestHeader): Future[Request] = {
+  def updateRequestMetadata(email: String, requestSlug: String, version: Option[ObjectId], conflictResolutions: Set[Metadata.MigrationConflictResolution])(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Request] = {
     for {
       requestWithTasks <- dao.requestWithTasks(requestSlug)
       currentProgram <- gitMetadata.fetchProgram(requestWithTasks.request.metadataVersion, requestWithTasks.request.program)
-      _ <- checkAccess(currentProgram.isAdmin(email))
+      _ <- checkAccess(latestMetadata.isAdmin(email, requestWithTasks.request.program))
       newProgram <- gitMetadata.fetchProgram(version, requestWithTasks.request.program)
       _ <- Future.sequence {
         conflictResolutions.map { migrationConflictResolution =>
@@ -165,7 +167,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     dao.request(requestSlug)
   }
 
-  def updateTaskState(email: String, taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], completionMessage: Option[String], securityBypass: Boolean = false)(implicit requestHeader: RequestHeader): Future[Task] = {
+  def updateTaskState(email: String, taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], completionMessage: Option[String], securityBypass: Boolean = false)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Task] = {
     dao.taskById(taskId).flatMap { currentTask =>
       if (currentTask.state == state && currentTask.completedBy == maybeCompletedBy) {
         Future.successful(currentTask)
@@ -174,7 +176,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
         for {
           requestWithTasks <- dao.requestWithTasks(currentTask.requestSlug)
           program <- gitMetadata.fetchProgram(requestWithTasks.request.metadataVersion, requestWithTasks.request.program)
-          _ <- checkAccess(securityBypass || program.isAdmin(email) || currentTask.completableBy.contains(email))
+          _ <- checkAccess(securityBypass || latestMetadata.isAdmin(email, requestWithTasks.request.program) || currentTask.completableBy.contains(email))
 
 
 
@@ -200,23 +202,23 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     dao.updateTaskKey(taskId, taskKey)
   }
 
-  def assignTask(email: String, taskId: Int, emails: Seq[String])(implicit requestHeader: RequestHeader): Future[Task] = {
+  def assignTask(email: String, taskId: Int, emails: Seq[String])(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Task] = {
     for {
       currentTask <- dao.taskById(taskId)
       request <- dao.request(currentTask.requestSlug)
       program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
-      _ <- checkAccess(program.isAdmin(email))
+      _ <- checkAccess(latestMetadata.isAdmin(email, request.program))
       updatedTask <- dao.assignTask(taskId, emails)
       _ <- notifier.taskAssigned(request, updatedTask, program)
     } yield updatedTask
   }
 
-  def deleteTask(email: String, taskId: Int)(implicit requestHeader: RequestHeader): Future[Unit] = {
+  def deleteTask(email: String, taskId: Int)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Unit] = {
     for {
       currentTask <- dao.taskById(taskId)
       request <- dao.request(currentTask.requestSlug)
       program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
-      _ <- checkAccess(program.isAdmin(email))
+      _ <- checkAccess(latestMetadata.isAdmin(email, request.program))
       _ <- externalTaskHandler.deleteTask(currentTask, program)
       result <- dao.deleteTask(taskId)
 
@@ -227,7 +229,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     } yield result
   }
 
-  def taskById(taskId: Int)(implicit requestHeader: RequestHeader): Future[Task] = {
+  def taskById(taskId: Int)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Task] = {
     for {
       task <- dao.taskById(taskId)
       request <- dao.request(task.requestSlug)
@@ -236,7 +238,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     } yield updatedTask
   }
 
-  def requestTasks(email: String, requestSlug: String, maybeState: Option[State.State] = None)(implicit requestHeader: RequestHeader): Future[Seq[(Task, Task.Prototype, DAO.NumComments)]] = {
+  def requestTasks(email: String, requestSlug: String, maybeState: Option[State.State] = None)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Seq[(Task, Task.Prototype, DAO.NumComments)]] = {
     def updateTasks(request: Request, program: Program, tasks: Seq[(Task, DAO.NumComments)]): Future[Seq[(Task, DAO.NumComments)]] = {
       Future.sequence {
         tasks.map { case (task, numComments) =>

@@ -18,7 +18,6 @@ import core.Extensions._
 import play.api.libs.json.JsonNaming.SnakeCase
 
 import scala.concurrent.Future
-import scala.util.Try
 
 case class MetadataVersion(id: Option[ObjectId], date: ZonedDateTime)
 
@@ -64,8 +63,6 @@ object Metadata {
 
 case class Program(name: String, description: Option[String], startTasks: Set[String], groups: Map[String, Set[String]], services: Map[String, String], tasks: Map[String, Task.Prototype], reports: Map[String, Report]) {
   val admins: Set[String] = groups.getOrElse("admin", Set.empty[String])
-
-  def isAdmin(email: String): Boolean = admins.contains(email)
 
   def completableBy(completableBy: (CompletableByType.CompletableByType, String)): Option[Set[String]] = {
     val (completableByType, completableByValue) = completableBy

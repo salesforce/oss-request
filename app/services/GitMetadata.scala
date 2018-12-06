@@ -20,7 +20,6 @@ import javax.inject.{Inject, Singleton}
 import models.{Metadata, MetadataVersion, Program}
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.ResetCommand.ResetType
-import org.eclipse.jgit.api.errors.NoHeadException
 import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.transport.{JschConfigSessionFactory, OpenSshConfig, SshTransport}
 import org.eclipse.jgit.util.FS
@@ -35,23 +34,25 @@ import scala.util.Try
 @Singleton
 class GitMetadata @Inject()(configuration: Configuration, environment: Environment, actorSystem: ActorSystem)(implicit ec: ExecutionContext) {
 
+  import GitMetadata._
+
   private implicit val timeout: Timeout = 15.seconds
 
   private lazy val actor = actorSystem.actorOf(Props(new GitMetadataActor(configuration, environment)))
 
   def allVersions: Future[Set[MetadataVersion]] = {
-    (actor ? GitMetadata.GetAllVersions).mapTo[Set[MetadataVersion]]
+    (actor ? GetAllVersions).mapTo[Set[MetadataVersion]]
   }
 
-  def latestVersion: Future[(Option[ObjectId], Metadata)] = {
+  def latestVersion: Future[LatestMetadata] = {
     allVersions.flatMap { versions =>
       val maybeVersion = versions.maxBy(_.date.toEpochSecond).id
-      fetchMetadata(maybeVersion).map(maybeVersion -> _)
+      fetchMetadata(maybeVersion).map(metadata => LatestMetadata(maybeVersion, metadata))
     }
   }
 
   def fetchMetadata(maybeVersion: Option[ObjectId]): Future[Metadata] = {
-    (actor ? GitMetadata.GetVersion(maybeVersion)).mapTo[Metadata]
+    (actor ? GetVersion(maybeVersion)).mapTo[Metadata]
   }
 
   def fetchProgram(maybeVersion: Option[ObjectId], programKey: String): Future[Program] = {
@@ -61,6 +62,8 @@ class GitMetadata @Inject()(configuration: Configuration, environment: Environme
 }
 
 class GitMetadataActor(configuration: Configuration, environment: Environment) extends Actor {
+
+  import GitMetadata._
 
   private implicit val ec = this.context.system.dispatcher
 
@@ -195,8 +198,8 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
   }
 
   override def receive: Receive = {
-    case GitMetadata.GetVersion(maybeVersion) => Future.fromTry(Try(fetchMetadata(maybeVersion))).pipeTo(sender)
-    case GitMetadata.GetAllVersions => Future.fromTry(Try(versions)).pipeTo(sender)
+    case GetVersion(maybeVersion) => Future.fromTry(Try(fetchMetadata(maybeVersion))).pipeTo(sender)
+    case GetAllVersions => Future.fromTry(Try(versions)).pipeTo(sender)
   }
 
   override def postStop(): Unit = {
@@ -207,5 +210,12 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
 
 object GitMetadata {
   case class GetVersion(maybeVersion: Option[ObjectId])
+
   case object GetAllVersions
+
+  case class LatestMetadata(maybeVersion: Option[ObjectId], metadata: Metadata) {
+    def isAdmin(email: String, programKey: String): Boolean = {
+      metadata.programs.get(programKey).exists(_.admins.contains(email))
+    }
+  }
 }

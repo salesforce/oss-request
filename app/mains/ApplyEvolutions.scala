@@ -17,6 +17,7 @@ import play.api.db.evolutions.{EvolutionsApi, EvolutionsReader}
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.{Application, Logger, Mode}
 import services.GitMetadata
+import services.GitMetadata.LatestMetadata
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext}
@@ -64,7 +65,7 @@ class ApplyEvolutions(app: Application) {
   case class Migration(after: Int, migrator: () => Unit)
 
   val migration2 = () => {
-    val (_, metadata) = Await.result(gitMetadata.latestVersion, Duration.Inf)
+    val LatestMetadata(_, metadata) = Await.result(gitMetadata.latestVersion, Duration.Inf)
 
     val databaseWithCtx = app.injector.instanceOf[DatabaseWithCtx]
     import databaseWithCtx.ctx._

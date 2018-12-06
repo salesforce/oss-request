@@ -7,10 +7,11 @@
 
 @import org.eclipse.jgit.lib.ObjectId
 @import core.Extensions._
+@import services.GitMetadata.LatestMetadata
 
 @this(main: Main)
 
-@(userInfo: controllers.UserInfo, allVersions: Seq[MetadataVersion], requests: Seq[RequestWithTasks])(implicit request: RequestHeader, metadata: models.Metadata)
+@(userInfo: controllers.UserInfo, allVersions: Seq[MetadataVersion], requests: Seq[RequestWithTasks])(implicit request: RequestHeader, latestMetadata: LatestMetadata)
 
 @main(Some(userInfo))("Migrate Metadata") {
 

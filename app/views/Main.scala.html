@@ -5,9 +5,11 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  *@
 
+@import services.GitMetadata.LatestMetadata
+
 @this(webJarsUtil: org.webjars.play.WebJarsUtil)
 
-@(maybeUserInfo: Option[controllers.UserInfo])(title: String, extraHead: Html = play.twirl.api.HtmlFormat.empty)(body: Html)(implicit request: RequestHeader, metadata: models.Metadata)
+@(maybeUserInfo: Option[controllers.UserInfo])(title: String, extraHead: Html = play.twirl.api.HtmlFormat.empty)(body: Html)(implicit request: RequestHeader, latestMetadata: LatestMetadata)
 
 <!DOCTYPE html>
 <html>
@@ -47,7 +49,7 @@
                         <li class="dropdown @if(title == "OSS Requests") { active }">
                             <a href="@routes.Application.requests(None)" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Requests <span class="caret"></span></a>
                             <ul class="dropdown-menu">
-                                @partials.QuerySelector(metadata)
+                                @partials.QuerySelector(latestMetadata.metadata)
                             </ul>
                         </li>
                         <li @if(title == "New Request") { class="active" }><a href="@routes.Application.newRequest(None, None, None)">New Request</a></li>
