@@ -307,9 +307,16 @@ class Application @Inject()
           prototype <- program.task(task.taskKey)
         } yield Ok(taskView(request, program, task, prototype, comments, userInfo, program.isAdmin(userInfo.email), program.groups.keySet))
 
-        f.recover {
+        f.recoverWith {
+          case rnf: DB.RequestNotFound =>
+            dao.previousSlug(requestSlug).map { newSlug =>
+              Redirect(routes.Application.task(newSlug, taskId))
+            } recoverWith {
+              case _: DB.RequestNotFound =>
+                Future.successful(NotFound(errorView(rnf.getMessage, userInfo)))
+            }
           case e: Exception =>
-            InternalServerError(errorView(e.getMessage, userInfo))
+            Future.successful(InternalServerError(errorView(e.getMessage, userInfo)))
         }
       }
     }
