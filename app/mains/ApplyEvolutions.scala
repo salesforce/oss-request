@@ -38,8 +38,10 @@ class ApplyEvolutions(app: Application) {
   val gitMetadata = app.injector.instanceOf[GitMetadata]
 
   val databaseWithCtx = app.injector.instanceOf[DatabaseWithCtx]
-
   import databaseWithCtx.ctx._
+
+  val daoWithCtx = app.injector.instanceOf[DAOWithCtx]
+  import daoWithCtx.objectIdEncoder
 
   def run: Unit = {
     val dbApi = app.injector.instanceOf[DBApi]
@@ -66,9 +68,6 @@ class ApplyEvolutions(app: Application) {
 
   val migration2 = () => {
     val LatestMetadata(_, metadata) = Await.result(gitMetadata.latestVersion, Duration.Inf)
-
-    val databaseWithCtx = app.injector.instanceOf[DatabaseWithCtx]
-    import databaseWithCtx.ctx._
 
     val requestsQuery = databaseWithCtx.ctx.run {
       quote {
@@ -115,9 +114,6 @@ class ApplyEvolutions(app: Application) {
   }
 
   val migration10 = () => {
-    val daoWithCtx = app.injector.instanceOf[DAOWithCtx]
-    import daoWithCtx._
-
     // migrate from embedded prototype to taskKey
       val metadataVersions = Await.result(gitMetadata.allVersions, Duration.Inf)
       val allMetadata = metadataVersions.flatMap { metadataVersion =>

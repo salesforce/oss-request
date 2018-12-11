@@ -7,7 +7,7 @@
 
 @this(main: Main, taskView: partials.TaskEditOrShow)
 
-@(tasks: Seq[(models.Task, models.Task.Prototype, modules.DAO.NumComments, models.Request, models.Program)], userInfo: controllers.UserInfo)(implicit request: RequestHeader, latestMetadata: services.GitMetadata.LatestMetadata)
+@(tasks: Seq[(models.Task, models.Task.Prototype, modules.DAO.NumComments, models.Request, models.Program)])(implicit request: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: services.GitMetadata.LatestMetadata)
 
 @main(Some(userInfo))("Your Open Tasks") {
 
@@ -16,7 +16,7 @@
     } else {
         @for(task <- tasks) {
             <h1>Request: <a href="@routes.Application.request(task._1.requestSlug)">@task._4.name</a></h1>
-            @taskView(task._5, task._1, task._2, Left(task._3), userInfo, latestMetadata.isAdmin(userInfo.email, task._4.program), task._5.groups.keySet)
+            @taskView(task._5, task._4, task._1, task._2, Left(task._3))
         }
     }
 

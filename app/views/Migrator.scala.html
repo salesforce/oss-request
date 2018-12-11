@@ -5,13 +5,12 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  *@
 
-@import org.eclipse.jgit.lib.ObjectId
 @import core.Extensions._
 @import services.GitMetadata.LatestMetadata
 
 @this(main: Main)
 
-@(userInfo: controllers.UserInfo, allVersions: Seq[MetadataVersion], requests: Seq[RequestWithTasks])(implicit request: RequestHeader, latestMetadata: LatestMetadata)
+@(allVersions: Seq[MetadataVersion], requests: Seq[RequestWithTasks])(implicit request: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: LatestMetadata)
 
 @main(Some(userInfo))("Migrate Metadata") {
 

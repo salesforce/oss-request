@@ -7,7 +7,7 @@
 
 @this(main: Main)
 
-@(title: String, requests: Seq[RequestWithTasksAndProgram], userInfo: controllers.UserInfo)(implicit request: RequestHeader, latestMetadata: services.GitMetadata.LatestMetadata)
+@(title: String, requests: Seq[RequestWithTasksAndProgram])(implicit request: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: services.GitMetadata.LatestMetadata)
 
 @main(Some(userInfo))("OSS Requests") {
 

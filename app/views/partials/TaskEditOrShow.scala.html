@@ -5,11 +5,15 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  *@
 
+@import core.Extensions._
+
 @this(taskEditView: TaskEdit, taskShowView: TaskShow, commentsView: Comments)
 
-@(program: models.Program, task: models.Task, taskPrototype: models.Task.Prototype, commentCountOrComments: Either[Long, Seq[Comment]], userInfo: controllers.UserInfo, isAdmin: Boolean, groups: Set[String])(implicit request: RequestHeader)
+@(program: models.Program, request: models.Request, task: models.Task, taskPrototype: models.Task.Prototype, commentCountOrComments: Either[Long, Seq[Comment]])(implicit requestHeader: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: services.GitMetadata.LatestMetadata)
 
-@import core.Extensions._
+@isAdmin = @{
+    latestMetadata.isAdmin(userInfo.email, request.program)
+}
 
 @panelType = {
     @task.state match {
@@ -31,7 +35,7 @@
     <span class="assignment-list">@AssignedTo(task, program)</span>
 
     @if(task.completableByEmailsOrUrl(program).isLeft && (assignedToUser || isAdmin)) {
-        <button type="button" class="btn btn-default btn-xs" title="Reassign" data-toggle="modal" data-target="#reassignModal" data-url="@helper.CSRF(routes.Application.updateTaskAssignment(task.requestSlug, task.id))" data-groups="@groups.mkString(",")">
+        <button type="button" class="btn btn-default btn-xs" title="Reassign" data-toggle="modal" data-target="#reassignModal" data-url="@helper.CSRF(routes.Application.updateTaskAssignment(task.requestSlug, task.id))" data-groups="@program.groups.keySet.mkString(",")">
             <span class="glyphicon glyphicon-pencil" style="padding-top: 5px"></span>
         </button>
     }

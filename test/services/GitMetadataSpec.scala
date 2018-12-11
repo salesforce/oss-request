@@ -14,9 +14,12 @@ import java.nio.file.Files
 import modules.DAOMock
 import org.scalatestplus.play._
 import play.api.test.Helpers._
-import play.api.{Configuration, Mode}
+import play.api.{Application, Configuration, Mode}
+import services.GitMetadata.LatestMetadata
 
 class GitMetadataSpec extends MixedPlaySpec {
+
+  implicit def latestMetadata(implicit app: Application): LatestMetadata = await(app.injector.instanceOf[GitMetadata].latestVersion)
 
   "fetchMetadata" must {
     "work with the default value in dev mode" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
@@ -101,7 +104,7 @@ class GitMetadataSpec extends MixedPlaySpec {
     "work" in new App(DAOMock.noDatabaseAppBuilder(Mode.Dev).build()) {
       val gitMetadata = app.injector.instanceOf[GitMetadata]
 
-      val (maybeVersion, metadata) = await(gitMetadata.latestVersion)
+      val LatestMetadata(maybeVersion, metadata) = await(gitMetadata.latestVersion)
 
       metadata.programs must not be empty
     }

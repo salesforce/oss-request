@@ -5,12 +5,12 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  *@
 
-@import org.eclipse.jgit.lib.ObjectId
 @import core.Extensions._
+@import org.eclipse.jgit.lib.ObjectId
 
 @this(main: Main, taskShowView: partials.TaskShow)
 
-@(userInfo: controllers.UserInfo, request: models.Request, maybeNewVersion: Option[ObjectId], currentProgram: Program, newProgram: Program, migrationConflicts: Set[Metadata.MigrationConflict])(implicit requestHeader: RequestHeader, latestMetadata: services.GitMetadata.LatestMetadata)
+@(request: models.Request, maybeNewVersion: Option[ObjectId], currentProgram: Program, newProgram: Program, migrationConflicts: Set[Metadata.MigrationConflict])(implicit requestHeader: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: services.GitMetadata.LatestMetadata)
 
 @main(Some(userInfo))("Migration Conflict Resolver") {
 

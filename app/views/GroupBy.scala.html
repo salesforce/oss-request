@@ -7,7 +7,7 @@
 
 @this(main: Main)
 
-@(requests: Map[Option[String], Seq[RequestWithTasksAndProgram]], report: models.Report, groupBy: models.GroupBy, userInfo: controllers.UserInfo)(implicit request: RequestHeader, latestMetadata: services.GitMetadata.LatestMetadata)
+@(requests: Map[Option[String], Seq[RequestWithTasksAndProgram]], report: models.Report, groupBy: models.GroupBy)(implicit request: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: services.GitMetadata.LatestMetadata)
 
 @main(Some(userInfo))("OSS Requests") {
 

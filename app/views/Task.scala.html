@@ -9,12 +9,12 @@
 
 @this(mainView: Main, taskView: partials.TaskEditOrShow, commentsView: partials.Comments)
 
-@(request: models.Request, program: models.Program, task: models.Task, taskPrototype: models.Task.Prototype, comments: Seq[Comment], userInfo: controllers.UserInfo, isAdmin: Boolean, groups: Set[String])(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata)
+@(program: models.Program, request: models.Request, task: models.Task, taskPrototype: models.Task.Prototype, comments: Seq[Comment])(implicit requestHeader: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: LatestMetadata)
 
 @mainView(Some(userInfo))("Task") {
 
     <h1>Request: <a href="@routes.Application.request(request.slug)">@request.name</a></h1>
 
-    @taskView(program, task, taskPrototype, Right(comments), userInfo, isAdmin, groups)
+    @taskView(program, request, task, taskPrototype, Right(comments))
 
 }

@@ -9,10 +9,10 @@ package models
 
 import java.time.ZonedDateTime
 
-import org.scalatest.{MustMatchers, WordSpec}
-import org.scalatest.OptionValues._
-import play.api.libs.json.Json
 import models.Task.{CompletableBy, CompletableByType}
+import org.scalatest.OptionValues._
+import org.scalatest.{MustMatchers, WordSpec}
+import play.api.libs.json.Json
 
 class TaskSpec extends WordSpec with MustMatchers {
 

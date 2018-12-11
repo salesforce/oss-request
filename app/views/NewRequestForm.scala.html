@@ -7,7 +7,7 @@
 
 @this(mainView: Main, taskEditView: partials.TaskEdit)
 
-@(programKey: String, projectName: String, taskKey: String, taskPrototype: models.Task.Prototype, userInfo: controllers.UserInfo, similarRequests: Seq[RequestWithTasksAndProgram])(implicit request: RequestHeader, latestMetadata: services.GitMetadata.LatestMetadata)
+@(programKey: String, projectName: String, taskKey: String, taskPrototype: models.Task.Prototype, similarRequests: Seq[RequestWithTasksAndProgram])(implicit request: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: services.GitMetadata.LatestMetadata)
 
 @mainView(Some(userInfo))("New Request") {
 

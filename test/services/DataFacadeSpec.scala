@@ -8,31 +8,29 @@
 package services
 
 import models.{DataIn, Metadata, State, Task}
+import modules.NotifyModule.HostInfo
 import modules.{DAOMock, NotifyMock, NotifyProvider}
 import org.scalatestplus.play.MixedPlaySpec
-import play.api.Mode
 import play.api.db.Database
 import play.api.db.evolutions.Evolutions
 import play.api.inject.bind
 import play.api.libs.json.Json
-import play.api.mvc.RequestHeader
-import play.api.test.FakeRequest
 import play.api.test.Helpers._
+import play.api.{Application, Mode}
+import services.GitMetadata.LatestMetadata
 
 import scala.util.Try
 
 class DataFacadeSpec extends MixedPlaySpec {
 
-
-
   def withDb = DAOMock.databaseAppBuilder().overrides(bind[NotifyProvider].to[NotifyMock]).build()
 
-  def database(implicit app: play.api.Application) = app.injector.instanceOf[Database]
-  def gitMetadata(implicit app: play.api.Application) = app.injector.instanceOf[GitMetadata]
-  def defaultProgram(implicit app: play.api.Application) = await(gitMetadata.fetchProgram(None, "default"))
-  def dataFacade(implicit app: play.api.Application) = app.injector.instanceOf[DataFacade]
-
-  implicit val fakeRequest: RequestHeader = FakeRequest()
+  def database(implicit app: Application) = app.injector.instanceOf[Database]
+  def gitMetadata(implicit app: Application) = app.injector.instanceOf[GitMetadata]
+  def defaultProgram(implicit app: Application) = await(gitMetadata.fetchProgram(None, "default"))
+  def dataFacade(implicit app: Application) = app.injector.instanceOf[DataFacade]
+  implicit def latestMetadata(implicit app: Application): LatestMetadata = await(app.injector.instanceOf[GitMetadata].latestVersion)
+  implicit val hostInfo = HostInfo(false, "localhost")
 
   "createTask" must {
     "work with events" in new App(withDb) {
@@ -93,7 +91,7 @@ class DataFacadeSpec extends MixedPlaySpec {
       assume(GitMetadataSpec.gitConfig.get("metadata-git-uri").isDefined)
 
       val gitMetadata = app.injector.instanceOf[GitMetadata]
-      val (version, _) = await(gitMetadata.latestVersion)
+      val version = await(gitMetadata.latestVersion).maybeVersion
 
       version must be (defined)
 
@@ -136,11 +134,11 @@ class DataFacadeSpec extends MixedPlaySpec {
       Evolutions.withEvolutions(database) {
         val allVersions = await(gitMetadata.allVersions)
 
-        val (latestVersion, latestMetadata) = await(gitMetadata.latestVersion)
+        implicit val latestMetadata = await(gitMetadata.latestVersion)
 
-        val latestDefault = await(latestMetadata.program("default"))
+        val latestDefault = await(latestMetadata.metadata.program("default"))
 
-        val request = await(dataFacade.createRequest(latestVersion, "default", "foo", "foo@foo.com"))
+        val request = await(dataFacade.createRequest(latestMetadata.maybeVersion, "default", "foo", "foo@foo.com"))
         val task = await(dataFacade.createTask(request.slug, latestDefault.tasks.last._1, Seq("foo@foo.com"), Some("foo@foo.com"), None, State.Completed))
         val taskPrototype = await(latestDefault.task(task.taskKey))
 
@@ -153,7 +151,7 @@ class DataFacadeSpec extends MixedPlaySpec {
           Try(await(default.task(task.taskKey))).filter(_.form == taskPrototype.form).isFailure
         }.flatMap(_.id)
 
-        assume(conflictingVersion != latestVersion)
+        assume(conflictingVersion != latestMetadata.maybeVersion)
 
         await(dataFacade.requestMetadataMigrationConflicts(request.slug, conflictingVersion)) must not be empty
       }

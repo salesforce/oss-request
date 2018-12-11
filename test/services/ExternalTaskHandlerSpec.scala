@@ -10,13 +10,14 @@ package services
 import java.time.ZonedDateTime
 
 import models.{Request, State, Task}
+import modules.NotifyModule.HostInfo
 import modules.{DAO, DAOMock}
 import org.scalatestplus.play.MixedPlaySpec
 import play.api.Application
 import play.api.libs.json.JsObject
-import play.api.mvc.RequestHeader
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
+import services.GitMetadata.LatestMetadata
 
 import scala.concurrent.Future
 
@@ -24,8 +25,10 @@ class ExternalTaskHandlerSpec extends MixedPlaySpec {
 
   def externalTaskHandler(implicit app: Application) = app.injector.instanceOf[ExternalTaskHandler]
   def gitMetadata(implicit app: Application) = app.injector.instanceOf[GitMetadata]
-  def program(implicit app: Application) = await(gitMetadata.latestVersion)._2.programs("two")
-  implicit val fakeRequest: RequestHeader = FakeRequest()
+  def program(implicit app: Application) = await(gitMetadata.latestVersion).metadata.programs("two")
+  implicit def latestMetadata(implicit app: Application): LatestMetadata = await(app.injector.instanceOf[GitMetadata].latestVersion)
+  implicit val fakeRequest = FakeRequest()
+  implicit val hostInfo = HostInfo(false, "localhost")
 
   def updateTaskState(task: Task)(state: State.State, maybeUrl: Option[String], maybeData: Option[JsObject], maybeCompletionMessage: Option[String]): Future[Task] = {
     Future.successful {

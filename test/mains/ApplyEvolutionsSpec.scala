@@ -18,7 +18,7 @@ import play.api.test.Helpers._
 import services.GitMetadata
 
 import scala.concurrent.ExecutionContext
-import scala.util.{Random, Try}
+import scala.util.Try
 
 class ApplyEvolutionsSpec extends PlaySpec with GuiceOneAppPerTest {
 

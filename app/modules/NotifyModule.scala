@@ -10,15 +10,14 @@ package modules
 import com.roundeights.hasher.Algo
 import javax.inject.{Inject, Singleton}
 import models.{Comment, Program, Request, Task}
+import modules.NotifyModule.HostInfo
 import play.api.data.Forms._
 import play.api.data._
-import play.api.data.format.Formats._
 import play.api.data.format.Formatter
 import play.api.http.{HeaderNames, Status}
 import play.api.inject.{Binding, Module}
 import play.api.libs.json.{JsNumber, JsObject, JsString, Json}
 import play.api.libs.ws.{WSAuthScheme, WSClient, WSResponse}
-import play.api.mvc.RequestHeader
 import play.api.{Configuration, Environment, Logger}
 import services.RuntimeReporter
 
@@ -34,6 +33,10 @@ class NotifyModule extends Module {
       case _ => Seq(bind[NotifyProvider].to[NotifyLogger])
     }
   }
+}
+
+object NotifyModule {
+  case class HostInfo(secure: Boolean, host: String)
 }
 
 trait NotifyProvider {
@@ -63,9 +66,9 @@ trait NotifyProvider {
 class Notifier @Inject()(notifyProvider: NotifyProvider)(implicit ec: ExecutionContext) {
   // todo: move content to templates
 
-  def taskStateChanged(request: Request, task: Task, program: Program)(implicit requestHeader: RequestHeader): Future[_] = {
+  def taskStateChanged(request: Request, task: Task, program: Program)(implicit hostInfo: HostInfo): Future[_] = {
     if (!task.completedBy.contains(request.creatorEmail)) {
-      val url = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL()
+      val url = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL(hostInfo.secure, hostInfo.host)
 
       val subject = s"OSS Request ${request.name} - Task ${task.prototype(program).label} is now ${task.stateToHuman(program)}"
       val message =
@@ -81,9 +84,9 @@ class Notifier @Inject()(notifyProvider: NotifyProvider)(implicit ec: ExecutionC
     }
   }
 
-  def taskAssigned(request: Request, task: Task, program: Program)(implicit requestHeader: RequestHeader): Future[_] = {
+  def taskAssigned(request: Request, task: Task, program: Program)(implicit hostInfo: HostInfo): Future[_] = {
     task.completableByEmailsOrUrl(program).fold({ emails =>
-      val url = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL()
+      val url = controllers.routes.Application.task(task.requestSlug, task.id).absoluteURL(hostInfo.secure, hostInfo.host)
 
       val subject = s"OSS Request - ${request.name} - Task Assigned - ${task.prototype(program).label}"
       val message =
@@ -98,10 +101,10 @@ class Notifier @Inject()(notifyProvider: NotifyProvider)(implicit ec: ExecutionC
     })
   }
 
-  def taskComment(request: Request, task: Task, commentsOnTask: Seq[Comment], comment: Comment, program: Program)(implicit requestHeader: RequestHeader): Future[_] = {
+  def taskComment(request: Request, task: Task, commentsOnTask: Seq[Comment], comment: Comment, program: Program)(implicit hostInfo: HostInfo): Future[_] = {
     val previousCommentors = commentsOnTask.map(_.creatorEmail).toSet
     val emails = task.completableByEmailsOrUrl(program).left.getOrElse(Set.empty[String]) + request.creatorEmail ++ previousCommentors - comment.creatorEmail
-    val url = controllers.routes.Application.task(request.slug, task.id).absoluteURL()
+    val url = controllers.routes.Application.task(request.slug, task.id).absoluteURL(hostInfo.secure, hostInfo.host)
 
     val subject = s"Comment on OSS Request Task - ${request.name} - ${task.prototype(program).label}"
     val message = s"""
@@ -118,8 +121,8 @@ class Notifier @Inject()(notifyProvider: NotifyProvider)(implicit ec: ExecutionC
     notifyProvider.sendMessage(emails, subject, message, data)
   }
 
-  def requestStatusChange(request: Request)(implicit requestHeader: RequestHeader): Future[_] = {
-    val url = controllers.routes.Application.request(request.slug).absoluteURL()
+  def requestStatusChange(request: Request)(implicit hostInfo: HostInfo): Future[_] = {
+    val url = controllers.routes.Application.request(request.slug).absoluteURL(hostInfo.secure, hostInfo.host)
     val subject = s"OSS Request ${request.name} was ${request.stateToHuman}"
     val message =
       s"""
@@ -129,8 +132,8 @@ class Notifier @Inject()(notifyProvider: NotifyProvider)(implicit ec: ExecutionC
     notifyProvider.sendMessage(Set(request.creatorEmail), subject, message)
   }
 
-  def allTasksCompleted(request: Request, admins: Set[String])(implicit requestHeader: RequestHeader): Future[_] = {
-    val url = controllers.routes.Application.request(request.slug).absoluteURL()
+  def allTasksCompleted(request: Request, admins: Set[String])(implicit hostInfo: HostInfo): Future[_] = {
+    val url = controllers.routes.Application.request(request.slug).absoluteURL(hostInfo.secure, hostInfo.host)
     val subject = s"OSS Request ${request.name} - All Tasks Completed"
     val message =
       s"""

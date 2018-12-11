@@ -10,18 +10,23 @@ package services
 import models.State
 import models.TaskEvent.{Criteria, CriteriaType}
 import modules.DAOMock
+import modules.NotifyModule.HostInfo
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.libs.json.Json
 import play.api.mvc.RequestHeader
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
+import services.GitMetadata.LatestMetadata
 
 class TaskEventHandlerSpec extends PlaySpec with GuiceOneAppPerTest {
 
   def taskEventHandler = app.injector.instanceOf[TaskEventHandler]
   def dataFacade = app.injector.instanceOf[DataFacade]
-  implicit val fakeRequest: RequestHeader = FakeRequest()
+
+  val fakeRequest: RequestHeader = FakeRequest()
+  implicit val hostInfo = HostInfo(fakeRequest.secure, fakeRequest.host)
+  implicit def latestMetadata: LatestMetadata = await(app.injector.instanceOf[GitMetadata].latestVersion)
 
   implicit override def fakeApplication() = DAOMock.noDatabaseAppBuilder().build()
 

@@ -5,13 +5,12 @@
  * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  *@
 
-@import org.eclipse.jgit.lib.ObjectId
 @import core.Extensions._
 @import services.GitMetadata.LatestMetadata
 
 @this(mainView: Main, taskView: partials.TaskEditOrShow)
 
-@(program: models.Program, request: models.Request, tasks: Seq[(models.Task, models.Task.Prototype, modules.DAO.NumComments)], userInfo: controllers.UserInfo)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata)
+@(program: models.Program, request: models.Request, tasks: Seq[(models.Task, models.Task.Prototype, modules.DAO.NumComments)])(implicit requestHeader: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: LatestMetadata)
 
 @tasksWithState(state: State.State) = @{
     tasks.filter(_._1.state == state)
@@ -226,7 +225,7 @@
     </div>
 
     @for(task <- tasks) {
-        @taskView(program, task._1, task._2, Left(task._3), userInfo, latestMetadata.isAdmin(userInfo.email, request.program), program.groups.keySet)
+        @taskView(program, request, task._1, task._2, Left(task._3))
     }
 
 }

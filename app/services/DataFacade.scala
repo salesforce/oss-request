@@ -9,10 +9,10 @@ package services
 
 import javax.inject.Inject
 import models.{Comment, DataIn, GroupBy, Metadata, Program, Request, RequestWithTasks, RequestWithTasksAndProgram, State, Task, TaskEvent}
+import modules.NotifyModule.HostInfo
 import modules.{DAO, Notifier}
 import org.eclipse.jgit.lib.ObjectId
 import play.api.libs.json.JsObject
-import play.api.mvc.RequestHeader
 import services.GitMetadata.LatestMetadata
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -34,7 +34,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     } yield request
   }
 
-  def createTask(requestSlug: String, taskKey: String, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Task] = {
+  def createTask(requestSlug: String, taskKey: String, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress)(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Task] = {
     for {
       RequestWithTasks(request, tasks) <- dao.requestWithTasks(requestSlug)
 
@@ -48,7 +48,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
 
       task <- dao.createTask(requestSlug, taskKey, completableBy, maybeCompletedBy, maybeData, state)
 
-      url = controllers.routes.Application.task(requestSlug, task.id).absoluteURL()
+      url = controllers.routes.Application.task(requestSlug, task.id).absoluteURL(hostInfo.secure, hostInfo.host)
 
       // we use the dao because we don't want to send notifications and re-process the events
       updatedTask <- externalTaskHandler.taskCreated(program, request, task, tasks, url, dao.updateTaskState(task.id, _, _, _, _))
@@ -82,7 +82,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     dao.requestsSimilarToName(program, name).flatMap(withProgram)
   }
 
-  def updateRequest(email: String, requestSlug: String, state: State.State, message: Option[String], securityBypass: Boolean = false)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Request] = {
+  def updateRequest(email: String, requestSlug: String, state: State.State, message: Option[String], securityBypass: Boolean = false)(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Request] = {
     for {
       currentRequest <- dao.request(requestSlug)
       program <- gitMetadata.fetchProgram(currentRequest.metadataVersion, currentRequest.program)
@@ -102,7 +102,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     } yield updatedRequest
   }
 
-  def deleteRequest(email: String, requestSlug: String)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Unit] = {
+  def deleteRequest(email: String, requestSlug: String)(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Unit] = {
     for {
       RequestWithTasks(request, tasks) <- dao.requestWithTasks(requestSlug)
       program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
@@ -120,7 +120,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     } yield requestWithTasks.tasks.flatMap(_.migrationConflict(currentProgram, newProgram)).toSet
   }
 
-  private def resolveConflict(email: String, program: Program, request: Request, task: Task, resolutionType: Metadata.MigrationConflictResolution.Type)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Option[Task]] = {
+  private def resolveConflict(email: String, program: Program, request: Request, task: Task, resolutionType: Metadata.MigrationConflictResolution.Type)(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Option[Task]] = {
     resolutionType match {
       case Metadata.MigrationConflictResolution.NewTaskKey(newTaskKey) =>
         updateTaskKey(email, task.id, newTaskKey).map(Some(_))
@@ -145,7 +145,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     }
   }
 
-  def updateRequestMetadata(email: String, requestSlug: String, version: Option[ObjectId], conflictResolutions: Set[Metadata.MigrationConflictResolution])(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Request] = {
+  def updateRequestMetadata(email: String, requestSlug: String, version: Option[ObjectId], conflictResolutions: Set[Metadata.MigrationConflictResolution])(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Request] = {
     for {
       requestWithTasks <- dao.requestWithTasks(requestSlug)
       currentProgram <- gitMetadata.fetchProgram(requestWithTasks.request.metadataVersion, requestWithTasks.request.program)
@@ -167,7 +167,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     dao.request(requestSlug)
   }
 
-  def updateTaskState(email: String, taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], completionMessage: Option[String], securityBypass: Boolean = false)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Task] = {
+  def updateTaskState(email: String, taskId: Int, state: State.State, maybeCompletedBy: Option[String], maybeData: Option[JsObject], completionMessage: Option[String], securityBypass: Boolean = false)(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Task] = {
     dao.taskById(taskId).flatMap { currentTask =>
       if (currentTask.state == state && currentTask.completedBy == maybeCompletedBy) {
         Future.successful(currentTask)
@@ -198,11 +198,11 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     }
   }
 
-  def updateTaskKey(email: String, taskId: Int, taskKey: String)(implicit requestHeader: RequestHeader): Future[Task] = {
+  def updateTaskKey(email: String, taskId: Int, taskKey: String)(implicit hostInfo: HostInfo): Future[Task] = {
     dao.updateTaskKey(taskId, taskKey)
   }
 
-  def assignTask(email: String, taskId: Int, emails: Seq[String])(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Task] = {
+  def assignTask(email: String, taskId: Int, emails: Seq[String])(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Task] = {
     for {
       currentTask <- dao.taskById(taskId)
       request <- dao.request(currentTask.requestSlug)
@@ -213,7 +213,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     } yield updatedTask
   }
 
-  def deleteTask(email: String, taskId: Int)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Unit] = {
+  def deleteTask(email: String, taskId: Int)(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Unit] = {
     for {
       currentTask <- dao.taskById(taskId)
       request <- dao.request(currentTask.requestSlug)
@@ -229,7 +229,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     } yield result
   }
 
-  def taskById(taskId: Int)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Task] = {
+  def taskById(taskId: Int)(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Task] = {
     for {
       task <- dao.taskById(taskId)
       request <- dao.request(task.requestSlug)
@@ -238,22 +238,30 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     } yield updatedTask
   }
 
-  def requestTasks(email: String, requestSlug: String, maybeState: Option[State.State] = None)(implicit requestHeader: RequestHeader, latestMetadata: LatestMetadata): Future[Seq[(Task, Task.Prototype, DAO.NumComments)]] = {
-    def updateTasks(request: Request, program: Program, tasks: Seq[(Task, DAO.NumComments)]): Future[Seq[(Task, DAO.NumComments)]] = {
-      Future.sequence {
-        tasks.map { case (task, numComments) =>
-          externalTaskHandler.taskStatus(task, program, updateTaskState(request.creatorEmail, task.id, _, _, _, _, true)).map { updatedTask =>
-            updatedTask -> numComments
-          }
+  private def updateTasksWithNumComments(request: Request, program: Program, tasks: Seq[(Task, DAO.NumComments)])(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Seq[(Task, DAO.NumComments)]] = {
+    Future.sequence {
+      tasks.map { case (task, numComments) =>
+        externalTaskHandler.taskStatus(task, program, updateTaskState(request.creatorEmail, task.id, _, _, _, _, true)).map { updatedTask =>
+          updatedTask -> numComments
         }
       }
     }
+  }
 
+  private def updateTasks(request: Request, program: Program, tasks: Seq[Task])(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Seq[Task]] = {
+    Future.sequence {
+      tasks.map { task =>
+        externalTaskHandler.taskStatus(task, program, updateTaskState(request.creatorEmail, task.id, _, _, _, _, true))
+      }
+    }
+  }
+
+  def requestTasks(email: String, requestSlug: String, maybeState: Option[State.State] = None)(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Seq[(Task, Task.Prototype, DAO.NumComments)]] = {
     for {
       tasks <- dao.requestTasks(requestSlug, maybeState)
       request <- dao.request(requestSlug)
       program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
-      updatedTasks <- updateTasks(request, program, tasks)
+      updatedTasks <- updateTasksWithNumComments(request, program, tasks)
     } yield {
       updatedTasks.flatMap { case (task, numComments) =>
         program.tasks.get(task.taskKey).map { prototype =>
@@ -263,7 +271,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     }
   }
 
-  def commentOnTask(requestSlug: String, taskId: Int, email: String, contents: String)(implicit requestHeader: RequestHeader): Future[Comment] = {
+  def commentOnTask(requestSlug: String, taskId: Int, email: String, contents: String)(implicit hostInfo: HostInfo): Future[Comment] = {
     for {
       comment <- dao.commentOnTask(taskId, email, contents)
       task <- dao.taskById(taskId)
@@ -284,8 +292,16 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     dao.tasksForUser(email, state)
   }
 
-  def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject], maybeDataIn: Option[DataIn]): Future[Seq[RequestWithTasksAndProgram]] = {
-    dao.searchRequests(maybeProgram, maybeState, maybeData, maybeDataIn).flatMap(withProgram)
+  def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject], maybeDataIn: Option[DataIn])(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Seq[RequestWithTasksAndProgram]] = {
+    dao.searchRequests(maybeProgram, maybeState, maybeData, maybeDataIn).flatMap(withProgram).flatMap { requestsWithTasksAndProgram =>
+      Future.sequence {
+        requestsWithTasksAndProgram.map { requestWithTasksAndProgram =>
+          updateTasks(requestWithTasksAndProgram.request, requestWithTasksAndProgram.program, requestWithTasksAndProgram.tasks).map { updatedTasks =>
+            requestWithTasksAndProgram.copy(tasks = updatedTasks)
+          }
+        }
+      }
+    }
   }
 
   def groupBy(requestsWithTasksAndProgram: Seq[RequestWithTasksAndProgram], groupBy: GroupBy): Future[Map[Option[String], Seq[RequestWithTasksAndProgram]]] = {

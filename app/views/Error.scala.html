@@ -7,7 +7,7 @@
 
 @this(mainView: Main)
 
-@(message: String, userInfo: controllers.UserInfo)(implicit requestHeader: RequestHeader, latestMetadata: services.GitMetadata.LatestMetadata)
+@(message: String)(implicit requestHeader: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: services.GitMetadata.LatestMetadata)
 
 @mainView(Some(userInfo))("Request Not Found") {
 

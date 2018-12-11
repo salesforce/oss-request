@@ -7,7 +7,7 @@
 
 @this(mainView: Main)
 
-@(userInfo: controllers.UserInfo, maybeResult: Option[scala.util.Try[String]] = None)(implicit request: RequestHeader, latestMetadata: services.GitMetadata.LatestMetadata)
+@(maybeResult: Option[scala.util.Try[String]] = None)(implicit request: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: services.GitMetadata.LatestMetadata)
 
 @mainView(Some(userInfo))("Notify Test") {
 

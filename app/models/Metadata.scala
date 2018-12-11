@@ -10,12 +10,12 @@ package models
 import java.net.URL
 import java.time.ZonedDateTime
 
+import core.Extensions._
 import models.Task.CompletableByType
 import org.eclipse.jgit.lib.ObjectId
 import play.api.libs.functional.syntax._
-import play.api.libs.json._
-import core.Extensions._
 import play.api.libs.json.JsonNaming.SnakeCase
+import play.api.libs.json._
 
 import scala.concurrent.Future
 

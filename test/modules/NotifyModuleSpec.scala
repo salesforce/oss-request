@@ -11,16 +11,16 @@ import java.time.{LocalDateTime, ZoneOffset}
 
 import com.roundeights.hasher.Algo
 import javax.inject.Singleton
+import modules.NotifyModule.HostInfo
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.db.Database
 import play.api.db.evolutions.Evolutions
 import play.api.inject.bind
 import play.api.libs.json.{JsObject, Json}
-import play.api.mvc.RequestHeader
-import play.api.test.FakeRequest
 import play.api.test.Helpers._
 import services.GitMetadata
+import services.GitMetadata.LatestMetadata
 
 import scala.concurrent.Future
 import scala.util.{Random, Try}
@@ -38,7 +38,8 @@ class NotifyModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 
   def defaultProgram = await(gitMetadata.fetchProgram(None, "default"))
 
-  implicit val fakeRequest: RequestHeader = FakeRequest()
+  implicit val hostInfo = HostInfo(false, "localhost")
+  implicit def latestMetadata: LatestMetadata = await(gitMetadata.latestVersion)
 
   implicit override def fakeApplication() = DAOMock.databaseAppBuilder().overrides(bind[NotifyProvider].to[NotifyMock]).build()
 

@@ -9,8 +9,9 @@ package controllers
 
 import akka.stream.scaladsl.StreamConverters
 import javax.inject.Inject
-import models.{Metadata, State, Task}
 import models.Task.CompletableByType
+import models.{Metadata, State, Task}
+import modules.NotifyModule.HostInfo
 import modules.{Auth, DAO, DB, NotifyProvider}
 import org.eclipse.jgit.lib.ObjectId
 import org.webjars.WebJarAssetLocator
@@ -33,12 +34,12 @@ class Application @Inject()
   (implicit ec: ExecutionContext)
   extends InjectedController {
 
-  private def withUserInfo[A](f: UserInfo => Future[Result])(implicit userRequest: UserRequest[A]): Future[Result] = {
-    userRequest.maybeUserInfo.fold(auth.authUrl.map(Redirect(_)))(f)
+  private def withUserInfoAndHostInfo[A](f: UserInfo => HostInfo => Future[Result])(implicit userRequest: UserRequest[A]): Future[Result] = {
+    userRequest.maybeUserInfo.fold(auth.authUrl.map(Redirect(_)))(userInfo => f(userInfo)(HostInfo(userRequest.secure, userRequest.host)))
   }
 
   def index = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       dataFacade.tasksForUser(userInfo.email, State.InProgress).map { tasks =>
         if (tasks.isEmpty) {
           Redirect(routes.Application.requests(None))
@@ -51,7 +52,7 @@ class Application @Inject()
   }
 
   def openUserTasks = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         dataFacade.tasksForUser(userInfo.email, State.InProgress).flatMap { tasks =>
 
@@ -67,7 +68,7 @@ class Application @Inject()
           tasksWithProgramFuture.map { tasksWithProgram =>
             // todo: this could be better
             if (tasks.size == tasksWithProgram.size) {
-              Ok(openUserTasksView(tasksWithProgram, userInfo))
+              Ok(openUserTasksView(tasksWithProgram))
             }
             else {
               InternalServerError("Could not find a specified program")
@@ -79,7 +80,7 @@ class Application @Inject()
   }
 
   def requests(program: Option[String]) = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
 
         val (maybeTitle, requestsFuture) = program.map { programKey =>
@@ -90,11 +91,11 @@ class Application @Inject()
 
         maybeTitle.map { title =>
           requestsFuture.map { requests =>
-            Ok(requestsView(title, requests, userInfo))
+            Ok(requestsView(title, requests))
           }
         } getOrElse {
           Future.successful {
-            InternalServerError(errorView("Could not find program", userInfo))
+            InternalServerError(errorView("Could not find program"))
           }
         }
       }
@@ -102,25 +103,25 @@ class Application @Inject()
   }
 
   def search(program: Option[String], state: Option[models.State.State], data: Option[String]) = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         val maybeData = data.flatMap(Json.parse(_).asOpt[JsObject])
         dataFacade.search(program, state, maybeData, None).map { requests =>
-          Ok(searchView(requests, userInfo))
+          Ok(searchView(requests))
         }
       }
     }
   }
 
   def report(programKey: String, reportKey: String) = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
-        latestMetadata.metadata.programs.get(programKey).fold(Future.successful(NotFound(errorView("Program Not Found", userInfo)))) { program =>
-          program.reports.get(reportKey).fold(Future.successful(NotFound(errorView("Report Not Found", userInfo)))) { report =>
+        latestMetadata.metadata.programs.get(programKey).fold(Future.successful(NotFound(errorView("Program Not Found")))) { program =>
+          program.reports.get(reportKey).fold(Future.successful(NotFound(errorView("Report Not Found")))) { report =>
             dataFacade.search(Some(programKey), report.query.state, report.query.data, report.query.dataIn).flatMap { requests =>
-              report.groupBy.fold(Future.successful(Ok(searchView(requests, userInfo)))) { groupBy =>
+              report.groupBy.fold(Future.successful(Ok(searchView(requests)))) { groupBy =>
                 dataFacade.groupBy(requests, groupBy).map { grouped =>
-                  Ok(groupedView(grouped, report, groupBy, userInfo))
+                  Ok(groupedView(grouped, report, groupBy))
                 }
               }
             }
@@ -131,7 +132,7 @@ class Application @Inject()
   }
 
   def newRequest(maybeName: Option[String], maybeProgramKey: Option[String], maybeStartTask: Option[String]) = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         val nonEmptyMaybeName = maybeName.filter(_.nonEmpty)
         val nonEmptyMaybeProgramKey = maybeProgramKey.filter(_.nonEmpty)
@@ -145,17 +146,17 @@ class Application @Inject()
           task <- programMetadata.tasks.get(startTask)
         } yield {
           dataFacade.requestsSimilarToName(programKey, name).map { similarRequests =>
-            Ok(newRequestFormView(programKey, name, startTask, task, userInfo, similarRequests))
+            Ok(newRequestFormView(programKey, name, startTask, task, similarRequests))
           }
         }
 
-        maybeTaskView.getOrElse(Future.successful(Ok(newRequestView(userInfo, nonEmptyMaybeName, nonEmptyMaybeProgramKey, nonEmptyMaybeStartTask))))
+        maybeTaskView.getOrElse(Future.successful(Ok(newRequestView(nonEmptyMaybeName, nonEmptyMaybeProgramKey, nonEmptyMaybeStartTask))))
       }
     }
   }
 
   def createRequest(name: String, programKey: String, startTask: String) = userAction.async(parse.json) { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         latestMetadata.metadata.program(programKey).flatMap { programMetadata =>
           programMetadata.tasks.get(startTask).fold(Future.successful(InternalServerError(s"Could not find task named '$startTask'"))) { metaTask =>
@@ -175,12 +176,12 @@ class Application @Inject()
   }
 
   def request(requestSlug: String) = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
         gitMetadata.fetchProgram(request.metadataVersion, request.program).flatMap { program =>
           gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
             dataFacade.requestTasks(userInfo.email, request.slug).map { tasks =>
-              Ok(requestView(program, request, tasks, userInfo))
+              Ok(requestView(program, request, tasks))
             }
           }
         }
@@ -191,7 +192,7 @@ class Application @Inject()
           } recoverWith {
             case _: DB.RequestNotFound =>
               gitMetadata.latestVersion.map { implicit latestMetadata =>
-                NotFound(errorView(rnf.getMessage, userInfo))
+                NotFound(errorView(rnf.getMessage))
               }
           }
       }
@@ -199,7 +200,7 @@ class Application @Inject()
   }
 
   def updateRequest(requestSlug: String, state: State.State) = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         // todo: allow user to provide a message
         dataFacade.updateRequest(userInfo.email, requestSlug, state, None).map { request =>
@@ -210,7 +211,7 @@ class Application @Inject()
   }
 
   def deleteRequest(requestSlug: String) = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         dataFacade.deleteRequest(userInfo.email, requestSlug).map { request =>
           NoContent
@@ -220,7 +221,7 @@ class Application @Inject()
   }
 
   def renameRequest(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       val maybeNewName = userRequest.body.get("value").flatMap(_.headOption).filter(_.nonEmpty)
       maybeNewName.fold(Future.successful(BadRequest("the new name was not specified"))) { newName =>
         dataFacade.renameRequest(userInfo.email, requestSlug, newName).map { request =>
@@ -231,7 +232,7 @@ class Application @Inject()
   }
 
   def metadataMigrate(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         val maybeVersion = userRequest.body.get("version").flatMap(_.headOption).flatMap { version =>
           Try(ObjectId.fromString(version)).toOption
@@ -272,7 +273,7 @@ class Application @Inject()
                 dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
                   gitMetadata.fetchProgram(request.metadataVersion, request.program).flatMap { currentProgram =>
                     gitMetadata.fetchProgram(maybeVersion, request.program).map { newProgram =>
-                      Ok(migrationResolverView(userInfo, request, maybeVersion, currentProgram, newProgram, migrationConflicts))
+                      Ok(migrationResolverView(request, maybeVersion, currentProgram, newProgram, migrationConflicts))
                     }
                   }
                 }
@@ -290,20 +291,21 @@ class Application @Inject()
   }
 
   def migrator() = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
-      for {
-        allVersions <- gitMetadata.allVersions
-        latestMetadata <- gitMetadata.latestVersion
-        programs = latestMetadata.metadata.programs.filterKeys(programKey => latestMetadata.isAdmin(userInfo.email, programKey)).keySet
-        requests <- Future.reduceLeft(programs.map(programKey => dao.searchRequests(Some(programKey), Some(State.InProgress), None, None)))(_ ++ _)
-      } yield {
-        Ok(migratorView(userInfo, allVersions.toSeq.sortBy(_.date.toEpochSecond).reverse, requests)(userRequest, latestMetadata))
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
+        for {
+          allVersions <- gitMetadata.allVersions
+          programs = latestMetadata.metadata.programs.filterKeys(programKey => latestMetadata.isAdmin(userInfo.email, programKey)).keySet
+          requests <- Future.reduceLeft(programs.map(programKey => dao.searchRequests(Some(programKey), Some(State.InProgress), None, None)))(_ ++ _)
+        } yield {
+          Ok(migratorView(allVersions.toSeq.sortBy(_.date.toEpochSecond).reverse, requests))
+        }
       }
     }
   }
 
   def task(requestSlug: String, taskId: Int) = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         val f = for {
           request <- dataFacade.request(userInfo.email, requestSlug)
@@ -311,7 +313,7 @@ class Application @Inject()
           comments <- dataFacade.commentsOnTask(taskId)
           program <- gitMetadata.fetchProgram(request.metadataVersion, request.program)
           prototype <- program.task(task.taskKey)
-        } yield Ok(taskView(request, program, task, prototype, comments, userInfo, latestMetadata.isAdmin(userInfo.email, request.program), program.groups.keySet))
+        } yield Ok(taskView(program, request, task, prototype, comments))
 
         f.recoverWith {
           case rnf: DB.RequestNotFound =>
@@ -319,17 +321,17 @@ class Application @Inject()
               Redirect(routes.Application.task(newSlug, taskId))
             } recoverWith {
               case _: DB.RequestNotFound =>
-                Future.successful(NotFound(errorView(rnf.getMessage, userInfo)))
+                Future.successful(NotFound(errorView(rnf.getMessage)))
             }
           case e: Exception =>
-            Future.successful(InternalServerError(errorView(e.getMessage, userInfo)))
+            Future.successful(InternalServerError(errorView(e.getMessage)))
         }
       }
     }
   }
 
   def addTask(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         val maybeTaskPrototypeKey = userRequest.body.get("taskPrototypeKey").flatMap(_.headOption)
         val maybeCompletableBy = userRequest.body.get("completableBy").flatMap(_.headOption).filterNot(_.isEmpty)
@@ -347,7 +349,7 @@ class Application @Inject()
                   Redirect(routes.Application.request(request.slug))
                 } recover {
                   case e @ (_: DataFacade.DuplicateTaskException | _: DataFacade.MissingTaskDependencyException) =>
-                    BadRequest(errorView(e.getMessage, userInfo))
+                    BadRequest(errorView(e.getMessage))
                 }
               }
             }
@@ -364,7 +366,7 @@ class Application @Inject()
   }
 
   def updateTaskState(requestSlug: String, taskId: Int, state: State.State, completionMessage: Option[String]) = userAction.async(maybeJsObject) { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         for {
           task <- dataFacade.taskById(taskId)
@@ -387,7 +389,7 @@ class Application @Inject()
   }
 
   def updateTaskAssignment(requestSlug: String, taskId: Int) = userAction.async(parse.json) { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       dataFacade.request(userInfo.email, requestSlug).flatMap { request =>
         gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
           gitMetadata.fetchProgram(request.metadataVersion, request.program).flatMap { program =>
@@ -413,7 +415,7 @@ class Application @Inject()
   }
 
   def deleteTask(requestSlug: String, taskId: Int) = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         dataFacade.deleteTask(userInfo.email, taskId).map { _ =>
           render {
@@ -426,7 +428,7 @@ class Application @Inject()
   }
 
   def commentOnTask(requestSlug: String, taskId: Int) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       val maybeContents = userRequest.body.get("contents").flatMap(_.headOption).filterNot(_.isEmpty)
       val maybeRedirect = userRequest.body.get("redirect").flatMap(_.headOption)
 
@@ -441,7 +443,7 @@ class Application @Inject()
   }
 
   def commentsOnTask(requestSlug: String, taskId: Int) = userAction.async(maybeJsObject) { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       dataFacade.commentsOnTask(taskId).map { comments =>
         Ok(commentsView(comments))
       }
@@ -449,6 +451,7 @@ class Application @Inject()
   }
 
   def emailReply = Action.async(parse.form(notifyProvider.form)) { implicit request =>
+    implicit val hostInfo = HostInfo(request.secure, request.host)
 
     def sendUnknownResponse = {
       val emailBody = "Sorry, but we couldn't figure out what to do with your email:\n\n" + request.body.body
@@ -474,23 +477,23 @@ class Application @Inject()
   }
 
   def formTest = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.map { implicit latestMetadata =>
-        Ok(formTestView(userInfo))
+        Ok(formTestView())
       }
     }
   }
 
   def notifyTest = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.map { implicit latestMetadata =>
-        Ok(notifyTestView(userInfo))
+        Ok(notifyTestView())
       }
     }
   }
 
   def notifyTestSend = userAction.async { implicit userRequest =>
-    withUserInfo { userInfo =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         val maybeInfo = for {
           form <- userRequest.body.asFormUrlEncoded
@@ -505,16 +508,16 @@ class Application @Inject()
         } yield recipient -> message
 
         maybeInfo.fold {
-          Future.successful(BadRequest(notifyTestView(userInfo, Some(Failure(new Exception("Missing form value"))))))
+          Future.successful(BadRequest(notifyTestView(Some(Failure(new Exception("Missing form value"))))))
         } { case (recipient, message) =>
           notifyProvider.sendMessage(Set(recipient), "Notify Test", message).map { result =>
             val message = result match {
               case s: String => s
               case _ => "Test Successful"
             }
-            Ok(notifyTestView(userInfo, Some(Success(message))))
+            Ok(notifyTestView(Some(Success(message))))
           } recover {
-            case t: Throwable => Ok(notifyTestView(userInfo, Some(Failure(t))))
+            case t: Throwable => Ok(notifyTestView(Some(Failure(t))))
           }
         }
       }

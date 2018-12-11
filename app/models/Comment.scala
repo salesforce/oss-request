@@ -8,6 +8,7 @@
 package models
 
 import java.time.ZonedDateTime
+
 import core.Extensions._
 
 case class Comment(id: Int, creatorEmail: String, createDate: ZonedDateTime, contents: String, taskId: Int) {

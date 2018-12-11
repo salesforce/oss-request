@@ -10,10 +10,10 @@ package models
 import java.net.URL
 import java.time.ZonedDateTime
 
+import core.Extensions._
 import io.getquill.MappedEncoding
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
-import core.Extensions._
 
 import scala.util.Try
 
