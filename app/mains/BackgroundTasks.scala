@@ -13,6 +13,7 @@ import modules.NotifyModule.HostInfo
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.{Logger, Mode}
 import services.{DataFacade, GitMetadata}
+import core.Extensions._
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Awaitable, ExecutionContext, Future}
@@ -32,16 +33,17 @@ object BackgroundTasks extends App {
   implicit val latestMetadata = await(gitMetadata.latestVersion)
 
   // this will refresh external tasks
-  val openRequests = await(dataFacade.search(None, Some(State.InProgress), None, None)).filter(_.request.metadataVersion != latestMetadata.maybeVersion)
+  Logger.info("Getting open requests...")
+  val openRequests = await(dataFacade.search(None, Some(State.InProgress), None, None))
 
   // update non-conflicting metadata
   await {
     Future.sequence {
-      openRequests.map { requestWithTasksAndProgram =>
+      openRequests.filter(_.request.metadataVersion != latestMetadata.maybeVersion).map { requestWithTasksAndProgram =>
         val requestSlug = requestWithTasksAndProgram.request.slug
-        dataFacade.requestMetadataMigrationConflicts(requestSlug, latestMetadata.maybeVersion).map { migrationConflicts =>
+        dataFacade.requestMetadataMigrationConflicts(requestSlug, latestMetadata.maybeVersion).flatMap { migrationConflicts =>
           if (migrationConflicts.isEmpty) {
-            Logger.info(s"Migrating request $requestSlug to latest metadata: ${latestMetadata.maybeVersion}")
+            Logger.info(s"Migrating request $requestSlug to latest metadata ${latestMetadata.maybeVersion.abbreviate}")
             dao.updateRequestMetadata(requestSlug, latestMetadata.maybeVersion)
           }
           else {
