@@ -20,7 +20,7 @@ class TaskSpec extends WordSpec with MustMatchers {
     "not produce a conflict when the prototypes are the same" in {
       val prototype = Task.Prototype("a task", Task.TaskType.Input, "test")
 
-      val program = Program("program", None, Set.empty, Map.empty, Map.empty, Map("task" -> prototype), Map.empty)
+      val program = Program("program", None, Set.empty, Map.empty, Map.empty, Seq.empty, Map("task" -> prototype), Map.empty)
 
       val task = Task(1, "task", ZonedDateTime.now(), Seq("foo@foo.com"), None, None, None, State.InProgress, None, "request")
 
@@ -29,7 +29,7 @@ class TaskSpec extends WordSpec with MustMatchers {
     "produce a conflict when the new program does not contain the old task prototype" in {
       val prototype = Task.Prototype("a task", Task.TaskType.Input, "test")
 
-      val program1 = Program("program", None, Set.empty, Map.empty, Map.empty, Map("task" -> prototype), Map.empty)
+      val program1 = Program("program", None, Set.empty, Map.empty, Map.empty, Seq.empty, Map("task" -> prototype), Map.empty)
       val program2 = program1.copy(tasks = Map.empty)
 
       val task = Task(1, "task", ZonedDateTime.now(), Seq("foo@foo.com"), None, None, None, State.InProgress, None, "request")
@@ -40,8 +40,8 @@ class TaskSpec extends WordSpec with MustMatchers {
       val prototype1 = Task.Prototype("v1", Task.TaskType.Input, "test", None, Some(Json.obj("foo" -> "bar")))
       val prototype2 = Task.Prototype("v2", Task.TaskType.Input, "test", None, Some(Json.obj("asdf" -> "zxcv")))
 
-      val program1 = Program("program", None, Set.empty, Map.empty, Map.empty, Map("task" -> prototype1), Map.empty)
-      val program2 = Program("program", None, Set.empty, Map.empty, Map.empty, Map("task" -> prototype2), Map.empty)
+      val program1 = Program("program", None, Set.empty, Map.empty, Map.empty, Seq.empty, Map("task" -> prototype1), Map.empty)
+      val program2 = Program("program", None, Set.empty, Map.empty, Map.empty, Seq.empty, Map("task" -> prototype2), Map.empty)
 
       val task = Task(1, "task", ZonedDateTime.now(), Seq("foo@foo.com"), None, None, None, State.Completed, None, "request")
 

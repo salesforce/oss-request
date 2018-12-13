@@ -8,6 +8,8 @@
 package services
 
 import javax.inject.Inject
+import models.State.State
+import models.Task.CompletableBy
 import models.TaskEvent.Criteria
 import models.{Program, Request, State, Task, TaskEvent}
 import play.api.libs.json.{JsLookupResult, JsObject, Reads}
@@ -17,7 +19,10 @@ import scala.util.Try
 
 class TaskEventHandler @Inject()(implicit ec: ExecutionContext) {
 
-  def process(program: Program, request: Request, tasks: Seq[Task], eventType: TaskEvent.EventType.EventType, task: Task, createTask: (String, String, Seq[String]) => Future[Task], updateRequestState: (State.State, Option[String]) => Future[Request]): Future[Seq[_]] = {
+  def process(program: Program, request: Request, tasks: Seq[Task], eventType: TaskEvent.EventType.EventType, task: Task)
+             (createTask: (String, String, Seq[String]) => Future[Task])
+             (updateTaskState: (Int, State) => Future[Task])
+             (updateRequestState: (State.State, Option[String]) => Future[Request]): Future[Seq[_]] = {
     program.tasks.get(task.taskKey).fold(Future.failed[Seq[_]](new Exception(s"Task not found: ${task.taskKey}"))) { taskPrototype =>
       Future.sequence {
         taskPrototype.taskEvents.filter { taskEvent =>
@@ -27,33 +32,7 @@ class TaskEventHandler @Inject()(implicit ec: ExecutionContext) {
           val handleAction = taskEvent.criteria.forall(TaskEventHandler.criteriaMatches(task.data))
 
           if (handleAction) {
-            taskEvent.action.`type` match {
-              case TaskEvent.EventActionType.CreateTask =>
-                val newTaskKey = taskEvent.action.value
-                program.tasks.get(newTaskKey).fold(Future.failed[Task](new Exception(s"Could not find task named '${taskEvent.action.value}'"))) { newTaskPrototype =>
-                  val completableBy = newTaskPrototype.completableBy.getOrElse(Task.CompletableBy(Task.CompletableByType.Email, Some(request.creatorEmail)))
-
-                  val maybeCompletableByOverride = for {
-                    overrides <- taskEvent.action.overrides
-                    completableByField <- (overrides \ "completable_by").asOpt[String]
-                    data <- task.data
-                    completableBy <- (data \ completableByField).asOpt[String]
-                  } yield completableBy
-
-                  completableBy.value.orElse(maybeCompletableByOverride).fold(Future.failed[Task](new Exception("Could not create task because it does not have a completable_by value"))) { completableByValue =>
-                    program.completableBy(completableBy.`type`, completableByValue).fold(Future.failed[Task](new Exception("Could not create task because it can't be assigned to anyone"))) { emails =>
-                      createTask(request.slug, newTaskKey, emails.toSeq).recoverWith {
-                        case _: DataFacade.DuplicateTaskException =>
-                          tasks.find(_.taskKey == newTaskKey).fold(Future.failed[Task](new Exception(s"Could not find the task: $newTaskKey")))(Future.successful)
-                      }
-                    }
-                  }
-                }
-              case TaskEvent.EventActionType.UpdateRequestState =>
-                updateRequestState(State.withName(taskEvent.action.value), taskEvent.action.message)
-              case _ =>
-                Future.failed[Task](new Exception(s"Could not process action type: ${taskEvent.action.`type`}"))
-            }
+            handleEvent(program, request, tasks, task.data, taskEvent.action)(createTask)(updateTaskState)(updateRequestState)
           }
           else {
             Future.successful(Seq.empty[Seq[Task]])
@@ -62,6 +41,58 @@ class TaskEventHandler @Inject()(implicit ec: ExecutionContext) {
       }
     }
   }
+
+  def handleEvent(program: Program, request: Request, tasks: Seq[Task], taskData: Option[JsObject], eventAction: TaskEvent.EventAction)
+                 (createTask: (String, String, Seq[String]) => Future[Task])
+                 (updateTaskState: (Int, State) => Future[Task])
+                 (updateRequestState: (State.State, Option[String]) => Future[Request]): Future[_] = {
+    eventAction.`type` match {
+      case TaskEvent.EventActionType.CreateTask =>
+        val maybeNewTaskKey = eventAction.value.orElse(eventAction.key)
+        maybeNewTaskKey.fold(Future.failed[Task](new Exception(s"New Task Key wasn't specified"))) { newTaskKey =>
+          program.tasks.get(newTaskKey).fold(Future.failed[Task](new Exception(s"Could not find task named '${eventAction.value}'"))) { newTaskPrototype =>
+            val completableBy = newTaskPrototype.completableBy.getOrElse(Task.CompletableBy(Task.CompletableByType.Email, Some(request.creatorEmail)))
+
+            val maybeCompletableByOverride = for {
+              overrides <- eventAction.overrides
+              completableByField <- (overrides \ "completable_by").asOpt[String]
+              data <- taskData
+              completableBy <- (data \ completableByField).asOpt[String]
+            } yield completableBy
+
+            completableBy.value.orElse(maybeCompletableByOverride).fold(Future.failed[Task](new Exception("Could not create task because it does not have a completable_by value"))) { completableByValue =>
+              program.completableBy(completableBy.`type`, completableByValue).fold(Future.failed[Task](new Exception("Could not create task because it can't be assigned to anyone"))) { emails =>
+                createTask(request.slug, newTaskKey, emails.toSeq).recoverWith {
+                  case _: DataFacade.DuplicateTaskException =>
+                    tasks.find(_.taskKey == newTaskKey).fold(Future.failed[Task](new Exception(s"Could not find the task: $newTaskKey")))(Future.successful)
+                }
+              }
+            }
+          }
+        }
+      case TaskEvent.EventActionType.UpdateTaskState =>
+        eventAction.key.fold(Future.failed[Task](new Exception(s"New Task Key wasn't specified"))) { key =>
+          eventAction.value.fold(Future.failed[Task](new Exception(s"Task State wasn't specified"))) { stateName =>
+            tasks.find(_.taskKey == key).fold(Future.failed[Task](new Exception(s"Task with key '$key' does not exist on this request"))) { task =>
+              val state = State.withName(stateName)
+              if (task.state == state) {
+                Future.successful(task)
+              }
+              else {
+                updateTaskState(task.id, State.withName(stateName))
+              }
+            }
+          }
+        }
+      case TaskEvent.EventActionType.UpdateRequestState =>
+        eventAction.value.fold(Future.failed[Request](new Exception(s"Request State wasn't specified"))) { stateName =>
+          updateRequestState(State.withName(stateName), eventAction.message)
+        }
+      case _ =>
+        Future.failed[Task](new Exception(s"Could not process action type: ${eventAction.`type`}"))
+    }
+  }
+
 }
 
 object TaskEventHandler {

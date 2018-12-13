@@ -9,7 +9,7 @@ package modules
 
 import java.time.ZonedDateTime
 
-import models.State
+import models.{ReportQuery, Request, State}
 import org.scalatestplus.play.PlaySpec
 import org.scalatestplus.play.guice.GuiceOneAppPerTest
 import play.api.db.Database
@@ -22,6 +22,7 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
 
   def database = app.injector.instanceOf[Database]
   def dao = app.injector.instanceOf[DAO]
+  def databaseWithCtx = app.injector.instanceOf[DatabaseWithCtx]
 
   "DB.slug" must {
     "lowercase" in {
@@ -196,6 +197,22 @@ class DAOModuleSpec extends PlaySpec with GuiceOneAppPerTest {
       val updatedRequest1 = await(dao.renameRequest(request1.slug, "Bar"))
       val request2 = await(dao.createRequest(None, "foo", "foo@bar.com"))
       request2.slug must not equal request1.slug
+    }
+  }
+
+  "searchRequests" must {
+    "work with completed query" in Evolutions.withEvolutions(database) {
+      val daoWithCtx = app.injector.instanceOf[DAOWithCtx]
+
+      val completedNowRequest = Request(None, "default", "now", "now", ZonedDateTime.now(), "asdf@asdf.com", State.Completed, Some(ZonedDateTime.now()), None)
+      val completedTwoMonthsAgoRequest = Request(None, "default", "two-months-ago", "two-months-ago", ZonedDateTime.now(), "asdf@asdf.com", State.Completed, Some(ZonedDateTime.now().minusMonths(2)), None)
+
+      daoWithCtx.insertRequest(completedNowRequest)
+      daoWithCtx.insertRequest(completedTwoMonthsAgoRequest)
+
+      val requests = await(dao.searchRequests(None, ReportQuery(None, None, None, Some("> now() - interval '1 month'"))))
+      requests must have size 1
+      requests.head.request.slug must equal ("now")
     }
   }
 

@@ -11,7 +11,7 @@ import java.time.ZonedDateTime
 import java.util.concurrent.ConcurrentHashMap
 
 import javax.inject.Singleton
-import models.{Comment, DataIn, PreviousSlug, Request, RequestWithTasks, State, Task}
+import models.{Comment, DataIn, PreviousSlug, ReportQuery, Request, RequestWithTasks, State, Task}
 import org.eclipse.jgit.lib.ObjectId
 import play.api.Mode
 import play.api.db.evolutions.EvolutionsModule
@@ -203,12 +203,12 @@ class DAOMock extends DAO {
     }.map(_.toSeq)
   }
 
-  def searchRequests(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject], maybeDataIn: Option[DataIn]): Future[Seq[RequestWithTasks]] = {
+  override def searchRequests(maybeProgram: Option[String], reportQuery: ReportQuery): Future[Seq[RequestWithTasks]] = {
     allRequests().map { requestsWithTasks =>
       requestsWithTasks.filter { requestWithTasks =>
         maybeProgram.forall(_ == requestWithTasks.request.program) &&
-        maybeState.forall(_ == requestWithTasks.request.state) &&
-        maybeData.forall { data =>
+        reportQuery.state.forall(_ == requestWithTasks.request.state) &&
+        reportQuery.data.forall { data =>
           requestWithTasks.tasks.exists { task =>
             task.data.exists { taskData =>
               // merge them an if they are they same, it is a match!
@@ -216,7 +216,8 @@ class DAOMock extends DAO {
             }
           }
         }
-        // todo: maybeDataIn
+        // todo: dataIn
+        // todo: completed
       }.toSeq
     }
   }

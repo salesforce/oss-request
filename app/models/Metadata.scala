@@ -61,7 +61,7 @@ object Metadata {
 
 }
 
-case class Program(name: String, description: Option[String], startTasks: Set[String], groups: Map[String, Set[String]], services: Map[String, String], tasks: Map[String, Task.Prototype], reports: Map[String, Report]) {
+case class Program(name: String, description: Option[String], startTasks: Set[String], groups: Map[String, Set[String]], services: Map[String, String], jobs: Seq[Job], tasks: Map[String, Task.Prototype], reports: Map[String, Report]) {
   val admins: Set[String] = groups.getOrElse("admin", Set.empty[String])
 
   def completableBy(completableBy: (CompletableByType.CompletableByType, String)): Option[Set[String]] = {
@@ -90,6 +90,7 @@ object Program {
     (__ \ "start_tasks").read[Set[String]].orElse(Reads.pure(Set.empty[String])) ~
     (__ \ "groups").read[Map[String, Set[String]]] ~
     (__ \ "services").read[Map[String, String]].orElse(Reads.pure(Map.empty[String, String])) ~
+    (__ \ "jobs").read[Seq[Job]].orElse(Reads.pure(Seq.empty)) ~
     (__ \ "tasks").read[Map[String, Task.Prototype]] ~
     (__ \ "reports").read[Map[String, Report]].orElse(Reads.pure(Map.empty[String, Report]))
   )(Program.apply _)
@@ -101,13 +102,14 @@ object DataIn {
   implicit val jsonReads: Reads[DataIn] = Json.reads[DataIn]
 }
 
-case class ReportQuery(state: Option[State.State], data: Option[JsObject], dataIn: Option[DataIn])
+case class ReportQuery(state: Option[State.State] = None, data: Option[JsObject] = None, dataIn: Option[DataIn] = None, completed: Option[String] = None)
 
 object ReportQuery {
   implicit val jsonReads: Reads[ReportQuery] = (
     (__ \ "state").readNullable[State.State] ~
     (__ \ "data").readNullable[JsObject] ~
-    (__ \ "data-in").readNullable[DataIn]
+    (__ \ "data-in").readNullable[DataIn] ~
+    (__ \ "completed").readNullable[String]
   )(ReportQuery.apply _)
 }
 
@@ -126,4 +128,11 @@ case class Report(title: String, query: ReportQuery, groupBy: Option[GroupBy])
 object Report {
   implicit val config = JsonConfiguration(SnakeCase)
   implicit val jsonReads: Reads[Report] = Json.reads[Report]
+}
+
+
+case class Job(name: String, query: ReportQuery, actions: Seq[TaskEvent.EventAction])
+
+object Job {
+  implicit val jsonReads: Reads[Job] = Json.reads[Job]
 }

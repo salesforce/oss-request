@@ -16,7 +16,7 @@ import com.github.mauricio.async.db.postgresql.pool.PostgreSQLConnectionFactory
 import com.github.mauricio.async.db.postgresql.util.URLParser
 import io.getquill.{PostgresAsyncContext, SnakeCase}
 import javax.inject.{Inject, Singleton}
-import models.{Comment, DataIn, PreviousSlug, Request, RequestWithTasks, State, Task}
+import models.{Comment, DataIn, PreviousSlug, ReportQuery, Request, RequestWithTasks, State, Task}
 import org.eclipse.jgit.lib.ObjectId
 import play.api.inject.{ApplicationLifecycle, Binding, Module}
 import play.api.libs.json.{JsObject, Json}
@@ -54,7 +54,7 @@ trait DAO {
   def commentOnTask(taskId: Int, email: String, contents: String): Future[Comment]
   def commentsOnTask(taskId: Int): Future[Seq[Comment]]
   def tasksForUser(email: String, state: State.State): Future[Seq[(Task, DAO.NumComments, Request)]]
-  def searchRequests(maybeProgram: Option[String], maybeState: Option[State.State], data: Option[JsObject], dataIn: Option[DataIn]): Future[Seq[RequestWithTasks]]
+  def searchRequests(maybeProgram: Option[String], reportQuery: ReportQuery): Future[Seq[RequestWithTasks]]
   def renameRequest(requestSlug: String, newName: String): Future[Request]
   def previousSlug(slug: String): Future[String]
 }
@@ -95,15 +95,19 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
 
       val request = Request(metadataVersion, programKey, slug, name, createDate, creatorEmail, state, None, None)
 
-      run {
-        quote {
-          query[Request].insert {
-            lift(request)
-          }
+      insertRequest(request)
+    }
+  }
+
+  def insertRequest(request: Request): Future[Request] = {
+    run {
+      quote {
+        query[Request].insert {
+          lift(request)
         }
-      } map { _ =>
-        request
       }
+    } map { _ =>
+      request
     }
   }
 
@@ -337,7 +341,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  override def searchRequests(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject], maybeDataIn: Option[DataIn]): Future[Seq[RequestWithTasks]] = {
+  override def searchRequests(maybeProgram: Option[String], reportQuery: ReportQuery): Future[Seq[RequestWithTasks]] = {
 
     case class QueryBuilder[T](query: Quoted[Query[T]]) {
       def ifDefined[U: Encoder](value: Option[U])(f: Quoted[(Query[T], U) => Query[T]]): QueryBuilder[T] =
@@ -362,10 +366,10 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
       .ifDefined(maybeProgram) {
         (q: Query[Request], program: String) => q.filter(_.program == program)
       }
-      .ifDefined(maybeState) {
+      .ifDefined(reportQuery.state) {
         (q: Query[Request], state: State.State) => q.filter(_.state == state)
       }
-      .ifDefined(maybeData) {
+      .ifDefined(reportQuery.data) {
         (q: Query[Request], data: JsObject) => q.filter { request =>
           query[Task].filter(_.requestSlug == request.slug).filter { task =>
             infix"""${task.data} @> $data""".as[Boolean]
@@ -373,7 +377,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
         }
       }
 
-    val queryBuilder = maybeDataIn match {
+    val queryBuilderWithDataIn = reportQuery.dataIn match {
       case None =>
         baseQueryBuilder
       case Some(dataIn) =>
@@ -385,6 +389,19 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
                   infix"${task.data}->>'${inject(dataIn.attribute)}'"
                 }
               }.nonEmpty
+            }
+          }
+        }
+    }
+
+    val queryBuilder = reportQuery.completed match {
+      case None =>
+        queryBuilderWithDataIn
+      case Some(completed) =>
+        QueryBuilder {
+          quote {
+            queryBuilderWithDataIn.query.filter { request =>
+              infix"""${request.completedDate} ${inject(completed)}""".as[Boolean]
             }
           }
         }

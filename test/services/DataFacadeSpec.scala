@@ -7,7 +7,7 @@
 
 package services
 
-import models.{DataIn, Metadata, State, Task}
+import models.{DataIn, Metadata, ReportQuery, State, Task}
 import modules.NotifyModule.HostInfo
 import modules.{DAOMock, NotifyMock, NotifyProvider}
 import org.scalatestplus.play.MixedPlaySpec
@@ -182,7 +182,7 @@ class DataFacadeSpec extends MixedPlaySpec {
       Evolutions.withEvolutions(database) {
         await(dataFacade.createRequest(None, "default", "foo", "foo@foo.com"))
 
-        val results = await(dataFacade.search(None, None, None, None))
+        val results = await(dataFacade.search(None, ReportQuery()))
 
         results.size must equal (1)
       }
@@ -192,7 +192,7 @@ class DataFacadeSpec extends MixedPlaySpec {
         await(dataFacade.createRequest(None, "default", "foo", "foo@foo.com"))
         await(dataFacade.createRequest(None, "two", "foo", "foo@foo.com"))
 
-        val results = await(dataFacade.search(Some("default"), None, None, None))
+        val results = await(dataFacade.search(Some("default"), ReportQuery()))
 
         results.size must equal (1)
       }
@@ -204,7 +204,7 @@ class DataFacadeSpec extends MixedPlaySpec {
 
         await(dataFacade.createRequest(None, "two", "foo", "foo@foo.com"))
 
-        val results = await(dataFacade.search(None, Some(State.InProgress), None, None))
+        val results = await(dataFacade.search(None, ReportQuery(Some(State.InProgress))))
 
         results.size must equal (1)
       }
@@ -216,8 +216,8 @@ class DataFacadeSpec extends MixedPlaySpec {
 
         await(dataFacade.createRequest(None, "two", "foo", "foo@foo.com"))
 
-        await(dataFacade.search(Some("default"), Some(State.InProgress), None, None)).size must equal (0)
-        await(dataFacade.search(Some("default"), Some(State.Cancelled), None, None)).size must equal (1)
+        await(dataFacade.search(Some("default"), ReportQuery(Some(State.InProgress)))).size must equal (0)
+        await(dataFacade.search(Some("default"), ReportQuery(Some(State.Cancelled)))).size must equal (1)
       }
     }
     "work with data" in new App(withDb) {
@@ -231,9 +231,9 @@ class DataFacadeSpec extends MixedPlaySpec {
 
         await(dataFacade.createRequest(None, "two", "foo", "foo@foo.com"))
 
-        await(dataFacade.search(None, None, None, None)).size must equal (2)
-        await(dataFacade.search(None, None, Some(json), None)).size must equal (1)
-        await(dataFacade.search(None, None, Some(Json.obj("foo" -> "asdf")), None)).size must equal (0)
+        await(dataFacade.search(None, ReportQuery())).size must equal (2)
+        await(dataFacade.search(None, ReportQuery(None, Some(json)))).size must equal (1)
+        await(dataFacade.search(None, ReportQuery(None, Some(Json.obj("foo" -> "asdf"))))).size must equal (0)
       }
     }
     "work with data-in" in new App(withDb) {
@@ -244,11 +244,11 @@ class DataFacadeSpec extends MixedPlaySpec {
 
         await(dataFacade.createRequest(None, "two", "foo", "foo@foo.com"))
 
-        await(dataFacade.search(None, None, None, Some(DataIn("foo", Set.empty)))).size must equal (0)
-        await(dataFacade.search(None, None, None, Some(DataIn("bar", Set.empty)))).size must equal (0)
-        await(dataFacade.search(None, None, None, Some(DataIn("foo", Set("baz"))))).size must equal (0)
-        await(dataFacade.search(None, None, None, Some(DataIn("foo", Set("bar"))))).size must equal (1)
-        await(dataFacade.search(None, None, None, Some(DataIn("foo", Set("bar", "baz"))))).size must equal (1)
+        await(dataFacade.search(None, ReportQuery(None, None, Some(DataIn("foo", Set.empty))))).size must equal (0)
+        await(dataFacade.search(None, ReportQuery(None, None, Some(DataIn("bar", Set.empty))))).size must equal (0)
+        await(dataFacade.search(None, ReportQuery(None, None, Some(DataIn("foo", Set("baz")))))).size must equal (0)
+        await(dataFacade.search(None, ReportQuery(None, None, Some(DataIn("foo", Set("bar")))))).size must equal (1)
+        await(dataFacade.search(None, ReportQuery(None, None, Some(DataIn("foo", Set("bar", "baz")))))).size must equal (1)
       }
     }
   }

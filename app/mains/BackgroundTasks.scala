@@ -7,13 +7,14 @@
 
 package mains
 
-import models.State
+import models.{ReportQuery, State}
 import modules.DAO
 import modules.NotifyModule.HostInfo
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.{Logger, Mode}
-import services.{DataFacade, GitMetadata}
+import services.{DataFacade, GitMetadata, TaskEventHandler}
 import core.Extensions._
+import services.GitMetadata.LatestMetadata
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Awaitable, ExecutionContext, Future}
@@ -28,13 +29,14 @@ object BackgroundTasks extends App {
   val gitMetadata = app.injector.instanceOf[GitMetadata]
   val dataFacade = app.injector.instanceOf[DataFacade]
   val dao = app.injector.instanceOf[DAO]
+  val taskEventHandler = app.injector.instanceOf[TaskEventHandler]
   implicit val ec = app.injector.instanceOf[ExecutionContext]
 
   implicit val latestMetadata = await(gitMetadata.latestVersion)
 
   // this will refresh external tasks
   Logger.info("Getting open requests...")
-  val openRequests = await(dataFacade.search(None, Some(State.InProgress), None, None))
+  val openRequests = await(dataFacade.search(None, ReportQuery(Some(State.InProgress), None, None, None)))
 
   // update non-conflicting metadata
   await {
@@ -48,6 +50,27 @@ object BackgroundTasks extends App {
           }
           else {
             Future.unit
+          }
+        }
+      }
+    }
+  }
+
+  // run jobs
+  await {
+    Future.sequence {
+      latestMetadata.metadata.programs.flatMap { case (programKey, program) =>
+        program.jobs.map { job =>
+          dataFacade.search(Some(programKey), job.query).flatMap { requests =>
+            Future.sequence {
+              for {
+                request <- requests
+                action <- job.actions
+              } yield {
+                Logger.info(s"Running job ${job.name} on request '${request.request.slug}")
+                taskEventHandler.handleEvent(program, request.request, request.tasks, None, action)(dataFacade.createTask(_, _, _))(dataFacade.updateTaskState(request.request.creatorEmail, _, _, None, None, None, true))(dataFacade.updateRequest(request.request.creatorEmail, request.request.slug, _, _, true))
+              }
+            }
           }
         }
       }

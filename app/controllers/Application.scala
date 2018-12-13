@@ -10,7 +10,7 @@ package controllers
 import akka.stream.scaladsl.StreamConverters
 import javax.inject.Inject
 import models.Task.CompletableByType
-import models.{Metadata, State, Task}
+import models.{Metadata, ReportQuery, State, Task}
 import modules.NotifyModule.HostInfo
 import modules.{Auth, DAO, DB, NotifyProvider}
 import org.eclipse.jgit.lib.ObjectId
@@ -106,7 +106,7 @@ class Application @Inject()
     withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
       gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         val maybeData = data.flatMap(Json.parse(_).asOpt[JsObject])
-        dataFacade.search(program, state, maybeData, None).map { requests =>
+        dataFacade.search(program, ReportQuery(state, maybeData, None, None)).map { requests =>
           Ok(searchView(requests))
         }
       }
@@ -118,7 +118,7 @@ class Application @Inject()
       gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
         latestMetadata.metadata.programs.get(programKey).fold(Future.successful(NotFound(errorView("Program Not Found")))) { program =>
           program.reports.get(reportKey).fold(Future.successful(NotFound(errorView("Report Not Found")))) { report =>
-            dataFacade.search(Some(programKey), report.query.state, report.query.data, report.query.dataIn).flatMap { requests =>
+            dataFacade.search(Some(programKey), report.query).flatMap { requests =>
               report.groupBy.fold(Future.successful(Ok(searchView(requests)))) { groupBy =>
                 dataFacade.groupBy(requests, groupBy).map { grouped =>
                   Ok(groupedView(grouped, report, groupBy))
@@ -296,7 +296,7 @@ class Application @Inject()
         for {
           allVersions <- gitMetadata.allVersions
           programs = latestMetadata.metadata.programs.filterKeys(programKey => latestMetadata.isAdmin(userInfo.email, programKey)).keySet
-          requests <- Future.reduceLeft(programs.map(programKey => dao.searchRequests(Some(programKey), Some(State.InProgress), None, None)))(_ ++ _)
+          requests <- Future.reduceLeft(programs.map(programKey => dao.searchRequests(Some(programKey), ReportQuery(Some(State.InProgress), None, None, None))))(_ ++ _)
         } yield {
           Ok(migratorView(allVersions.toSeq.sortBy(_.date.toEpochSecond).reverse, requests))
         }

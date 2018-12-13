@@ -8,7 +8,7 @@
 package services
 
 import javax.inject.Inject
-import models.{Comment, DataIn, GroupBy, Metadata, Program, Request, RequestWithTasks, RequestWithTasksAndProgram, State, Task, TaskEvent}
+import models.{Comment, DataIn, GroupBy, Metadata, Program, ReportQuery, Request, RequestWithTasks, RequestWithTasksAndProgram, State, Task, TaskEvent}
 import modules.NotifyModule.HostInfo
 import modules.{DAO, Notifier}
 import org.eclipse.jgit.lib.ObjectId
@@ -55,7 +55,7 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
 
       RequestWithTasks(_, updatedTasks) <- dao.requestWithTasks(requestSlug)
 
-      _ <- taskEventHandler.process(program, request, updatedTasks, TaskEvent.EventType.StateChange, updatedTask, createTask(_, _, _), updateRequest(request.creatorEmail, task.requestSlug, _, _, true))
+      _ <- taskEventHandler.process(program, request, updatedTasks, TaskEvent.EventType.StateChange, updatedTask)(createTask(_, _, _))(updateTaskState(request.creatorEmail, _, _, maybeCompletedBy, maybeData, None, true))(updateRequest(request.creatorEmail, task.requestSlug, _, _, true))
 
       _ <- if (state == State.InProgress) notifier.taskAssigned(request, updatedTask, program) else Future.unit
     } yield updatedTask
@@ -178,15 +178,13 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
           program <- gitMetadata.fetchProgram(requestWithTasks.request.metadataVersion, requestWithTasks.request.program)
           _ <- checkAccess(securityBypass || latestMetadata.isAdmin(email, requestWithTasks.request.program) || currentTask.completableBy.contains(email))
 
-
-
           task <- dao.updateTaskState(taskId, state, maybeCompletedBy, maybeData, completionMessage)
 
           _ <- if (task.state == State.InProgress) notifier.taskAssigned(requestWithTasks.request, task, program) else notifier.taskStateChanged(requestWithTasks.request, task, program)
 
           _ <- for {
             updatedRequestWithTasks <- dao.requestWithTasks(currentTask.requestSlug)
-            _ <- taskEventHandler.process(program, updatedRequestWithTasks.request, updatedRequestWithTasks.tasks, TaskEvent.EventType.StateChange, task, createTask(_, _, _), updateRequest(email, task.requestSlug, _, _, securityBypass))
+            _ <- taskEventHandler.process(program, updatedRequestWithTasks.request, updatedRequestWithTasks.tasks, TaskEvent.EventType.StateChange, task)(createTask(_, _, _))(updateTaskState(email, _, _, maybeCompletedBy, maybeData, completionMessage, securityBypass))(updateRequest(email, task.requestSlug, _, _, securityBypass))
           } yield Unit
 
           _ <- for {
@@ -292,8 +290,8 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
     dao.tasksForUser(email, state)
   }
 
-  def search(maybeProgram: Option[String], maybeState: Option[State.State], maybeData: Option[JsObject], maybeDataIn: Option[DataIn])(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Seq[RequestWithTasksAndProgram]] = {
-    dao.searchRequests(maybeProgram, maybeState, maybeData, maybeDataIn).flatMap(withProgram).flatMap { requestsWithTasksAndProgram =>
+  def search(maybeProgram: Option[String], reportQuery: ReportQuery)(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Seq[RequestWithTasksAndProgram]] = {
+    dao.searchRequests(maybeProgram, reportQuery).flatMap(withProgram).flatMap { requestsWithTasksAndProgram =>
       Future.sequence {
         requestsWithTasksAndProgram.map { requestWithTasksAndProgram =>
           updateTasks(requestWithTasksAndProgram.request, requestWithTasksAndProgram.program, requestWithTasksAndProgram.tasks).map { updatedTasks =>

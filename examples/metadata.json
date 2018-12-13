@@ -46,6 +46,29 @@
         }
       }
     },
+    "jobs": [
+      {
+        "name": "reopen requests approved over a second ago",
+        "query": {
+          "completed": "< now() - interval '1 second'"
+        },
+        "action": [
+          {
+            "type": "CREATE_TASK",
+            "key": "ip_review"
+          },
+          {
+            "type": "UPDATE_TASK_STATE",
+            "key": "ip_review",
+            "value": "IN_PROGRESS"
+          },
+          {
+            "type": "UPDATE_REQUEST_STATE",
+            "value": "IN_PROGRESS"
+          }
+        ]
+      }
+    ],
     "tasks": {
       "start": {
         "label": "OSS Request Info",

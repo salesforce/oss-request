@@ -25,12 +25,13 @@ object TaskEvent {
     }
   }
 
-  case class EventAction(`type`: EventActionType.EventActionType, value: String, message: Option[String] = None, overrides: Option[JsObject] = None)
+  case class EventAction(`type`: EventActionType.EventActionType, value: Option[String] = None, key: Option[String] = None, message: Option[String] = None, overrides: Option[JsObject] = None)
 
   object EventActionType extends Enumeration {
     type EventActionType = Value
 
     val CreateTask = Value("CREATE_TASK")
+    val UpdateTaskState = Value("UPDATE_TASK_STATE")
     val UpdateRequestState = Value("UPDATE_REQUEST_STATE")
 
     implicit val jsonReads = Reads[EventActionType] { jsValue =>
@@ -43,6 +44,7 @@ object TaskEvent {
     implicit val jsonWrites = Json.writes[EventAction]
   }
 
+  // todo: merge Criteria and ReportQuery
   object CriteriaType extends Enumeration {
 
     type CriteriaType = Value
