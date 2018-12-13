@@ -47,8 +47,13 @@ class GitMetadata @Inject()(configuration: Configuration, environment: Environme
 
   def latestVersion: Future[LatestMetadata] = {
     allVersions.flatMap { versions =>
-      val maybeVersion = versions.maxBy(_.date.toEpochSecond).id
-      fetchMetadata(maybeVersion).map(metadata => LatestMetadata(maybeVersion, metadata))
+      if (versions.isEmpty) {
+        Future.failed(new Exception("No metadata versions"))
+      }
+      else {
+        val maybeVersion = versions.maxBy(_.date.toEpochSecond).id
+        fetchMetadata(maybeVersion).map(metadata => LatestMetadata(maybeVersion, metadata))
+      }
     }
   }
 
