@@ -18,7 +18,7 @@ import akka.util.Timeout
 import com.jcraft.jsch.{JSch, Session}
 import javax.inject.{Inject, Singleton}
 import models.{Metadata, MetadataVersion, Program}
-import org.eclipse.jgit.api.Git
+import org.eclipse.jgit.api.{Git, TransportCommand}
 import org.eclipse.jgit.api.ResetCommand.ResetType
 import org.eclipse.jgit.api.errors.JGitInternalException
 import org.eclipse.jgit.lib.ObjectId
@@ -89,10 +89,7 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
 
   lazy val maybeMetadataGitSshKey = configuration.getOptional[String]("metadata-git-ssh-key")
 
-
-  lazy val gitRepo = {
-    val cacheDir = Files.createTempDirectory("git").toFile
-
+  def withAuth[C <: org.eclipse.jgit.api.GitCommand[_], T](transportCommand: TransportCommand[C, T]): TransportCommand[C, T] = {
     val maybeSshSessionFactory = maybeMetadataGitSshKey.map { metadataGitSshKey =>
       new JschConfigSessionFactory() {
         override def configure(hc: OpenSshConfig.Host, session: Session): Unit = {
@@ -106,6 +103,21 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
         }
       }
     }
+
+    maybeSshSessionFactory.fold(transportCommand) { sshSessionFactory =>
+      transportCommand.setTransportConfigCallback { transport =>
+        val sshTransport = transport.asInstanceOf[SshTransport]
+        sshTransport.setSshSessionFactory(sshSessionFactory)
+      }
+
+      transportCommand
+    }
+  }
+
+
+
+  lazy val gitRepo = {
+    val cacheDir = Files.createTempDirectory("git").toFile
 
     val (gitUri, branch) = if (metadataGitUri.getFragment != null) {
       new URI(metadataGitUri.getScheme, metadataGitUri.getUserInfo, metadataGitUri.getHost, metadataGitUri.getPort, metadataGitUri.getPath, null, null) -> metadataGitUri.getFragment
@@ -127,14 +139,7 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
         .setBranchesToClone(Seq(s"refs/heads/$branch").asJava)
         .setBranch(s"refs/heads/$branch")
 
-      val clone = maybeSshSessionFactory.fold(baseClone) { sshSessionFactory =>
-        baseClone.setTransportConfigCallback { transport =>
-          val sshTransport = transport.asInstanceOf[SshTransport]
-          sshTransport.setSshSessionFactory(sshSessionFactory)
-        }
-      }
-
-      clone.call()
+      withAuth(baseClone).call()
     }
 
     if (metadataGitUri.getScheme == "file") {
@@ -205,7 +210,7 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
 
   def refresh(): Seq[FetchResult] = {
     gitRepo.remoteList().call().asScala.map { remote =>
-      gitRepo.fetch().setRemote(remote.getName).setRefSpecs(remote.getFetchRefSpecs).call()
+      withAuth(gitRepo.fetch().setRemote(remote.getName).setRefSpecs(remote.getFetchRefSpecs)).call()
     }
   }
 
