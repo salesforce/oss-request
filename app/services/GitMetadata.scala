@@ -203,8 +203,10 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
     }
   }
 
-  def refresh(): FetchResult = {
-    gitRepo.fetch().call()
+  def refresh(): Seq[FetchResult] = {
+    gitRepo.remoteList().call().asScala.map { remote =>
+      gitRepo.fetch().setRemote(remote.getName).setRefSpecs(remote.getFetchRefSpecs).call()
+    }
   }
 
   def fetchMetadataWithRecovery(maybeVersion: Option[ObjectId]): Future[Metadata] = {
