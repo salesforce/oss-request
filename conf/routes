@@ -18,6 +18,7 @@ POST        /request/:requestSlug                              controllers.Appli
 DELETE      /request/:requestSlug                              controllers.Application.deleteRequest(requestSlug: String)
 POST        /request/:requestSlug/metadata-migrate             controllers.Application.metadataMigrate(requestSlug: String)
 POST        /request/:requestSlug/rename                       controllers.Application.renameRequest(requestSlug: String)
+POST        /request/:requestSlug/update-owner                 controllers.Application.updateRequestOwner(requestSlug: String)
 POST        /request/:requestSlug/task                         controllers.Application.addTask(requestSlug: String)
 POST        /request/:requestSlug/task/:taskId/state           controllers.Application.updateTaskState(requestSlug: String, taskId: Int, state: models.State.State, completionMessage: Option[String])
 POST        /request/:requestSlug/task/:taskId/assignment      controllers.Application.updateTaskAssignment(requestSlug: String, taskId: Int)

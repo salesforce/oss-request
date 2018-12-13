@@ -203,9 +203,21 @@
     <div class="jumbotron">
         @if(latestMetadata.isAdmin(userInfo.email, request.program) || request.creatorEmail == userInfo.email) {
             <h1><a href="#" id="requestName" data-type="text" data-pk="@request.slug" data-url="@helper.CSRF(routes.Application.renameRequest(request.slug))" data-mode="inline">@request.name</a></h1>
+            <p>Owned by <a href="#" id="requestOwner" data-type="email" data-pk="@request.slug" data-url="@helper.CSRF(routes.Application.updateRequestOwner(request.slug))" data-mode="inline">@request.creatorEmail</a> - created on @request.createDate.monthDayYear</p>
             <script>
                 $(document).ready(function() {
                     $('#requestName').editable({
+                        success: function(response) {
+                            if(response.slug === undefined) {
+                                return response;
+                            }
+                            else {
+                                location.replace("/request/" + response.slug);
+                            }
+                        }
+                    });
+
+                    $('#requestOwner').editable({
                         success: function(response) {
                             if(response.slug === undefined) {
                                 return response;
@@ -219,8 +231,8 @@
             </script>
         } else {
             <h1>@request.name</h1>
+            <p>Owned by @request.creatorEmail - created on @request.createDate.monthDayYear</p>
         }
-        <p>Created by @request.creatorEmail on @request.createDate.monthDayYear</p>
         <div>@state</div>
     </div>
 

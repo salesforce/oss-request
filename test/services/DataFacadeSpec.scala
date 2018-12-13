@@ -306,4 +306,14 @@ class DataFacadeSpec extends MixedPlaySpec {
     }
   }
 
+  "updateRequestOwner" must {
+    "work" in new App(withDb) {
+      Evolutions.withEvolutions(database) {
+        val request = await(dataFacade.createRequest(None, "test", "foo", "foo@bar.com"))
+        val updatedRequest = await(dataFacade.updateRequestOwner("foo@bar.com", request.slug, "asdf@asdf.com"))
+        updatedRequest.creatorEmail must equal ("asdf@asdf.com")
+      }
+    }
+  }
+
 }

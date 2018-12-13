@@ -42,6 +42,7 @@ trait DAO {
   def request(requestSlug: String): Future[Request]
   def requestWithTasks(requestSlug: String): Future[RequestWithTasks]
   def updateRequestState(requestSlug: String, state: State.State, message: Option[String]): Future[Request]
+  def updateRequestOwner(requestSlug: String, newOwner: String): Future[Request]
   def updateRequestMetadata(requestSlug: String, version: Option[ObjectId]): Future[Request]
   def deleteRequest(requestSlug: String): Future[Unit]
   def createTask(requestSlug: String, taskKey: String, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress): Future[Task]
@@ -178,6 +179,14 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
+  override def updateRequestOwner(requestSlug: String, newOwner: String): Future[Request] = {
+    run {
+      quote {
+        query[Request].filter(_.slug == lift(requestSlug)).update(_.creatorEmail -> lift(newOwner))
+      }
+    }.flatMap(_ => request(requestSlug))
+  }
+
   override def request(slug: String): Future[Request] = {
     run {
       quote {
@@ -222,7 +231,7 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     }
   }
 
-  def taskById(taskId: Int): Future[Task] = {
+  override def taskById(taskId: Int): Future[Task] = {
     run {
       quote {
         query[Task].filter(_.id == lift(taskId))

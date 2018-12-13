@@ -85,20 +85,25 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
   def updateRequest(email: String, requestSlug: String, state: State.State, message: Option[String], securityBypass: Boolean = false)(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Request] = {
     for {
       currentRequest <- dao.request(requestSlug)
-      program <- gitMetadata.fetchProgram(currentRequest.metadataVersion, currentRequest.program)
       _ <- checkAccess(securityBypass || latestMetadata.isAdmin(email, currentRequest.program))
       updatedRequest <- dao.updateRequestState(requestSlug, state, message)
       _ <- notifier.requestStatusChange(updatedRequest)
     } yield updatedRequest
   }
 
-  def renameRequest(email: String, requestSlug: String, newName: String): Future[Request] = {
+  def renameRequest(email: String, requestSlug: String, newName: String)(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Request] = {
     for {
       currentRequest <- dao.request(requestSlug)
-      latestMetadata <- gitMetadata.latestVersion
-      program <- gitMetadata.fetchProgram(currentRequest.metadataVersion, currentRequest.program)
       _ <- checkAccess(currentRequest.creatorEmail == email || latestMetadata.isAdmin(email, currentRequest.program))
       updatedRequest <- dao.renameRequest(requestSlug, newName)
+    } yield updatedRequest
+  }
+
+  def updateRequestOwner(email: String, requestSlug: String, newOwner: String)(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Request] = {
+    for {
+      currentRequest <- dao.request(requestSlug)
+      _ <- checkAccess(currentRequest.creatorEmail == email || latestMetadata.isAdmin(email, currentRequest.program))
+      updatedRequest <- dao.updateRequestOwner(requestSlug, newOwner)
     } yield updatedRequest
   }
 
@@ -148,7 +153,6 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
   def updateRequestMetadata(email: String, requestSlug: String, version: Option[ObjectId], conflictResolutions: Set[Metadata.MigrationConflictResolution])(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Request] = {
     for {
       requestWithTasks <- dao.requestWithTasks(requestSlug)
-      currentProgram <- gitMetadata.fetchProgram(requestWithTasks.request.metadataVersion, requestWithTasks.request.program)
       _ <- checkAccess(latestMetadata.isAdmin(email, requestWithTasks.request.program))
       newProgram <- gitMetadata.fetchProgram(version, requestWithTasks.request.program)
       _ <- Future.sequence {

@@ -222,10 +222,25 @@ class Application @Inject()
 
   def renameRequest(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
     withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
-      val maybeNewName = userRequest.body.get("value").flatMap(_.headOption).filter(_.nonEmpty)
-      maybeNewName.fold(Future.successful(BadRequest("the new name was not specified"))) { newName =>
-        dataFacade.renameRequest(userInfo.email, requestSlug, newName).map { request =>
-          Ok(Json.toJson(request))
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
+        val maybeNewName = userRequest.body.get("value").flatMap(_.headOption).filter(_.nonEmpty)
+        maybeNewName.fold(Future.successful(BadRequest("the new name was not specified"))) { newName =>
+          dataFacade.renameRequest(userInfo.email, requestSlug, newName).map { request =>
+            Ok(Json.toJson(request))
+          }
+        }
+      }
+    }
+  }
+
+  def updateRequestOwner(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
+        val maybeNewOwner = userRequest.body.get("value").flatMap(_.headOption).filter(_.nonEmpty)
+        maybeNewOwner.fold(Future.successful(BadRequest("the new owner was not specified"))) { newOwner =>
+          dataFacade.updateRequestOwner(userInfo.email, requestSlug, newOwner).map { request =>
+            Ok(Json.toJson(request))
+          }
         }
       }
     }
