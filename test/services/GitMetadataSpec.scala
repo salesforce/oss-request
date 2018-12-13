@@ -37,9 +37,8 @@ class GitMetadataSpec extends MixedPlaySpec {
       val versionId2 = versions.last.id
       versionId1 must be (defined)
       versionId2 must be (defined)
-      val metadata1 = await(gitMetadata.fetchMetadata(versionId1))
-      val metadata2 = await(gitMetadata.fetchMetadata(versionId2))
-      metadata1 must not equal metadata2
+      noException must be thrownBy await(gitMetadata.fetchMetadata(versionId1))
+      noException must be thrownBy await(gitMetadata.fetchMetadata(versionId2))
     }
     "fail in prod mode without a value" in new App(DAOMock.noDatabaseAppBuilder(Mode.Prod, GitMetadataSpec.prodConfig).build()) {
       val config = app.injector.instanceOf[Configuration]
