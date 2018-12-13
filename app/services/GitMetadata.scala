@@ -20,8 +20,9 @@ import javax.inject.{Inject, Singleton}
 import models.{Metadata, MetadataVersion, Program}
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.ResetCommand.ResetType
+import org.eclipse.jgit.api.errors.GitAPIException
 import org.eclipse.jgit.lib.ObjectId
-import org.eclipse.jgit.transport.{JschConfigSessionFactory, OpenSshConfig, SshTransport}
+import org.eclipse.jgit.transport.{FetchResult, JschConfigSessionFactory, OpenSshConfig, SshTransport}
 import org.eclipse.jgit.util.FS
 import play.api.libs.json.Json
 import play.api.{Configuration, Environment, Mode}
@@ -197,8 +198,22 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
     }
   }
 
+  def refresh(): FetchResult = {
+    gitRepo.fetch().call()
+  }
+
+  def fetchMetadataWithRecovery(maybeVersion: Option[ObjectId]): Future[Metadata] = {
+    def fetch() = Future.fromTry(Try(fetchMetadata(maybeVersion)))
+    fetch().recoverWith {
+      // retry after refresh
+      case _: GitAPIException =>
+        refresh()
+        fetch()
+    }
+  }
+
   override def receive: Receive = {
-    case GetVersion(maybeVersion) => Future.fromTry(Try(fetchMetadata(maybeVersion))).pipeTo(sender)
+    case GetVersion(maybeVersion) => fetchMetadataWithRecovery(maybeVersion).pipeTo(sender)
     case GetAllVersions => Future.fromTry(Try(versions)).pipeTo(sender)
   }
 
