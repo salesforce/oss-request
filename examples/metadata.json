@@ -52,7 +52,7 @@
         "query": {
           "completed": "< now() - interval '1 second'"
         },
-        "action": [
+        "actions": [
           {
             "type": "CREATE_TASK",
             "key": "ip_review"
