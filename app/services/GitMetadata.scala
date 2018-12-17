@@ -18,7 +18,7 @@ import akka.util.Timeout
 import com.jcraft.jsch.{JSch, Session}
 import javax.inject.{Inject, Singleton}
 import models.{Metadata, MetadataVersion, Program}
-import org.eclipse.jgit.api.{Git, TransportCommand}
+import org.eclipse.jgit.api.{Git, GitCommand, TransportCommand}
 import org.eclipse.jgit.api.ResetCommand.ResetType
 import org.eclipse.jgit.api.errors.JGitInternalException
 import org.eclipse.jgit.lib.ObjectId
@@ -71,7 +71,8 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
 
   import GitMetadata._
 
-  private implicit val ec = this.context.system.dispatcher
+  private implicit val ec = context.system.dispatcher
+  private implicit val timeout: Timeout = 15.seconds
 
   lazy val metadataGitUri: URI = configuration.getOptional[String]("metadata-git-uri").map(new URI(_)).getOrElse {
     if (environment.mode == Mode.Prod)
@@ -89,7 +90,7 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
 
   lazy val maybeMetadataGitSshKey = configuration.getOptional[String]("metadata-git-ssh-key")
 
-  def withAuth[C <: org.eclipse.jgit.api.GitCommand[_], T](transportCommand: TransportCommand[C, T]): TransportCommand[C, T] = {
+  def withAuth[C <: GitCommand[_], T](transportCommand: TransportCommand[C, T]): TransportCommand[C, T] = {
     val maybeSshSessionFactory = maybeMetadataGitSshKey.map { metadataGitSshKey =>
       new JschConfigSessionFactory() {
         override def configure(hc: OpenSshConfig.Host, session: Session): Unit = {
@@ -219,14 +220,16 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
     fetch().recoverWith {
       // retry after refresh
       case _: JGitInternalException =>
-        refresh()
-        fetch()
+        (self ? Refresh).flatMap(_ => fetch())
     }
   }
+
+  context.system.scheduler.schedule(5.minutes, 1.minute, self, Refresh)
 
   override def receive: Receive = {
     case GetVersion(maybeVersion) => fetchMetadataWithRecovery(maybeVersion).pipeTo(sender)
     case GetAllVersions => Future.fromTry(Try(versions)).pipeTo(sender)
+    case Refresh => Future.fromTry(Try(refresh())).pipeTo(sender)
   }
 
   override def postStop(): Unit = {
@@ -239,6 +242,8 @@ object GitMetadata {
   case class GetVersion(maybeVersion: Option[ObjectId])
 
   case object GetAllVersions
+
+  case object Refresh
 
   case class LatestMetadata(maybeVersion: Option[ObjectId], metadata: Metadata) {
     def isAdmin(email: String, programKey: String): Boolean = {
