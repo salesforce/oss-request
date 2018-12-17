@@ -89,7 +89,7 @@ class ExternalTaskHandler @Inject()(environment: Environment, configuration: Con
                 updateTaskState(serviceResponse.state, Some(serviceResponse.url.toString), serviceResponse.maybeData, None)
               }
             case _ =>
-              Future.failed(UnexpectedResponse(response.statusText, response.body))
+              Future.failed(UnexpectedResponse(response.status, response.statusText, response.body))
           }
         } recoverWith {
           case e: UnexpectedResponse =>
@@ -121,7 +121,7 @@ class ExternalTaskHandler @Inject()(environment: Environment, configuration: Con
                   updateTaskState(serviceResponse.state, Some(serviceResponse.url.toString), serviceResponse.maybeData, None)
                 }
               case _ =>
-                Future.failed(UnexpectedResponse(response.statusText, response.body))
+                Future.failed(UnexpectedResponse(response.status, response.statusText, response.body))
             }
           }
         } recoverWith {
@@ -129,7 +129,13 @@ class ExternalTaskHandler @Inject()(environment: Environment, configuration: Con
             if (environment.mode != Mode.Test) {
               Logger.error(e.body, e)
             }
-            updateTaskState(State.Cancelled, task.completedBy, None, Some(e.body))
+
+            if (Status.isServerError(e.status)) {
+              updateTaskState(State.InProgress, task.completedBy, None, Some(e.body))
+            }
+            else {
+              updateTaskState(State.Cancelled, task.completedBy, None, Some(e.body))
+            }
           case e: Exception =>
             if (environment.mode != Mode.Test) {
               Logger.error("Error communicating with Service", e)
@@ -152,7 +158,7 @@ class ExternalTaskHandler @Inject()(environment: Environment, configuration: Con
               case Status.NO_CONTENT =>
                 Future.unit
               case _ =>
-                Future.failed(UnexpectedResponse(response.statusText, response.body))
+                Future.failed(UnexpectedResponse(response.status, response.statusText, response.body))
             }
           }
         }
@@ -176,4 +182,4 @@ class ExternalTaskHandler @Inject()(environment: Environment, configuration: Con
 
 }
 
-case class UnexpectedResponse(statusText: String, body: String) extends Exception(s"Unexpected status '$statusText' from service")
+case class UnexpectedResponse(status: Int, statusText: String, body: String) extends Exception(s"Unexpected status '$statusText' from service")
