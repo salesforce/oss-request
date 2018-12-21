@@ -158,31 +158,16 @@
                         @if(conditions.isEmpty && request.completionMessage.isEmpty) {
                             @if(latestMetadata.isAdmin(userInfo.email, request.program)) {
                                 <p>Approved on <a href="#" id="completedDate" data-type="combodate" data-pk="@request.slug" data-url="@helper.CSRF(routes.Application.updateRequestCompletedDate(request.slug))" data-mode="inline">@completedDate.monthDayYear</a></p>
-                                <script>
-                                    $(document).ready(function() {
-                                        $('#completedDate').editable({
-                                            viewformat: 'MMM D, YYYY',
-                                            template: 'MMM / D / YYYY',
-                                            combodate: {
-                                                minYear: 2010,
-                                                maxYear: (new Date()).getFullYear()
-                                            },
-                                            success: function(response) {
-                                                if(response.slug === undefined) {
-                                                    return response;
-                                                }
-                                                else {
-                                                    location.replace("/request/" + response.slug);
-                                                }
-                                            }
-                                        });
-                                    });
-                                </script>
+
                             } else {
                                 <p>Approved on @completedDate.monthDayYear</p>
                             }
                         } else {
-                            <p>Conditionally approved on @completedDate.monthDayYear provided:</p>
+                            @if(latestMetadata.isAdmin(userInfo.email, request.program)) {
+                                <p>Conditionally approved on <a href="#" id="completedDate" data-type="combodate" data-pk="@request.slug" data-url="@helper.CSRF(routes.Application.updateRequestCompletedDate(request.slug))" data-mode="inline">@completedDate.monthDayYear</a> provided:</p>
+                            } else {
+                                <p>Conditionally approved on @completedDate.monthDayYear provided:</p>
+                            }
                             <ul>
                                 @for((taskTitle, message) <- conditions) {
                                     <li>@taskTitle - @message.capitalize</li>
@@ -192,6 +177,26 @@
                                 }
                             </ul>
                         }
+                        <script>
+                            $(document).ready(function() {
+                                $('#completedDate').editable({
+                                    viewformat: 'MMM D, YYYY',
+                                    template: 'MMM / D / YYYY',
+                                    combodate: {
+                                        minYear: 2010,
+                                        maxYear: (new Date()).getFullYear()
+                                    },
+                                    success: function(response) {
+                                        if(response.slug === undefined) {
+                                            return response;
+                                        }
+                                        else {
+                                            location.replace("/request/" + response.slug);
+                                        }
+                                    }
+                                });
+                            });
+                        </script>
                     }
                 }
                 case None => {
