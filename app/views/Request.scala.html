@@ -156,7 +156,31 @@
                 case Some(completedDate) => {
                     @defining(Tasks.conditionalApprovals(program, tasks.map(_._1))) { conditions =>
                         @if(conditions.isEmpty && request.completionMessage.isEmpty) {
-                            <p>Approved on @completedDate.monthDayYear</p>
+                            @if(latestMetadata.isAdmin(userInfo.email, request.program)) {
+                                <p>Approved on <a href="#" id="completedDate" data-type="combodate" data-pk="@request.slug" data-url="@helper.CSRF(routes.Application.updateRequestCompletedDate(request.slug))" data-mode="inline">@completedDate.monthDayYear</a></p>
+                                <script>
+                                    $(document).ready(function() {
+                                        $('#completedDate').editable({
+                                            viewformat: 'MMM D, YYYY',
+                                            template: 'MMM / D / YYYY',
+                                            combodate: {
+                                                minYear: 2010,
+                                                maxYear: (new Date()).getFullYear()
+                                            },
+                                            success: function(response) {
+                                                if(response.slug === undefined) {
+                                                    return response;
+                                                }
+                                                else {
+                                                    location.replace("/request/" + response.slug);
+                                                }
+                                            }
+                                        });
+                                    });
+                                </script>
+                            } else {
+                                <p>Approved on @completedDate.monthDayYear</p>
+                            }
                         } else {
                             <p>Conditionally approved on @completedDate.monthDayYear provided:</p>
                             <ul>

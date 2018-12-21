@@ -258,6 +258,16 @@ class DAOMock extends DAO {
     }
   }
 
+  override def updateRequestCompletedDate(requestSlug: String, newDate: ZonedDateTime): Future[Request] = {
+    request(requestSlug).map { request =>
+      val updatedRequest = request.copy(completedDate = Some(newDate))
+      requests -= request
+      requests += updatedRequest
+
+      updatedRequest
+    }
+  }
+
   override def previousSlug(slug: String): Future[String] = {
     previousSlugs.find(_.previous == slug).fold(Future.failed[String](new Exception(slug + " not found")))(ps => Future.successful(ps.current))
   }

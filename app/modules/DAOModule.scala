@@ -43,6 +43,7 @@ trait DAO {
   def requestWithTasks(requestSlug: String): Future[RequestWithTasks]
   def updateRequestState(requestSlug: String, state: State.State, message: Option[String]): Future[Request]
   def updateRequestOwner(requestSlug: String, newOwner: String): Future[Request]
+  def updateRequestCompletedDate(requestSlug: String, newDate: ZonedDateTime): Future[Request]
   def updateRequestMetadata(requestSlug: String, version: Option[ObjectId]): Future[Request]
   def deleteRequest(requestSlug: String): Future[Unit]
   def createTask(requestSlug: String, taskKey: String, completableBy: Seq[String], maybeCompletedBy: Option[String] = None, maybeData: Option[JsObject] = None, state: State.State = State.InProgress): Future[Task]
@@ -183,6 +184,15 @@ class DAOWithCtx @Inject()(database: DatabaseWithCtx)(implicit ec: ExecutionCont
     run {
       quote {
         query[Request].filter(_.slug == lift(requestSlug)).update(_.creatorEmail -> lift(newOwner))
+      }
+    }.flatMap(_ => request(requestSlug))
+  }
+
+  override def updateRequestCompletedDate(requestSlug: String, newDate: ZonedDateTime): Future[Request] = {
+    val someNewDate: Option[ZonedDateTime] = Some(newDate)
+    run {
+      quote {
+        query[Request].filter(_.slug == lift(requestSlug)).update(_.completedDate -> lift(someNewDate))
       }
     }.flatMap(_ => request(requestSlug))
   }

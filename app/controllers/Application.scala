@@ -7,6 +7,9 @@
 
 package controllers
 
+import java.time.{LocalDate, ZoneId, ZonedDateTime}
+import java.time.format.DateTimeFormatter
+
 import akka.stream.scaladsl.StreamConverters
 import javax.inject.Inject
 import models.Task.CompletableByType
@@ -239,6 +242,22 @@ class Application @Inject()
         val maybeNewOwner = userRequest.body.get("value").flatMap(_.headOption).filter(_.nonEmpty)
         maybeNewOwner.fold(Future.successful(BadRequest("the new owner was not specified"))) { newOwner =>
           dataFacade.updateRequestOwner(userInfo.email, requestSlug, newOwner).map { request =>
+            Ok(Json.toJson(request))
+          }
+        }
+      }
+    }
+  }
+
+  def updateRequestCompletedDate(requestSlug: String) = userAction.async(parse.formUrlEncoded) { implicit userRequest =>
+    withUserInfoAndHostInfo { implicit userInfo => implicit hostInfo =>
+      gitMetadata.latestVersion.flatMap { implicit latestMetadata =>
+        val maybeCompletedDate = userRequest.body.get("value").flatMap(_.headOption).filter(_.nonEmpty).flatMap { value =>
+          Try(LocalDate.parse(value, DateTimeFormatter.ofPattern("yyyy-MM-dd")).atStartOfDay(ZoneId.systemDefault())).toOption
+        }
+
+        maybeCompletedDate.fold(Future.successful(BadRequest("the new date was not specified"))) { newDate =>
+          dataFacade.updateRequestCompletedDate(userInfo.email, requestSlug, newDate).map { request =>
             Ok(Json.toJson(request))
           }
         }

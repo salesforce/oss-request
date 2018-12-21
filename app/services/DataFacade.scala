@@ -7,6 +7,8 @@
 
 package services
 
+import java.time.ZonedDateTime
+
 import javax.inject.Inject
 import models.{Comment, DataIn, GroupBy, Metadata, Program, ReportQuery, Request, RequestWithTasks, RequestWithTasksAndProgram, State, Task, TaskEvent}
 import modules.NotifyModule.HostInfo
@@ -104,6 +106,14 @@ class DataFacade @Inject()(dao: DAO, taskEventHandler: TaskEventHandler, externa
       currentRequest <- dao.request(requestSlug)
       _ <- checkAccess(currentRequest.creatorEmail == email || latestMetadata.isAdmin(email, currentRequest.program))
       updatedRequest <- dao.updateRequestOwner(requestSlug, newOwner)
+    } yield updatedRequest
+  }
+
+  def updateRequestCompletedDate(email: String, requestSlug: String, newDate: ZonedDateTime)(implicit hostInfo: HostInfo, latestMetadata: LatestMetadata): Future[Request] = {
+    for {
+      currentRequest <- dao.request(requestSlug)
+      _ <- checkAccess(latestMetadata.isAdmin(email, currentRequest.program))
+      updatedRequest <- dao.updateRequestCompletedDate(requestSlug, newDate)
     } yield updatedRequest
   }
 
