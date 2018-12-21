@@ -70,7 +70,7 @@ object BackgroundTasks extends App {
                 Logger.info(s"Running job ${job.name} action ${action.`type`} on request '${request.request.slug}")
                 taskEventHandler.handleEvent(program, request.request, request.tasks, None, action)(dataFacade.createTask(_, _, _))(dataFacade.updateTaskState(request.request.creatorEmail, _, _, None, None, None, true))(dataFacade.updateRequest(request.request.creatorEmail, request.request.slug, _, _, true)).recover {
                   case e: Exception =>
-                    Logger.error("Error running job ${job.name} action ${action.`type`} on request '${request.request.slug}", e)
+                    Logger.error(s"Error running job ${job.name} action ${action.`type`} on request '${request.request.slug}", e)
                     Unit
                 }
               }
