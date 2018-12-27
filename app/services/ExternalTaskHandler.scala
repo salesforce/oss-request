@@ -69,7 +69,8 @@ class ExternalTaskHandler @Inject()(environment: Environment, configuration: Con
         "request" -> Json.obj(
           "program" -> request.program,
           "slug" -> request.slug,
-          "name" -> request.name
+          "name" -> request.name,
+          "owner" -> request.creatorEmail
         ),
         "task" -> Json.obj(
           "id" -> task.id,
