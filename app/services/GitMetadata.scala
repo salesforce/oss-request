@@ -220,7 +220,7 @@ class GitMetadataActor(configuration: Configuration, environment: Environment) e
     fetch().recoverWith {
       // retry after refresh
       case _: JGitInternalException =>
-        (self ? Refresh).flatMap(_ => fetch())
+        //(self ? Refresh).flatMap(_ => fetch())
     }
   }
 
