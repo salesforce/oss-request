@@ -24,8 +24,7 @@ case class MetadataVersion(id: Option[ObjectId], date: ZonedDateTime)
 case class Metadata(programs: Map[String, Program]) {
 
   def program(programKey: String): Future[Program] = {
-    //programs.get(programKey).fold(Future.failed[Program](new Exception(s"Program '$programKey' not found")))(Future.successful)
-    programs.get(programKey).fold(Future.failed())(Future.successful)
+    programs.get(programKey).fold(Future.failed[Program](new Exception(s"Program '$programKey' not found")))(Future.successful)
   }
 
 }
