@@ -220,7 +220,7 @@ class SamlAuth @Inject() (configuration: Configuration, wsClient: WSClient) (imp
         val samlResponse = new SamlResponse(settings(metadata), httpRequest)
 
         Future.fromTry(Try(samlResponse.checkStatus())).flatMap { _ =>
-          samlResponse.getNameId.fold(Future.failed[Set[String]](new Exception("No emails"))) { emails =>
+          samlResponse.getNameId().fold(Future.failed[Set[String]](new Exception("No emails"))) { emails =>
             Future.successful(emails.asScala.toSet)
           }
         }
