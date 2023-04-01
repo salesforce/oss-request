@@ -1,0 +1,18 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@this(main: Main)
+
+@(requests: Seq[RequestWithTasksAndProgram])(implicit request: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: services.GitMetadata.LatestMetadata)
+
+@main(Some(userInfo))("OSS Requests") {
+
+    <h2>Search Results</h2>
+
+    @partials.RequestsList(requests)
+
+}

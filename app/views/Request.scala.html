@@ -1,0 +1,280 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@import core.Extensions._
+@import services.GitMetadata.LatestMetadata
+
+@this(mainView: Main, taskView: partials.TaskEditOrShow)
+
+@(program: models.Program, request: models.Request, tasks: Seq[(models.Task, models.Task.Prototype, modules.DAO.NumComments)])(implicit requestHeader: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: LatestMetadata)
+
+@tasksWithState(state: State.State) = @{
+    tasks.filter(_._1.state == state)
+}
+
+@progressWidth(completedTasks: Seq[_]) = @{
+    if (tasks.isEmpty) {
+        0
+    }
+    else {
+        completedTasks.size * 100 / tasks.size
+    }
+}
+
+@metadataOutOfDate = @{
+    (request.metadataVersion, latestMetadata.maybeVersion) match {
+        case (Some(r), Some(l)) => r != l
+        case (Some(r), None) => true
+        case (None, Some(l)) => false
+        case (None, None) => false
+    }
+}
+
+@state = {
+    @request.state match {
+        case models.State.InProgress => {
+            @defining(tasksWithState(State.Completed)) { completedTasks =>
+                <div class="progress">
+                    @if(completedTasks.isEmpty) {
+                        <span>@completedTasks.size of @tasks.size tasks completed</span>
+                    }
+                    <div class="progress-bar" role="progressbar" aria-valuenow="@completedTasks.size" aria-valuemin="0" aria-valuemax="@tasks.size" style="width: @progressWidth(completedTasks)%;">
+                        @if(completedTasks.nonEmpty) {
+                            @completedTasks.size of @tasks.size tasks completed
+                        }
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    @if(completedTasks.size == tasks.size && latestMetadata.isAdmin(userInfo.email, request.program)) {
+                        <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Completed))" method="post" class="btn-group">
+                            <button type="submit" class="btn btn-success">Approve Request</button>
+                        </form>
+                    }
+
+                    @if(latestMetadata.isAdmin(userInfo.email, request.program)) {
+                        <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Denied))" method="post" class="btn-group">
+                            <button type="submit" class="btn btn-danger">Deny Request</button>
+                        </form>
+                    }
+
+                    @if(latestMetadata.isAdmin(userInfo.email, request.program) || request.creatorEmail == userInfo.email) {
+                        <form action="@helper.CSRF(routes.Application.updateRequest(request.slug, models.State.Cancelled))" method="post" class="btn-group">
+                            <button type="submit" class="btn btn-warning">Cancel Request</button>
+                        </form>
+                    }
+
+                    @if(latestMetadata.isAdmin(userInfo.email, request.program) && metadataOutOfDate) {
+                        <form action="@helper.CSRF(routes.Application.metadataMigrate(request.slug))" method="post" class="btn-group">
+                            <input type="hidden" name="version" value="@latestMetadata.maybeVersion.map(_.name()).getOrElse("")">
+                            <button type="submit" class="btn btn-default" title="Request = @request.metadataVersion.abbreviate &amp; Latest = @latestMetadata.maybeVersion.abbreviate">Update Metadata</button>
+                        </form>
+                    }
+
+                    @if(latestMetadata.isAdmin(userInfo.email, request.program)) {
+                        <div class="btn-group">
+                            <button class="btn btn-danger btn-sm pull-right" data-toggle="modal" data-target="#confirmModal" data-action="delete" data-url="@helper.CSRF(routes.Application.deleteRequest(request.slug))" data-redirect="@routes.Application.index()">
+                                <span class="glyphicon glyphicon-trash"></span>
+                            </button>
+                        </div>
+                    }
+                </div>
+
+                <div class="row">
+                    @if(latestMetadata.isAdmin(userInfo.email, request.program)) {
+                        <div class="col-md-12">
+                            <form action="@helper.CSRF(routes.Application.addTask(request.slug))" method="post" class="form-inline">
+                                <div class="form-group">
+                                    <label for="taskPrototypeKeySelect">Add a Task</label>
+                                    <select id="taskPrototypeKeySelect" name="taskPrototypeKey" class="form-control">
+                                        <option disabled selected value> -- task type -- </option>
+                                        @for((key, taskPrototype) <- program.tasks) {
+                                            <option value="@key">@taskPrototype.label</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div id="completableByEmailDiv" class="form-group" style="display: none;">
+                                    <label for="completableByEmail">Completable By (Email)</label>
+                                    <input id="completableByEmail" type="email" class="form-control">
+                                </div>
+                                <div id="completableByGroupDiv" class="form-group" style="display: none;">
+                                    <label for="completableByGroup">Completable By</label>
+                                    <select id="completableByGroup" class="form-control">
+                                    @for(group <- program.groups.keys) {
+                                        <option>@group</option>
+                                    }
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Add It</button>
+                            </form>
+                        </div>
+
+                        <script>
+                            // Only send a completableBy form value if it was needed by the prototype
+                            const taskPrototypes = @Html(play.api.libs.json.Json.toJson(program.tasks).toString);
+
+                            const completableByEmailDiv = document.getElementById("completableByEmailDiv");
+                            const completableByGroupDiv = document.getElementById("completableByGroupDiv");
+                            const completableByEmail = document.getElementById("completableByEmail");
+                            const completableByGroup = document.getElementById("completableByGroup");
+                            const taskPrototypeKeySelect = document.getElementById("taskPrototypeKeySelect");
+
+                            completableByEmailDiv.style.display = "none";
+                            completableByGroupDiv.style.display = "none";
+
+                            taskPrototypeKeySelect.onchange = function() {
+                                const taskPrototype = taskPrototypes[this.value];
+
+                                completableByEmailDiv.style.display = "none";
+                                completableByGroupDiv.style.display = "none";
+                                completableByEmail.name = "";
+                                completableByGroup.name = "";
+
+                                if ((taskPrototype.completable_by !== undefined) && (taskPrototype.completable_by.value === undefined)) {
+                                    if (taskPrototype.completable_by.type === "GROUP") {
+                                        completableByGroupDiv.style.display = "inline-block";
+                                        completableByGroup.name = "completableBy";
+                                    }
+                                    else if (taskPrototype.completable_by.type === "EMAIL") {
+                                        completableByEmailDiv.style.display = "inline-block";
+                                        completableByEmail.name = "completableBy";
+                                    }
+                                }
+                            };
+                        </script>
+                    }
+                </div>
+            }
+        }
+
+        case models.State.Completed => {
+            @request.completedDate match {
+                case Some(completedDate) => {
+                    @defining(Tasks.conditionalApprovals(program, tasks.map(_._1))) { conditions =>
+                        @if(conditions.isEmpty && request.completionMessage.isEmpty) {
+                            @if(latestMetadata.isAdmin(userInfo.email, request.program)) {
+                                <p>Approved on <a href="#" id="completedDate" data-type="combodate" data-pk="@request.slug" data-url="@helper.CSRF(routes.Application.updateRequestCompletedDate(request.slug))" data-mode="inline">@completedDate.monthDayYear</a></p>
+
+                            } else {
+                                <p>Approved on @completedDate.monthDayYear</p>
+                            }
+                        } else {
+                            @if(latestMetadata.isAdmin(userInfo.email, request.program)) {
+                                <p>Conditionally approved on <a href="#" id="completedDate" data-type="combodate" data-pk="@request.slug" data-url="@helper.CSRF(routes.Application.updateRequestCompletedDate(request.slug))" data-mode="inline">@completedDate.monthDayYear</a> provided:</p>
+                            } else {
+                                <p>Conditionally approved on @completedDate.monthDayYear provided:</p>
+                            }
+                            <ul>
+                                @for((taskTitle, message) <- conditions) {
+                                    <li>@taskTitle - @message.capitalize</li>
+                                }
+                                @for(message <- request.completionMessage) {
+                                    <li>@message.capitalize</li>
+                                }
+                            </ul>
+                        }
+                        <script>
+                            $(document).ready(function() {
+                                $('#completedDate').editable({
+                                    viewformat: 'MMM D, YYYY',
+                                    template: 'MMM / D / YYYY',
+                                    combodate: {
+                                        minYear: 2010,
+                                        maxYear: (new Date()).getFullYear()
+                                    },
+                                    success: function(response) {
+                                        if(response.slug === undefined) {
+                                            return response;
+                                        }
+                                        else {
+                                            location.replace("/request/" + response.slug);
+                                        }
+                                    }
+                                });
+                            });
+                        </script>
+                    }
+                }
+                case None => {
+                    @request.stateToHuman
+                }
+            }
+        }
+
+        case models.State.Denied => {
+            Request Denied
+
+            @if(latestMetadata.isAdmin(userInfo.email, request.program)) {
+                <div class="btn-group">
+                    <button class="btn btn-danger btn-sm pull-right" data-toggle="modal" data-target="#confirmModal" data-action="delete" data-url="@helper.CSRF(routes.Application.deleteRequest(request.slug))" data-redirect="@routes.Application.index()">
+                        <span class="glyphicon glyphicon-trash"></span>
+                    </button>
+                </div>
+            }
+        }
+
+        case models.State.Cancelled => {
+            Request Cancelled
+
+            @if(latestMetadata.isAdmin(userInfo.email, request.program)) {
+                <div class="btn-group">
+                    <button class="btn btn-danger btn-sm pull-right" data-toggle="modal" data-target="#confirmModal" data-action="delete" data-url="@helper.CSRF(routes.Application.deleteRequest(request.slug))" data-redirect="@routes.Application.index()">
+                        <span class="glyphicon glyphicon-trash"></span>
+                    </button>
+                </div>
+            }
+        }
+
+        case _ => {
+            Request @request.stateToHuman
+        }
+    }
+}
+
+@mainView(Some(userInfo))("Request") {
+
+    <div class="jumbotron">
+        @if(latestMetadata.isAdmin(userInfo.email, request.program) || request.creatorEmail == userInfo.email) {
+            <h1><a href="#" id="requestName" data-type="text" data-pk="@request.slug" data-url="@helper.CSRF(routes.Application.renameRequest(request.slug))" data-mode="inline">@request.name</a></h1>
+            <p>Owned by <a href="#" id="requestOwner" data-type="email" data-pk="@request.slug" data-url="@helper.CSRF(routes.Application.updateRequestOwner(request.slug))" data-mode="inline">@request.creatorEmail</a> - created on @request.createDate.monthDayYear</p>
+            <script>
+                $(document).ready(function() {
+                    $('#requestName').editable({
+                        success: function(response) {
+                            if(response.slug === undefined) {
+                                return response;
+                            }
+                            else {
+                                location.replace("/request/" + response.slug);
+                            }
+                        }
+                    });
+
+                    $('#requestOwner').editable({
+                        success: function(response) {
+                            if(response.slug === undefined) {
+                                return response;
+                            }
+                            else {
+                                location.replace("/request/" + response.slug);
+                            }
+                        }
+                    });
+                });
+            </script>
+        } else {
+            <h1>@request.name</h1>
+            <p>Owned by @request.creatorEmail - created on @request.createDate.monthDayYear</p>
+        }
+        <div>@state</div>
+    </div>
+
+    @for(task <- tasks) {
+        @taskView(program, request, task._1, task._2, Left(task._3))
+    }
+
+}

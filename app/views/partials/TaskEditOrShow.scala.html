@@ -1,0 +1,227 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@import core.Extensions._
+
+@this(taskEditView: TaskEdit, taskShowView: TaskShow, commentsView: Comments)
+
+@(program: models.Program, request: models.Request, task: models.Task, taskPrototype: models.Task.Prototype, commentCountOrComments: Either[Long, Seq[Comment]])(implicit requestHeader: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: services.GitMetadata.LatestMetadata)
+
+@isAdmin = @{
+    latestMetadata.isAdmin(userInfo.email, request.program)
+}
+
+@panelType = {
+    @task.state match {
+        case models.State.InProgress => {
+            panel-default
+        }
+        case models.State.Completed => {
+            panel-success
+        }
+        case _ => {
+            panel-warning
+        }
+    }
+}
+
+@assignedToUser = @{task.completableBy.contains(userInfo.email)}
+
+@assignment = {
+    <span class="assignment-list">@AssignedTo(task, program)</span>
+
+    @if(task.completableByEmailsOrUrl(program).isLeft && (assignedToUser || isAdmin)) {
+        <button type="button" class="btn btn-default btn-xs" title="Reassign" data-toggle="modal" data-target="#reassignModal" data-url="@helper.CSRF(routes.Application.updateTaskAssignment(task.requestSlug, task.id))" data-groups="@program.groups.keySet.mkString(",")">
+            <span class="glyphicon glyphicon-pencil" style="padding-top: 5px"></span>
+        </button>
+    }
+}
+
+
+@completed = {
+    <div class="panel-footer">
+        @for(completedDate <- task.completedDate) {
+            @(task.completableByEmailsOrUrl(program), task.completionMessage, taskPrototype.`type`, task.completedBy) match {
+                case (Left(_), Some(completionMessage), Task.TaskType.Approval, Some(completedBy)) => {
+                    Conditionally approved on @completedDate.monthDayYear by @completedBy provided @completionMessage
+                }
+                case (Left(_), _, _, Some(completedBy)) => {
+                    @task.stateToHuman(program).capitalize on @completedDate.monthDayYear by @completedBy
+                }
+                case (Left(_), _, _, None) => {
+                    @task.stateToHuman(program).capitalize on @completedDate.monthDayYear
+                }
+                case (Right(url), maybeCompletionMessage, _, maybeCompletedBy) => {
+                    @task.stateToHuman(program).capitalize on @completedDate.monthDayYear
+                    @for(completedBy <- maybeCompletedBy) {
+                        by <a href="@completedBy">@completedBy</a>
+                    }
+                    @for(completionMessage <- maybeCompletionMessage) {
+                        with message: <code>@completionMessage</code>
+                    }
+                }
+            }
+        }
+    </div>
+}
+
+<div class="panel @panelType">
+    <div class="panel-heading clearfix">
+        <h3 class="panel-title pull-left">
+            <a href="@routes.Application.task(task.requestSlug, task.id)">@taskPrototype.label</a>
+            <small>(Created on @task.createDate.monthDayYear)</small>
+        </h3>
+        <div class="pull-right">
+            @if(isAdmin) {
+                <div style="display: inline-block">
+                    @if(task.state != State.InProgress) {
+                        <form action="@helper.CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, State.InProgress, None))" method="post">
+                            <button class="btn btn-warning btn-sm pull-right" title="Reopen" type="submit">
+                                <span class="glyphicon glyphicon-pencil"></span>
+                            </button>
+                        </form>
+                    }
+                </div>
+
+                <div style="display: inline-block">
+                    <button class="btn btn-danger btn-sm pull-right" data-toggle="modal" data-target="#confirmModal" data-action="delete" data-url="@helper.CSRF(routes.Application.deleteTask(task.requestSlug, task.id))">
+                        <span class="glyphicon glyphicon-trash"></span>
+                    </button>
+                </div>
+            }
+
+            @commentCountOrComments match {
+                case Left(commentCount) => {
+                    <div style="display: inline-block">
+                        <button class="btn btn-default btn-sm pull-right" data-toggle="modal" data-target="#commentsModal" data-requestslug="@task.requestSlug" data-taskid="@task.id">
+                            <span class="glyphicon glyphicon-comment"></span>
+                            @commentCount Comments
+                        </button>
+                    </div>
+                }
+                case _ => {}
+            }
+        </div>
+    </div>
+
+    @task.state match {
+        case models.State.InProgress if assignedToUser => {
+            @taskEditView(Right(task), taskPrototype)
+        }
+        case _ => {
+            @taskShowView(task, taskPrototype)
+        }
+    }
+
+    <hr style="margin: 0"/>
+
+    @commentCountOrComments match {
+        case Right(comments) => {
+            <div class="panel-body">
+                <h4>Comments</h4>
+
+                @commentsView(comments)
+
+                <form method="post" action="@routes.Application.commentOnTask(task.requestSlug, task.id)" style="margin-top: 10px;">
+                    @helper.CSRF.formField
+                    <input type="hidden" name="redirect" value="@routes.Application.task(task.requestSlug, task.id)">
+                    <div class="form-group">
+                        <textarea name="contents" class="form-control" rows="3" placeholder="Your comments..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Comment</button>
+                </form>
+            </div>
+        }
+        case _ => {}
+    }
+
+    @* todo: more info on cancelled tasks *@
+
+    @(taskPrototype.`type`) match {
+        case models.Task.TaskType.Input => {
+            @task.state match {
+                case models.State.InProgress => {
+                    <div class="panel-footer">
+                        @assignment
+                    </div>
+                }
+                case _ => {
+                    @completed
+                }
+            }
+        }
+        case models.Task.TaskType.Action => {
+            @task.state match {
+                case models.State.InProgress if assignedToUser => {
+                    <div class="panel-footer clearfix">
+                        @assignment
+
+                        <form action="@helper.CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, models.State.Completed, task.completionMessage)).url" method="post" class="pull-right">
+                            <button type="submit" class="btn btn-success">Mark as Completed</button>
+                        </form>
+                    </div>
+                }
+                case models.State.InProgress => {
+                    <div class="panel-footer">
+                        @assignment
+                    </div>
+                }
+                case _ => {
+                    @completed
+                }
+            }
+        }
+        case models.Task.TaskType.Approval => {
+            @task.state match {
+                case models.State.InProgress if assignedToUser => {
+                    <div class="panel-footer clearfix">
+                        @assignment
+
+                        <div class="pull-right">
+                            <div style="display: inline-block">
+                                <form action="@helper.CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, models.State.Completed, task.completionMessage)).url" method="post">
+                                    <button type="submit" class="btn btn-success">Approve</button>
+                                </form>
+                            </div>
+                            @if(taskPrototype.approvalConditions.nonEmpty) {
+                                <div style="display: inline-block">
+                                    <div class="btn-group">
+                                        <button type="button" class="btn btn-warning dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                            Approve Conditionally <span class="caret"></span>
+                                        </button>
+                                        <ul class="dropdown-menu">
+                                            @for(condition <- taskPrototype.approvalConditions) {
+                                                <li data-condition="@condition">
+                                                    <form action="@helper.CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, models.State.Completed, Some(condition))).url" method="post"></form>
+                                                    <a href="#" onclick="$(this).prev().submit()">@condition</a>
+                                                </li>
+                                            }
+                                        </ul>
+                                    </div>
+                                </div>
+                            }
+                            <div style="display: inline-block">
+                                <form action="@helper.CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, models.State.Denied, task.completionMessage)).url" method="post">
+                                    <button type="submit" class="btn btn-danger">Deny</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                }
+                case models.State.InProgress => {
+                    <div class="panel-footer">
+                        @assignment
+                    </div>
+                }
+                case _ => {
+                    @completed
+                }
+            }
+        }
+    }
+
+</div>

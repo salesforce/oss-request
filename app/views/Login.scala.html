@@ -1,0 +1,14 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@this(main: Main)
+
+@()(implicit request: RequestHeader, latestMetadata: services.GitMetadata.LatestMetadata)
+
+@main(None)("Login") {
+    You need to <a href="/">login</a> to do anything.
+}

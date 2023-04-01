@@ -1,0 +1,35 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@this(mainView: Main, taskEditView: partials.TaskEdit)
+
+@(programKey: String, projectName: String, taskKey: String, taskPrototype: models.Task.Prototype, similarRequests: Seq[RequestWithTasksAndProgram])(implicit request: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: services.GitMetadata.LatestMetadata)
+
+@mainView(Some(userInfo))("New Request") {
+
+    @if(similarRequests.nonEmpty) {
+        <div class="alert alert-warning" role="alert">
+            <span class="glyphicon glyphicon-exclamation-sign" aria-hidden="true"></span>
+            Is this request a duplicate?  Similar requests:
+        </div>
+
+        @partials.RequestsList(similarRequests)
+
+        <div class="alert alert-warning" role="alert">
+            Or, proceed creating a new request.
+        </div>
+    }
+
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h3 class="panel-title">New Request - @projectName</h3>
+        </div>
+
+        @taskEditView(Left((programKey, projectName, taskKey, Set(userInfo.email))), taskPrototype)
+    </div>
+
+}

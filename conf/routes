@@ -1,0 +1,58 @@
+# Routes
+# This file defines all application routes (Higher priority routes first)
+# ~~~~
+
+# User Visible URLs
+GET         /                                                  controllers.Application.index
+GET         /open-tasks                                        controllers.Application.openUserTasks
+GET         /requests                                          controllers.Application.requests(program: Option[String])
+GET         /search                                            controllers.Application.search(program: Option[String], state: Option[models.State.State], data: Option[String])
+GET         /report/:program/:report                           controllers.Application.report(program: String, report: String)
+GET         /request                                           controllers.Application.newRequest(name: Option[String], program: Option[String], startTask: Option[String])
+GET         /request/:requestSlug                              controllers.Application.request(requestSlug: String)
+GET         /request/:requestSlug/task/:taskId                 controllers.Application.task(requestSlug: String, taskId: Int)
+
+# API and Form Post URLs
+POST        /request                                           controllers.Application.createRequest(name: String, program: String, startTask: String)
+POST        /request/:requestSlug                              controllers.Application.updateRequest(requestSlug: String, state: models.State.State)
+DELETE      /request/:requestSlug                              controllers.Application.deleteRequest(requestSlug: String)
+POST        /request/:requestSlug/metadata-migrate             controllers.Application.metadataMigrate(requestSlug: String)
+POST        /request/:requestSlug/rename                       controllers.Application.renameRequest(requestSlug: String)
+POST        /request/:requestSlug/updateRequestCompletedDate   controllers.Application.updateRequestCompletedDate(requestSlug: String)
+POST        /request/:requestSlug/update-owner                 controllers.Application.updateRequestOwner(requestSlug: String)
+POST        /request/:requestSlug/task                         controllers.Application.addTask(requestSlug: String)
+POST        /request/:requestSlug/task/:taskId/state           controllers.Application.updateTaskState(requestSlug: String, taskId: Int, state: models.State.State, completionMessage: Option[String])
+POST        /request/:requestSlug/task/:taskId/assignment      controllers.Application.updateTaskAssignment(requestSlug: String, taskId: Int)
+DELETE      /request/:requestSlug/task/:taskId                 controllers.Application.deleteTask(requestSlug: String, taskId: Int)
+GET         /request/:requestSlug/task/:taskId/comments        controllers.Application.commentsOnTask(requestSlug: String, taskId: Int)
+POST        /request/:requestSlug/task/:taskId/comments        controllers.Application.commentOnTask(requestSlug: String, taskId: Int)
+
++ nocsrf
+POST        /email_reply                                       controllers.Application.emailReply
+
+GET         /migrator                                          controllers.Application.migrator()
+
+GET         /form-test                                         controllers.Application.formTest()
+GET         /notify-test                                       controllers.Application.notifyTest()
+POST        /notify-test                                       controllers.Application.notifyTestSend()
+
+GET         /callback                                          controllers.Application.callback(code: Option[String], state: Option[String])
++ nocsrf
+POST        /acs                                               controllers.Application.acs()
+
+GET         /select-email                                      controllers.Application.selectEmail(email: String, state: Option[String])
+
+GET         /logout                                            controllers.Application.logout()
+
++nocsrf
+POST        /_demo_repo                                        controllers.Application.createDemoRepo()
+GET         /_demo_repo                                        controllers.Application.demoRepo(url: String)
+DELETE      /_demo_repo                                        controllers.Application.deleteDemoRepo(url: String)
+GET         /_demo_team                                        controllers.Application.demoTeam()
+
+# Map static resources from the /public folder to the /assets URL path
+GET         /assets/*file                                      controllers.Assets.versioned(path="/public", file: Asset)
+GET         /favicon.ico                                       controllers.Application.favicon()
+
+# WebJars
+->          /webjars                                           webjars.Routes

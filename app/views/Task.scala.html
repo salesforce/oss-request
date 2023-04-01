@@ -1,0 +1,20 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@import services.GitMetadata.LatestMetadata
+
+@this(mainView: Main, taskView: partials.TaskEditOrShow, commentsView: partials.Comments)
+
+@(program: models.Program, request: models.Request, task: models.Task, taskPrototype: models.Task.Prototype, comments: Seq[Comment])(implicit requestHeader: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: LatestMetadata)
+
+@mainView(Some(userInfo))("Task") {
+
+    <h1>Request: <a href="@routes.Application.request(request.slug)">@request.name</a></h1>
+
+    @taskView(program, request, task, taskPrototype, Right(comments))
+
+}

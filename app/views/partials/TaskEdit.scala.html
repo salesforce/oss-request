@@ -1,0 +1,95 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@this()
+
+@(newOrExistingTask: Either[(String, String, String, Set[String]), models.Task], taskPrototype: models.Task.Prototype)(implicit request: RequestHeader)
+
+@import helper._
+
+@formUrl(state: models.State.State = State.Completed) = @{
+    newOrExistingTask match {
+        case Left((programKey, name, taskKey, _)) => CSRF(routes.Application.createRequest(name, programKey, taskKey)).url
+        case Right(task) => CSRF(routes.Application.updateTaskState(task.requestSlug, task.id, state, task.completionMessage)).url
+    }
+}
+
+@(taskPrototype.`type`) match {
+    case models.Task.TaskType.Input => {
+        <div class="panel-body">
+            @Html(taskPrototype.infoMarkdownToHtml)
+
+            @defining(scala.util.Random.alphanumeric.take(8).mkString) { formid =>
+                @for(form <- taskPrototype.form) {
+                    <div id="@formid"></div>
+                    <script>
+                        (function() {
+                            const form = @Html(form.toString);
+
+                            @newOrExistingTask match {
+                                case Right(task) => {
+                                    @for(data <- task.data) {
+                                        form.data = @Html(data.toString);
+                                    }
+                                }
+                                case _ => {
+
+                                }
+                            }
+
+                            if (form.options === undefined) {
+                              form.options = {};
+                            }
+
+                            form.options.form = {
+                                attributes: {
+                                    action: "@Html(formUrl())",
+                                    method: "post"
+                                },
+                                buttons: {
+                                    submit: {
+                                        click: function () {
+                                            if (this.isValid(true)) {
+                                                const config = {
+                                                    data: JSON.stringify(this.getValue()),
+                                                    contentType: "application/json"
+                                                };
+                                                this.ajaxSubmit(config).done(function(data) {
+                                                    if (data.requestSlug !== undefined) {
+                                                        // the updateTask call returns a task json
+                                                        window.location = "/request/" + data.requestSlug;
+                                                    }
+                                                    else if (data.slug !== undefined) {
+                                                        // the createRequest call returns a request json
+                                                        window.location = "/request/" + data.slug;
+                                                    }
+                                                    else {
+                                                        window.location.reload();
+                                                    }
+                                                });
+                                            }
+                                            else {
+                                                console.error(this.getValue());
+                                            }
+                                        }
+                                    }
+                                }
+                            };
+
+                            $("#@formid").alpaca(form);
+                        })();
+                    </script>
+                }
+            }
+        </div>
+    }
+    case _ => {
+        <div class="panel-body">
+            <p>@Html(taskPrototype.infoMarkdownToHtml)</p>
+        </div>
+    }
+}

@@ -1,0 +1,83 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@this(mainView: Main, webJarsUtil: org.webjars.play.WebJarsUtil)
+
+@()(implicit request: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: services.GitMetadata.LatestMetadata)
+
+@extraHead() =  {
+    @webJarsUtil.locate("jsoneditor.min.css").css()
+    @webJarsUtil.locate("jsoneditor.min.js").script()
+}
+
+@mainView(Some(userInfo))("Form Test", extraHead()) {
+
+    <form class="form-inline">
+        <div class="form-group">
+            <label for="programSelect">Program</label>
+            <select id="programSelect" class="form-control input-small">
+                <option disabled selected>Select a Program</option>
+                @for(program <- latestMetadata.metadata.programs) {
+                    <option value="@program._1">@program._2.name</option>
+                }
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="formSelect">Form to Test</label>
+            <select id="formSelect" class="form-control input-small" disabled>
+                <option disabled selected>Select a Form</option>
+                @for(program <- latestMetadata.metadata.programs) {
+                    @for(task <- program._2.tasks) {
+                        @for(form <- task._2.form) {
+                            <option value="@task._1" data-program="@program._1" data-json="@JavaScript(form.toString())" hidden>@task._2.label</option>
+                        }
+                    }
+                }
+            </select>
+        </div>
+    </form>
+
+    <div id="jsoneditor" style="height: 600px; margin-top: 20px;"></div>
+
+    <button id="tryit" class="btn btn-default btn-block" style="margin-top: 20px">Try it!</button>
+
+    <div id="form" class="well" style="margin-top: 20px"></div>
+
+
+    <script type="text/javascript">
+        var container = document.getElementById("jsoneditor");
+        var editor = new JSONEditor(container, {"mode": "code"});
+        var form = $("#form");
+        var formSelect = $("#formSelect");
+
+        function render(event) {
+            event.preventDefault();
+            form.empty();
+            try {
+                var json = editor.get();
+                form.alpaca(json);
+            } catch (e) {
+              form.text(e.message);
+            }
+        }
+
+        $("#tryit").click(render);
+
+        $("#programSelect").change(function(e) {
+          const program = e.target.value;
+          formSelect.children("option").attr("hidden", "hidden");
+          formSelect.children("[data-program=\"" + program + "\"]").removeAttr("hidden");
+          formSelect.removeAttr('disabled');
+        });
+
+        $("#formSelect").change(function() {
+          var json = $(this).find(':selected').data('json');
+          editor.set(json);
+        });
+    </script>
+
+}

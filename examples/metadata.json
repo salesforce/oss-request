@@ -1,0 +1,411 @@
+{
+  "default": {
+    "name": "Default Program",
+    "description": "This is the normal open source program - [more info](http://asdf.com)",
+    "groups": {
+      "admin": [
+        "foo@bar.com",
+        "zxcv@zxcv.com"
+      ],
+      "security": [
+        "baz@baz.com"
+      ]
+    },
+    "reports": {
+      "in_foo_org": {
+        "title": "Requests in Foo",
+        "query": {
+          "data": {
+            "github_org": "Foo"
+          }
+        }
+      },
+      "in_foo_or_bar_org": {
+        "title": "Requests in Foo or Bar",
+        "query": {
+          "data-in": {
+            "attribute": "github_org",
+            "values": ["Foo", "Bar"]
+          }
+        }
+      },
+      "in_progress": {
+        "title": "In Progress",
+        "query": {
+          "state": "IN_PROGRESS"
+        }
+      },
+      "completed_with_group_by": {
+        "title": "Completed By Team",
+        "query": {
+          "state": "COMPLETED"
+        },
+        "group_by": {
+          "title": "Team",
+          "service": "http://localhost:9000/_demo_team"
+        }
+      }
+    },
+    "jobs": [
+      {
+        "name": "reopen requests approved over a second ago",
+        "query": {
+          "completed": "< now() - interval '1 second'"
+        },
+        "actions": [
+          {
+            "type": "CREATE_TASK",
+            "key": "ip_review"
+          },
+          {
+            "type": "UPDATE_TASK_STATE",
+            "key": "ip_review",
+            "value": "IN_PROGRESS"
+          },
+          {
+            "type": "UPDATE_REQUEST_STATE",
+            "value": "IN_PROGRESS"
+          }
+        ]
+      }
+    ],
+    "tasks": {
+      "start": {
+        "label": "OSS Request Info",
+        "type": "INPUT",
+        "info": "Please fill in all the info for your OSS request.",
+        "form": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "project_name": {
+                "title": "Project Description",
+                "type": "string",
+                "required": true
+              },
+              "github_org": {
+                "title": "GitHub Org",
+                "type": "string",
+                "enum": [
+                  "Foo",
+                  "Bar",
+                  "Personal"
+                ],
+                "required": true
+              },
+              "patentable": {
+                "type": "boolean",
+                "enum": [true, false]
+              },
+              "info": {
+                "title": "Info",
+                "type": "string"
+              }
+            }
+          },
+          "options": {
+            "fields": {
+              "github_org": {
+                "type": "select",
+                "noneLabel": "-- Select --",
+                "removeDefaultNone": false
+              },
+              "patentable": {
+                "type": "radio",
+                "label": "Is this patentable?",
+                "removeDefaultNone": true,
+                "optionLabels": ["Yes", "No"]
+              },
+              "info": {
+                "type": "textarea"
+              }
+            }
+          }
+        },
+        "task_events": [
+          {
+            "type": "STATE_CHANGE",
+            "value": "COMPLETED",
+            "action": {
+              "type": "CREATE_TASK",
+              "value": "review_request"
+            }
+          },
+          {
+            "type": "STATE_CHANGE",
+            "value": "COMPLETED",
+            "criteria": {
+              "type": "FIELD_VALUE",
+              "value": "github_org==Foo"
+            },
+            "action": {
+              "type": "CREATE_TASK",
+              "value": "create_github_repo"
+            }
+          },
+          {
+            "type": "STATE_CHANGE",
+            "value": "COMPLETED",
+            "criteria": {
+              "type": "FIELD_VALUE",
+              "value": "patentable==true"
+            },
+            "action": {
+              "type": "CREATE_TASK",
+              "value": "ip_approval"
+            }
+          },
+          {
+            "type": "STATE_CHANGE",
+            "value": "COMPLETED",
+            "criteria": {
+              "type": "AND_CRITERIA",
+              "value": [
+                {
+                  "type": "FIELD_VALUE",
+                  "value": "github_org==Personal"
+                },
+                {
+                  "type": "FIELD_VALUE",
+                  "value": "patentable==false"
+                }
+              ]
+            },
+            "action": {
+              "type": "UPDATE_REQUEST_STATE",
+              "value": "COMPLETED",
+              "message": "seek security review if needed"
+            }
+          }
+        ]
+      },
+      "review_request": {
+        "label": "Review Request",
+        "type": "ACTION",
+        "completable_by": {
+          "type": "GROUP",
+          "value": "admin"
+        },
+        "info": "Please review the request and assign tasks [more info](http://asdf.com)"
+      },
+      "ip_approval": {
+        "label": "IP Approval",
+        "type": "APPROVAL",
+        "completable_by": {
+          "type": "EMAIL",
+          "value": "foo@bar.com"
+        },
+        "info": "Schedule a meeting with Foo Bar to start the IP approval process.",
+        "approval_conditions": [
+          "new features must seek new approval"
+        ]
+      },
+      "vp_approval": {
+        "label": "VP Approval",
+        "type": "APPROVAL",
+        "completable_by": {
+          "type": "EMAIL"
+        },
+        "info": "The requester's VP must approve this."
+      },
+      "create_github_repo": {
+        "label": "Create GitHub Repo",
+        "type": "ACTION",
+        "completable_by": {
+          "type": "GROUP",
+          "value": "admin"
+        },
+        "info": "A GitHub repo needs to be created."
+      }
+    }
+  },
+  "two": {
+    "name": "Program Two",
+    "start_tasks": ["oss_request_info", "another_task"],
+    "groups": {
+      "admin": [
+        "foo@bar.com",
+        "asfd@asdf.com"
+      ],
+      "security": [
+        "blah@blah.com"
+      ]
+    },
+    "services": {
+      "repo_creator": "http://localhost:9000/_demo_repo"
+    },
+    "tasks": {
+      "oss_request_info": {
+        "label": "OSS Request Info",
+        "type": "INPUT",
+        "info": "Please fill in all the info for your OSS request.",
+        "form": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "project_description": {
+                "title": "Project Description",
+                "type": "string",
+                "required": true
+              },
+              "a_date": {
+                "title": "A Date",
+                "format": "date"
+              }
+            }
+          }
+        }
+      },
+      "another_task": {
+        "label": "Another Task",
+        "type": "INPUT",
+        "info": "Fill out the form",
+        "form": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "favorite_color": {
+                "title": "What is your favorite color?",
+                "type": "string",
+                "required": true
+              }
+            }
+          }
+        }
+      },
+      "repo_info": {
+        "label": "Repo Info",
+        "type": "INPUT",
+        "info": "Where should we create the repo?",
+        "form": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "org": {
+                "title": "Org Name",
+                "type": "string",
+                "required": true
+              },
+              "name": {
+                "title": "Repo Name",
+                "type": "string",
+                "required": true
+              }
+            }
+          }
+        }
+      },
+      "create_repo": {
+        "label": "Create the repo",
+        "type": "ACTION",
+        "info": "This creates the repo",
+        "dependencies": ["repo_info"],
+        "form": {
+          "foo": "bar"
+        },
+        "completable_by": {
+          "type": "SERVICE",
+          "value": "repo_creator"
+        }
+      }
+    }
+  },
+  "test": {
+    "name": "Test",
+    "groups": {
+      "admin": [
+        "foo@bar.com"
+      ]
+    },
+    "tasks": {
+      "one": {
+        "label": "One",
+        "type": "ACTION",
+        "info": "One",
+        "task_events": [
+          {
+            "type": "STATE_CHANGE",
+            "value": "COMPLETED",
+            "action": {
+              "type": "UPDATE_REQUEST_STATE",
+              "value": "COMPLETED",
+              "message": "seek security review if needed"
+            }
+          }
+        ]
+      },
+      "two": {
+        "label": "Two",
+        "type": "ACTION",
+        "info": "Two",
+        "task_events": [
+          {
+            "type": "STATE_CHANGE",
+            "value": "COMPLETED",
+            "action": {
+              "type": "CREATE_TASK",
+              "value": "one"
+            }
+          }
+        ]
+      },
+      "three": {
+        "label": "Three",
+        "type": "ACTION",
+        "info": "Three",
+        "task_events": [
+          {
+            "type": "STATE_CHANGE",
+            "value": "COMPLETED",
+            "action": {
+              "type": "CREATE_TASK",
+              "value": "five"
+            }
+          }
+        ]
+      },
+      "four": {
+        "label": "Four",
+        "type": "ACTION",
+        "info": "Four",
+        "task_events": [
+          {
+            "type": "STATE_CHANGE",
+            "value": "COMPLETED",
+            "action": {
+              "type": "CREATE_TASK",
+              "value": "five",
+              "overrides": {
+                "completable_by": "email"
+              }
+            }
+          }
+        ]
+      },
+      "five": {
+        "label": "Five",
+        "type": "ACTION",
+        "info": "Five",
+        "completable_by": {
+          "type": "EMAIL"
+        }
+      },
+      "six": {
+        "label": "Six",
+        "type": "ACTION",
+        "info": "Six",
+        "dependencies": ["one"]
+      },
+      "seven": {
+        "label": "Seven",
+        "type": "ACTION",
+        "info": "Seven"
+      },
+      "eight": {
+        "label": "Eight",
+        "type": "ACTION",
+        "info": "Eight"
+      }
+    }
+  }
+}

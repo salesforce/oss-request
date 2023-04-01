@@ -1,0 +1,39 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@import core.Extensions._
+@import services.GitMetadata.LatestMetadata
+
+@this(main: Main)
+
+@(allVersions: Seq[MetadataVersion], requests: Seq[RequestWithTasks])(implicit request: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: LatestMetadata)
+
+@main(Some(userInfo))("Migrate Metadata") {
+
+    <h2>Migrate Metadata</h2>
+
+    @for(requestWithTasks <- requests) {
+        <div class="well">
+            <h3>
+                <a href="@routes.Application.request(requestWithTasks.request.slug)">@requestWithTasks.request.name</a>
+                <span class="badge pull-right" style="margin-top: 5px;">@requestWithTasks.completedTasks.size of @requestWithTasks.tasks.size tasks completed</span>
+            </h3>
+
+            <form action="@routes.Application.metadataMigrate(requestWithTasks.request.slug)" method="post" class="form-inline">
+                @helper.CSRF.formField
+                <select name="version" class="form-control" title="Version">
+                    @for(version <- allVersions) {
+                        <option value="@version.id.map(_.name()).getOrElse("")" @if(version.id == requestWithTasks.request.metadataVersion) { selected }>@version.date.monthDayYear - @version.id.abbreviate</option>
+                    }
+                </select>
+
+                <button type="submit" class="btn btn-default">Migrate Metadata</button>
+            </form>
+        </div>
+    }
+
+}

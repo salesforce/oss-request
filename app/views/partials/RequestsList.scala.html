@@ -1,0 +1,66 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@(requests: Seq[RequestWithTasksAndProgram])
+
+@import core.Extensions._
+
+@stateClass(state: models.State.State, conditions: Seq[_]) = {
+    @state match {
+        case models.State.Denied => {
+            list-group-item-danger
+        }
+        case models.State.Cancelled => {
+            list-group-item
+        }
+        case models.State.Completed if conditions.nonEmpty => {
+            list-group-item-warning
+        }
+        case models.State.Completed if conditions.isEmpty => {
+            list-group-item-success
+        }
+        case _ => {
+            list-group-item
+        }
+    }
+}
+
+@if(requests.nonEmpty) {
+    <div class="list-group">
+    @for(requestWithTasksAndProgram <- requests) {
+
+        @defining(Tasks.conditionalApprovals(requestWithTasksAndProgram.program, requestWithTasksAndProgram.tasks).map(_._2) ++ requestWithTasksAndProgram.request.completionMessage) { conditions =>
+            <a href="@routes.Application.request(requestWithTasksAndProgram.request.slug)" class="list-group-item @stateClass(requestWithTasksAndProgram.request.state, conditions)">
+                <span class="badge" style="margin-top: 25px;">@requestWithTasksAndProgram.completedTasks.size of @requestWithTasksAndProgram.tasks.size tasks completed</span>
+                <h4>@requestWithTasksAndProgram.request.name</h4>
+                <p>
+                    @(requestWithTasksAndProgram.request.state, requestWithTasksAndProgram.request.completedDate) match {
+                        case (State.Completed, Some(completedDate)) if conditions.nonEmpty => {
+                            Conditionally approved on @completedDate.monthDayYear
+                        }
+                        case (State.InProgress, _) => {
+                            Created on @requestWithTasksAndProgram.request.createDate.monthDayYear by @requestWithTasksAndProgram.request.creatorEmail
+                        }
+                        case (_, Some(completedDate)) => {
+                            @requestWithTasksAndProgram.request.stateToHuman.capitalize on @completedDate.monthDayYear
+                        }
+                        case _ => {
+                            @requestWithTasksAndProgram.request.stateToHuman.capitalize
+                        }
+                    }
+
+                    @if(conditions.nonEmpty) {
+                        @conditions.distinct.mkString("(", ", ", ")")
+                    }
+                </p>
+            </a>
+        }
+    }
+    </div>
+} else {
+    No requests!
+}

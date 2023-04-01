@@ -1,0 +1,68 @@
+{
+  "name": "OSS Request",
+  "env": {
+    "APPLICATION_SECRET": {
+      "generator": "secret"
+    },
+    "HOSTNAME": {
+      "description": "The allowed hostname for the Play Framework AllowedHostsFilter",
+      "required": true
+    },
+    "AUTH_PROVIDER": {
+      "description": "Auth Provider: saml or oauth",
+      "required": true
+    },
+    "SAML_ENTITY_ID": {
+      "description": "SAML Entity ID"
+    },
+    "SAML_METADATA_URL": {
+      "description": "SAML Metadata URL"
+    },
+    "OAUTH_PROVIDER": {
+      "description": "OAuth Provider: github or salesforce"
+    },
+    "OAUTH_CLIENT_ID": {
+      "description": "OAuth Client ID"
+    },
+    "OAUTH_CLIENT_SECRET": {
+      "description": "OAuth Client Secret"
+    },
+    "METADATA_GIT_URI": {
+      "description": "URI to the metadata git repo",
+      "required": true
+    },
+    "METADATA_GIT_FILE": {
+      "description": "Metadata file name"
+    },
+    "METADATA_GIT_SSH_KEY": {
+      "description": "SSH Key to the metadata git repo"
+    }
+  },
+  "addons": [
+    "heroku-postgresql"
+  ],
+  "environments": {
+    "test": {
+      "buildpacks": [
+        {
+          "url": "heroku/scala"
+        },
+        {
+          "url": "heroku/nodejs"
+        }
+      ],
+      "scripts": {
+        "test-setup": "npm install -g snyk",
+        "test": ".bin/test.sh"
+      },
+      "env": {
+        "APPLICATION_SECRET": {
+          "generator": "secret"
+        }
+      },
+      "addons":[
+        "heroku-postgresql:standard-0"
+      ]
+    }
+  }
+}

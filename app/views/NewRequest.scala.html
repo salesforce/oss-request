@@ -1,0 +1,112 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@this(mainView: Main)
+
+@(maybeName: Option[String], maybeProgramKey: Option[String], maybeStartTask: Option[String])(implicit request: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: services.GitMetadata.LatestMetadata)
+
+@mainView(Some(userInfo))("New Request") {
+
+    <form id="new-request-form" action="@routes.Application.newRequest(None, None, None)" method="get" class="form-horizontal">
+        <div class="form-group">
+            <label for="name" class="col-sm-2 control-label">Request Name</label>
+            <div class="col-sm-3">
+                <input id="name" name="name" required class="form-control" @for(name <- maybeName) { value="@name" }>
+            </div>
+        </div>
+
+        @maybeProgramKey.fold {
+            @if(latestMetadata.metadata.programs.size == 1) {
+                <input type="hidden" name="program" value="@latestMetadata.metadata.programs.head._1">
+            } else {
+                <div class="form-group">
+                    <label for="program" class="col-sm-2 control-label">Program</label>
+
+                    <div class="col-sm-6">
+                    @for(program <- latestMetadata.metadata.programs) {
+                        <div class="radio">
+                            <label>
+                                <input type="radio" name="program" value="@program._1" @if(program == latestMetadata.metadata.programs.head) { checked } >
+                                <em>@program._2.name</em>
+                                @for(descriptionMarkdown <- program._2.descriptionMarkdown) {
+                                    - @Html(descriptionMarkdown)
+                                }
+                            </label>
+                        </div>
+                    }
+                    </div>
+                </div>
+            }
+        } { programKey =>
+            <input type="hidden" name="program" value="@programKey">
+        }
+
+        @maybeStartTask.fold {
+            <input type="hidden" name="startTask">
+            @for(program <- latestMetadata.metadata.programs) {
+                <div class="start-task" data-program="@program._1" style="display: none">
+                    @if(program._2.startTasks.isEmpty) {
+                        <input type="hidden" class="input" data-program="@program._1" value="start">
+                    } else if(program._2.startTasks.size == 1) {
+                        <input type="hidden" class="input" data-program="@program._1" value="@program._2.startTasks.head">
+                    } else {
+                        <div class="form-group">
+                            <label for="startTask-@program._1" class="col-sm-2 control-label">Start With</label>
+
+                            <div class="col-sm-3">
+                                <select id="startTask-@program._1" data-program="@program._1" class="form-control input" required>
+                                    @for(taskKey <- program._2.startTasks) {
+                                        @for(task <- program._2.tasks.get(taskKey)) {
+                                            <option value="@taskKey">@task.label</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+
+            <script>
+                function programKey() {
+                    const radioVal = $('input[name=program]:checked').val();
+                    const inputVal = $('input[name=program]').val();
+                    if (radioVal !== undefined) {
+                        return radioVal;
+                    }
+                    else {
+                        return inputVal;
+                    }
+                }
+
+                function refreshStartTask() {
+                    $('.start-task').hide();
+                    $('.start-task[data-program=' + programKey() + ']').show();
+
+                    const startTask = $('.input[data-program=' + programKey() + ']').val();
+                    $('input[name=startTask]').val(startTask);
+                }
+
+                $(function () {
+                    refreshStartTask();
+                    $('input[name=program]').change(refreshStartTask);
+                    $('select.input').change(refreshStartTask);
+                });
+            </script>
+
+        } { startTask =>
+            <input type="hidden" name="startTask" value="@startTask">
+        }
+
+        <div class="form-group">
+            <div class="col-sm-offset-2 col-sm-3">
+                <button type="submit" class="btn btn-default">Next</button>
+            </div>
+        </div>
+    </form>
+
+}

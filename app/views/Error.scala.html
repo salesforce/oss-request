@@ -1,0 +1,19 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@this(mainView: Main)
+
+@(message: String)(implicit requestHeader: RequestHeader, userInfo: controllers.UserInfo, latestMetadata: services.GitMetadata.LatestMetadata)
+
+@mainView(Some(userInfo))("Request Not Found") {
+
+    <div class="jumbotron">
+        <h1>Error</h1>
+        <p>@message</p>
+    </div>
+
+}

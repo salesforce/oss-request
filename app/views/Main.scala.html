@@ -1,0 +1,145 @@
+@*
+ * Copyright (c) 2018, Salesforce.com, Inc.
+ * All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * For full license text, see the LICENSE.txt file in the repo root or https://opensource.org/licenses/BSD-3-Clause
+ *@
+
+@import services.GitMetadata.LatestMetadata
+
+@this(webJarsUtil: org.webjars.play.WebJarsUtil)
+
+@(maybeUserInfo: Option[controllers.UserInfo])(title: String, extraHead: Html = play.twirl.api.HtmlFormat.empty)(body: Html)(implicit request: RequestHeader, latestMetadata: LatestMetadata)
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>@title</title>
+        @webJarsUtil.locate("bootstrap", "bootstrap.min.css").css()
+        @webJarsUtil.locate("Eonasdan-bootstrap-datetimepicker", "bootstrap-datetimepicker.min.css").css()
+        @webJarsUtil.locate("x-editable-bootstrap3", "bootstrap-editable.css").css()
+        @webJarsUtil.locate("alpaca", "bootstrap/alpaca.min.css").css()
+
+        @webJarsUtil.locate("jquery", "jquery.min.js").script()
+        @webJarsUtil.locate("bootstrap", "bootstrap.min.js").script()
+        @webJarsUtil.locate("momentjs", "moment.min.js").script()
+        @webJarsUtil.locate("Eonasdan-bootstrap-datetimepicker", "bootstrap-datetimepicker.min.js").script()
+        @webJarsUtil.locate("x-editable-bootstrap3", "bootstrap-editable.js").script()
+        @webJarsUtil.locate("handlebars", "handlebars.min.js").script()
+        @webJarsUtil.locate("alpaca", "bootstrap/alpaca.min.js").script()
+        @webJarsUtil.locate("anchorme.min.js").script()
+
+        @extraHead
+
+        <script src="@routes.Assets.versioned("main.js")"></script>
+        <link rel="stylesheet" type="text/css" href="@routes.Assets.versioned("main.css")"/>
+    </head>
+    <body>
+        <nav class="navbar navbar-inverse navbar-fixed-top">
+            <div class="container">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="/">OSS Request</a>
+                </div>
+
+                @for(userInfo <- maybeUserInfo) {
+                    <ul class="nav navbar-nav">
+                        <li @if(title == "Your Open Tasks") { class="active" }><a href="@routes.Application.openUserTasks()">Your Open Tasks</a></li>
+                        <li class="dropdown @if(title == "OSS Requests") { active }">
+                            <a href="@routes.Application.requests(None)" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Requests <span class="caret"></span></a>
+                            <ul class="dropdown-menu">
+                                @partials.QuerySelector(latestMetadata.metadata)
+                            </ul>
+                        </li>
+                        <li @if(title == "New Request") { class="active" }><a href="@routes.Application.newRequest(None, None, None)">New Request</a></li>
+                    </ul>
+
+                    <div class="navbar-header navbar-right">
+                        <p class="navbar-text">@userInfo.email</p>
+                        <a href="@routes.Application.logout()" class="btn btn-default navbar-btn">Logout</a>
+                    </div>
+                }
+            </div>
+        </nav>
+
+        <div class="container">
+            @body
+
+            <div class="modal fade" id="commentsModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                            <h4 class="modal-title"></h4>
+                        </div>
+                        <div class="modal-body"></div>
+                        <div class="modal-footer">
+                            <form id="newComment" method="post">
+                                @helper.CSRF.formField
+                                <div class="form-group">
+                                    <textarea name="contents" class="form-control" rows="3" placeholder="Your comments..."></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Add Comment</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="confirmModal" tabindex="-1">
+                <div class="modal-dialog modal-sm">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                            <h4 class="modal-title">Are you sure?</h4>
+                        </div>
+                        <div class="modal-footer">
+                            <button id="confirmButton" type="submit" class="btn btn-danger">Do It!</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* todo: this needs a better UI *@
+            <div class="modal fade" id="reassignModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                            <h4 class="modal-title">Reassign Task</h4>
+                        </div>
+                        <div class="modal-body">
+                            <form class="form-horizontal">
+                                <div class="form-group">
+                                    <label for="reassignEmail" class="col-sm-2 control-label">Email</label>
+                                    <div class="col-sm-4">
+                                        <input type="email" class="form-control" id="reassignEmail">
+                                    </div>
+                                    @for(userInfo <- maybeUserInfo) {
+                                        <button onclick="event.preventDefault(); $('#reassignEmail').val('@userInfo.email');" class="btn btn-link">&lt;--- Current User (@userInfo.email)</button>
+                                    }
+                                </div>
+                                <div class="form-group">
+                                    <label class="col-sm-2 control-label">Or</label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="reassignGroup" class="col-sm-2 control-label">Group</label>
+                                    <div class="col-sm-4">
+                                        <select class="form-control" id="reassignGroup">
+                                        </select>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <span id="reassignError"></span>
+                            <button id="reassignButton" type="submit" class="btn btn-warning">Reassign</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>

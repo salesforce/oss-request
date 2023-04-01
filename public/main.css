@@ -1,0 +1,28 @@
+body {
+    margin-top: 60px;
+}
+
+.panel-heading .glyphicon {
+    vertical-align: middle;
+    font-size: 16px;
+}
+
+.panel-title.pull-left {
+    padding-top: 7px;
+}
+
+.panel-footer span .assignment-list {
+    line-height: 32px;
+}
+
+.modal-body .list-group-item {
+    background: white;
+}
+
+.modal-body .list-group-item:nth-child(odd) {
+    background: ghostwhite;
+}
+
+.text-white-space-pre {
+    white-space: pre-line;
+}
